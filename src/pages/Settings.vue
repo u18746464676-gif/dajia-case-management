@@ -8,6 +8,60 @@
     <div class="card">
       <h2 class="text-lg font-bold text-gray-900 mb-6">⚙️ 设置</h2>
 
+      <!-- AI 助手 -->
+      <div class="mb-8">
+        <h3 class="font-medium text-gray-800 mb-3">🤖 AI 智能助手</h3>
+
+        <!-- 智能搜索 -->
+        <div class="mb-6">
+          <label class="label">智能搜索案件</label>
+          <div class="flex gap-2">
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="input-field flex-1 text-sm"
+              placeholder="输入自然语言搜索，如：'所有未处罚的案件'"
+              @keyup.enter="doSmartSearch"
+            />
+            <button @click="doSmartSearch" class="btn-primary text-sm" :disabled="searchLoading">
+              {{ searchLoading ? '分析中...' : '搜索' }}
+            </button>
+          </div>
+          <div v-if="searchResult" class="mt-3 p-4 bg-blue-50 rounded-xl text-sm">
+            <div class="font-semibold text-blue-700 mb-2">搜索结果：</div>
+            <pre class="whitespace-pre-wrap text-blue-600">{{ searchResult }}</pre>
+          </div>
+        </div>
+
+        <!-- AI 文书生 -->
+        <div>
+          <label class="label">生成法律文书</label>
+          <div class="flex gap-2 mb-3">
+            <select v-model="docType" class="input-field flex-1 text-sm">
+              <option value="投诉信">投诉信</option>
+              <option value="答复函">答复函</option>
+              <option value="案件摘要">案件摘要</option>
+            </select>
+            <select v-model="selectedCaseId" class="input-field flex-1 text-sm">
+              <option value="">选择案件...</option>
+              <option v-for="c in store.cases" :key="c.id" :value="c.id">
+                {{ c.shopName }} - {{ c.productName }}
+              </option>
+            </select>
+            <button @click="generateDoc" class="btn-primary text-sm" :disabled="docLoading || !selectedCaseId">
+              {{ docLoading ? '生成中...' : '生成' }}
+            </button>
+          </div>
+          <div v-if="generatedDoc" class="p-4 bg-green-50 rounded-xl">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-semibold text-green-700">生成的文书：</span>
+              <button @click="copyDoc" class="text-xs text-green-600 hover:text-green-800">复制</button>
+            </div>
+            <pre class="whitespace-pre-wrap text-sm text-green-600 max-h-96 overflow-y-auto">{{ generatedDoc }}</pre>
+          </div>
+        </div>
+      </div>
+
       <!-- 阿里云盘授权 -->
       <div class="mb-8">
         <h3 class="font-medium text-gray-800 mb-3">阿里云盘授权</h3>
@@ -79,7 +133,7 @@
 
       <!-- 版本信息 -->
       <div class="border-t pt-4 mt-4 text-xs text-gray-400">
-        打假案件管理系统 v1.0.0 · 数据存储于本地浏览器
+        打假案件管理系统 v1.1.0 · 支持云端同步 · AI 智能助手
       </div>
     </div>
   </div>
@@ -88,13 +142,22 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useCaseStore } from '@/stores/case'
+import { smartSearchCases, generateDocument } from '@/lib/doubao'
 
 const store = useCaseStore()
 
 const showTokenInput = ref(false)
 const manualToken = ref('')
-
 const aliToken = ref(null)
+
+// AI 功能
+const searchQuery = ref('')
+const searchResult = ref('')
+const searchLoading = ref(false)
+const docType = ref('投诉信')
+const selectedCaseId = ref('')
+const generatedDoc = ref('')
+const docLoading = ref(false)
 
 onMounted(() => {
   const saved = localStorage.getItem('ali_token')
@@ -108,21 +171,49 @@ const tokenExpireDate = computed(() => {
   return new Date(aliToken.value.expires_at).toLocaleDateString('zh-CN')
 })
 
+// AI 智能搜索
+async function doSmartSearch() {
+  if (!searchQuery.value.trim()) return
+  searchLoading.value = true
+  searchResult.value = ''
+  try {
+    searchResult.value = await smartSearchCases(store.cases, searchQuery.value)
+  } catch (err) {
+    searchResult.value = '搜索失败：' + err.message
+  }
+  searchLoading.value = false
+}
+
+// AI 生成文书
+async function generateDoc() {
+  if (!selectedCaseId.value) return
+  const caseData = store.getCase(selectedCaseId.value)
+  if (!caseData) return
+
+  docLoading.value = true
+  generatedDoc.value = ''
+  try {
+    generatedDoc.value = await generateDocument(caseData, docType.value)
+  } catch (err) {
+    generatedDoc.value = '生成失败：' + err.message
+  }
+  docLoading.value = false
+}
+
+function copyDoc() {
+  navigator.clipboard.writeText(generatedDoc.value)
+  alert('已复制到剪贴板')
+}
+
 function startAuth() {
-  // 跳转到阿里云盘授权页面
-  const clientId = 'YOUR_CLIENT_ID' // TODO: 填入阿里云盘应用client_id
-  const redirectUri = encodeURIComponent('http://localhost:3000/settings')
-  const authUrl = `https://auth.aliyundrive.com/v2/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&state=aliyun`
-  // 暂时显示手动输入框
   showTokenInput.value = true
 }
 
 function submitManualToken() {
   if (!manualToken.value.trim()) return
-  // 解析token（简化处理，实际应该用code换token）
   const tokenData = {
     refresh_token: manualToken.value.trim(),
-    expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30天
+    expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000,
   }
   localStorage.setItem('ali_token', JSON.stringify(tokenData))
   aliToken.value = tokenData

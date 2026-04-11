@@ -256,10 +256,10 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import Tesseract from 'tesseract.js'
 import { useRoute, useRouter } from 'vue-router'
 import { useCaseStore } from '@/stores/case'
 import dayjs from 'dayjs'
+import { extractFromImage } from '@/lib/doubao'
 
 const store = useCaseStore()
 const route = useRoute()
@@ -432,54 +432,39 @@ async function handleOcrUpload(event) {
   ocrResult.value = null
 
   try {
-    const result = await Tesseract.recognize(file, 'chi_sim+eng', {
-      logger: m => console.log(m)
+    // 将图片转换为 base64
+    const reader = new FileReader()
+    const imageBase64 = await new Promise((resolve, reject) => {
+      reader.onload = (e) => {
+        const base64 = e.target.result.split(',')[1]
+        resolve(base64)
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
     })
 
-    const text = result.data.text
-    const lines = text.split('\n').filter(l => l.trim())
+    // 使用豆包AI提取图片信息
+    const result = await extractFromImage(imageBase64)
 
-    // 提取可能的店铺/主体名称
-    let shopName = ''
-    for (const line of lines) {
-      const trimmed = line.trim()
-      // 跳过太短或太长的行
-      if (trimmed.length >= 4 && trimmed.length <= 30) {
-        shopName = trimmed
-        break
-      }
-    }
-
-    // 提取可能的快递单号（常见的快递单号格式）
-    let trackingNumber = ''
-    const trackingPatterns = [
-      /\d{10,20}/,  // 10-20位数字
-      /[A-Z]\d{9,15}[A-Z]/i,  // 类似顺丰格式
-      /\d{15,18}/,  // 15-18位数字
-    ]
-    for (const line of lines) {
-      for (const pattern of trackingPatterns) {
-        const match = line.match(pattern)
-        if (match) {
-          trackingNumber = match[0]
-          break
-        }
-      }
-      if (trackingNumber) break
+    if (!result) {
+      alert('AI识别失败，请重试或使用传统OCR')
+      return
     }
 
     // 匹配案件
     const matchedCases = store.cases.filter(c => {
+      const shopName = result.shopName || ''
       if (!shopName) return false
       return c.shopName.includes(shopName) || shopName.includes(c.shopName) ||
              c.licenseName.includes(shopName) || shopName.includes(c.licenseName)
     })
 
     ocrResult.value = {
-      shopName,
-      trackingNumber,
+      shopName: result.shopName || '',
+      trackingNumber: result.trackingNumber || '',
       matchedCases,
-      rawText: text
+      rawText: result.raw || JSON.stringify(result, null, 2),
+      aiResult: result
     }
 
   } catch (err) {
