@@ -1,6 +1,7 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
     <!-- 顶部导航 -->
+    <AIChat />
     <header class="bg-white/80 backdrop-blur-md shadow-sm border-b border-slate-200 sticky top-0 z-50">
       <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div class="flex items-center gap-4">
@@ -110,5 +111,6 @@
 
 <script setup>
 import { useCaseStore } from '@/stores/case'
+import AIChat from '@/components/AIChat.vue'
 const store = useCaseStore()
 </script>
