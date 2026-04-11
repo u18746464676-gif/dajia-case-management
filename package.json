@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.103.0",
     "dayjs": "^1.11.10",
     "pinia": "^2.1.0",
     "tesseract.js": "^7.0.0",

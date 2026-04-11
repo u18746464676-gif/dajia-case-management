@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import dayjs from 'dayjs'
+import { supabase } from '@/lib/supabase'
 
 const STORAGE_KEY = 'pdd_case_list_v1'
 
@@ -12,43 +13,13 @@ function uuid() {
   })
 }
 
-// 计算法定时限
-function calcDeadlines(status, acceptanceDate, decisionDate) {
-  const deadlines = []
-  const now = dayjs()
-
-  if (status === 'pending_report') {
-    // 举报后7个工作日应答
-  }
-
-  if (acceptanceDate) {
-    // 受理后90日结案（复杂可延至180日）
-    deadlines.push({
-      name: '立案后结案时限',
-      date: dayjs(acceptanceDate).add(90, 'day').format('YYYY-MM-DD'),
-      type: 'legal',
-      alertDays: 7,
-    })
-  }
-
-  if (status === 'decided' && decisionDate) {
-    if (acceptanceWay === '责令改正') {
-      deadlines.push({
-        name: '责令改正整改期限',
-        date: dayjs(decisionDate).add(15, 'day').format('YYYY-MM-DD'),
-        type: 'legal',
-        alertDays: 3,
-      })
-    }
-  }
-
-  return deadlines
-}
-
 export const useCaseStore = defineStore('case', () => {
-  const cases = ref(loadFromStorage())
+  const cases = ref([])
+  const isLoading = ref(false)
+  const isSynced = ref(false)
 
-  function loadFromStorage() {
+  // 从localStorage加载（首次加载用）
+  function loadFromLocalStorage() {
     try {
       const data = localStorage.getItem(STORAGE_KEY)
       return data ? JSON.parse(data) : []
@@ -57,8 +28,66 @@ export const useCaseStore = defineStore('case', () => {
     }
   }
 
-  function saveToStorage() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cases.value))
+  // 保存到localStorage
+  function saveToLocalStorage(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  }
+
+  // 从Supabase加载
+  async function loadFromSupabase() {
+    isLoading.value = true
+    try {
+      const { data, error } = await supabase
+        .from('cases')
+        .select('data')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        cases.value = data.map(row => row.data)
+      }
+      isSynced.value = true
+    } catch (err) {
+      console.error('加载失败，尝试本地数据:', err)
+      cases.value = loadFromLocalStorage()
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // 保存到Supabase
+  async function saveToSupabase() {
+    try {
+      // 先删除所有旧数据
+      await supabase.from('cases').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+
+      // 批量插入新数据
+      const records = cases.value.map(c => ({
+        id: c.id,
+        data: c
+      }))
+
+      if (records.length > 0) {
+        const { error } = await supabase.from('cases').upsert(records)
+        if (error) throw error
+      }
+    } catch (err) {
+      console.error('保存到云失败:', err)
+    }
+  }
+
+  // 初始化加载
+  async function init() {
+    await loadFromSupabase()
+    // 如果云端没数据，从本地读取
+    if (cases.value.length === 0) {
+      const localData = loadFromLocalStorage()
+      if (localData.length > 0) {
+        cases.value = localData
+        await saveToSupabase()
+      }
+    }
   }
 
   // 统计
@@ -82,7 +111,7 @@ export const useCaseStore = defineStore('case', () => {
   }
 
   // 新增案件
-  function createCase(data) {
+  async function createCase(data) {
     const now = dayjs().toISOString()
     const newCase = {
       id: uuid(),
@@ -109,36 +138,39 @@ export const useCaseStore = defineStore('case', () => {
       notes: '',
     }
     cases.value.unshift(newCase)
-    saveToStorage()
+    saveToLocalStorage(cases.value)
+    await saveToSupabase()
     return newCase
   }
 
   // 更新案件
-  function updateCase(id, data) {
+  async function updateCase(id, data) {
     const idx = cases.value.findIndex(c => c.id === id)
     if (idx === -1) return null
     const now = dayjs().toISOString()
     const old = cases.value[idx]
     const updated = { ...old, ...data, updatedAt: now }
     cases.value[idx] = updated
-    saveToStorage()
+    saveToLocalStorage(cases.value)
+    await saveToSupabase()
     return updated
   }
 
   // 变更状态
-  function changeStatus(id, newStatus, extra = {}) {
+  async function changeStatus(id, newStatus, extra = {}) {
     const idx = cases.value.findIndex(c => c.id === id)
     if (idx === -1) return null
     const now = dayjs().toISOString()
     const old = cases.value[idx]
     old.statusHistory.push({ from: old.status, to: newStatus, changedAt: now })
     cases.value[idx] = { ...old, status: newStatus, updatedAt: now, ...extra }
-    saveToStorage()
+    saveToLocalStorage(cases.value)
+    await saveToSupabase()
     return cases.value[idx]
   }
 
   // 添加答复
-  function addReply(caseId, reply) {
+  async function addReply(caseId, reply) {
     const c = cases.value.find(c => c.id === caseId)
     if (!c) return
     c.replies.unshift({
@@ -148,12 +180,13 @@ export const useCaseStore = defineStore('case', () => {
       attachmentUrls: reply.attachmentUrls || [],
     })
     c.updatedAt = dayjs().toISOString()
-    saveToStorage()
+    saveToLocalStorage(cases.value)
+    await saveToSupabase()
     return c
   }
 
   // 上传文书
-  function addDocument(caseId, doc) {
+  async function addDocument(caseId, doc) {
     const c = cases.value.find(c => c.id === caseId)
     if (!c) return
     c.documents.push({
@@ -164,19 +197,24 @@ export const useCaseStore = defineStore('case', () => {
       uploadedAt: dayjs().toISOString(),
     })
     c.updatedAt = dayjs().toISOString()
-    saveToStorage()
+    saveToLocalStorage(cases.value)
+    await saveToSupabase()
     return c
   }
 
   // 删除案件
-  function deleteCase(id) {
+  async function deleteCase(id) {
     cases.value = cases.value.filter(c => c.id !== id)
-    saveToStorage()
+    saveToLocalStorage(cases.value)
+    await saveToSupabase()
   }
 
   return {
     cases,
     stats,
+    isLoading,
+    isSynced,
+    init,
     getCase,
     createCase,
     updateCase,
