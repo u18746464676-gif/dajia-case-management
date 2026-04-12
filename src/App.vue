@@ -2,13 +2,13 @@
   <div class="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-amber-50">
     <!-- 顶部导航 -->
     <AIChat />
-    <header class="bg-gradient-to-r from-red-800 via-red-700 to-amber-700 shadow-xl">
+    <header class="bg-gradient-to-r from-red-600 via-red-500 to-amber-500 shadow-xl">
       <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center">
         <div class="flex items-center gap-4 text-center">
-          <span class="text-4xl">🏛️</span>
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/State_Emblem_of_the_People%27s_Republic_of_China.svg/800px-State_Emblem_of_the_People%27s_Republic_of_China.svg.png" alt="国徽" class="w-16 h-16 object-contain" />
           <div class="flex flex-col">
             <span class="text-2xl font-bold text-white tracking-wide">打假案件管理系统</span>
-            <span class="text-xs text-white/70 tracking-widest">ANTI-COUNTERFEITING CASE MANAGEMENT</span>
+            <span class="text-xs text-white/80 tracking-widest">ANTI-COUNTERFEITING CASE MANAGEMENT</span>
           </div>
         </div>
       </div>
@@ -21,7 +21,7 @@
           <router-link
             to="/"
             class="flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all duration-200 border-2"
-            :class="!$route.query.status ? 'bg-red-700 text-white border-red-700 shadow-lg' : 'bg-white text-red-700 border-red-200 hover:border-red-400'"
+            :class="!$route.query.status ? 'bg-red-500 text-white border-red-500 shadow-lg' : 'bg-white text-red-600 border-red-200 hover:border-red-400'"
           >
             <span class="font-bold">{{ store.stats.total }}</span>
             <span>全部</span>
@@ -99,7 +99,7 @@
     </main>
 
     <!-- 底部版权 -->
-    <footer class="bg-gradient-to-r from-red-800 via-red-700 to-amber-700 text-white/80 py-4 mt-auto">
+    <footer class="bg-gradient-to-r from-red-600 via-red-500 to-amber-500 text-white/80 py-4 mt-auto">
       <div class="max-w-7xl mx-auto px-6 text-center text-sm">
         打假案件管理系统 · 政务专用版 v1.1
       </div>
