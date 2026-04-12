@@ -2,13 +2,16 @@
   <div class="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-amber-50">
     <!-- 顶部导航 -->
     <AIChat />
-    <header class="bg-gradient-to-r from-red-700 via-red-600 to-amber-600 shadow-xl">
-      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center">
-        <div class="flex items-center gap-4 text-center">
-          <img src="/guohui.png" alt="国徽" class="w-14 h-14 object-contain drop-shadow-lg" />
+    <header class="bg-gradient-to-r from-red-800 via-red-700 to-red-600 shadow-2xl">
+      <div class="max-w-7xl mx-auto px-8 py-5 flex items-center justify-center">
+        <div class="flex items-center gap-6 text-center">
+          <div class="relative">
+            <img src="/guohui.png" alt="国徽" class="w-20 h-20 object-contain" />
+            <div class="absolute inset-0 bg-gradient-to-b from-red-700/20 to-transparent rounded-full"></div>
+          </div>
           <div class="flex flex-col">
-            <span class="text-2xl font-bold text-white tracking-wide">打假案件管理系统</span>
-            <span class="text-xs text-white/80 tracking-widest">ANTI-COUNTERFEITING CASE MANAGEMENT</span>
+            <span class="text-3xl font-bold text-white tracking-wide drop-shadow">打假案件管理系统</span>
+            <span class="text-sm text-white/70 tracking-widest mt-1">ANTI-COUNTERFEITING CASE MANAGEMENT</span>
           </div>
         </div>
       </div>
