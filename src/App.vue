@@ -6,8 +6,8 @@
       <div class="max-w-7xl mx-auto px-8 py-5 flex items-center justify-center">
         <div class="flex items-center gap-6 text-center">
           <div class="relative">
-            <img src="/guohui.png" alt="国徽" class="w-20 h-20 object-contain" />
-            <div class="absolute inset-0 bg-gradient-to-b from-red-700/20 to-transparent rounded-full"></div>
+            <img src="/guohui.png" alt="国徽" class="w-20 h-20 object-contain opacity-90" />
+            <div class="absolute inset-0 bg-gradient-to-b from-red-800/10 to-transparent rounded-full"></div>
           </div>
           <div class="flex flex-col">
             <span class="text-3xl font-bold text-white tracking-wide drop-shadow">打假案件管理系统</span>
