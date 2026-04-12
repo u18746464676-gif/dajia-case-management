@@ -127,10 +127,6 @@
           <div class="text-xs text-red-500 font-medium">当月案件</div>
           <div class="text-2xl font-bold text-red-700">{{ monthlyStats.total }}</div>
         </div>
-        <div class="flex-1 min-w-[150px] bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-3 border border-orange-100">
-          <div class="text-xs text-orange-500 font-medium">当月花费</div>
-          <div class="text-2xl font-bold text-orange-700">¥{{ monthlyStats.expense.toLocaleString() }}</div>
-        </div>
         <div class="flex-1 min-w-[150px] bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border border-green-100">
           <div class="text-xs text-green-500 font-medium">当月盈利</div>
           <div class="text-2xl font-bold text-green-700">¥{{ monthlyStats.profit.toLocaleString() }}</div>

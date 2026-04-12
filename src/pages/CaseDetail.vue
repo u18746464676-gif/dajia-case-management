@@ -185,28 +185,6 @@
       </div>
     </div>
 
-    <!-- 答复记录 -->
-    <div class="card mb-4 border-0 shadow-lg">
-      <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-        <span>💬</span>
-        <span>答复记录</span>
-        <span class="text-xs text-slate-400 font-normal">({{ c.replies.length }})</span>
-      </h3>
-      <div v-if="c.replies.length === 0" class="text-center py-8 text-slate-400">
-        <span class="text-4xl">💬</span>
-        <p class="mt-2">暂无答复记录</p>
-      </div>
-      <div v-else class="space-y-4">
-        <div v-for="r in c.replies" :key="r.id" class="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold text-slate-700 bg-slate-100 px-3 py-1 rounded-full">{{ r.date }}</span>
-            <button @click="deleteReply(r.id)" class="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors">删除</button>
-          </div>
-          <p class="text-sm text-slate-600">{{ r.content }}</p>
-        </div>
-      </div>
-    </div>
-
     <!-- 案件材料 -->
     <div class="card mb-4 border-0 shadow-lg">
       <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -593,7 +571,6 @@ const materialTabs = computed(() => {
   return [
     { label: '全部', value: 'all', count: allMaterials.value.length },
     { label: '信封', value: 'images', count: caseImages.value.length },
-    { label: '答复', value: 'replies', count: c.value?.replies?.length || 0 },
     { label: '文书', value: 'documents', count: c.value?.documents?.length || 0 },
   ]
 })
