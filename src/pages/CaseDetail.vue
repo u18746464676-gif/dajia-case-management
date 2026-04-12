@@ -143,6 +143,48 @@
       </div>
     </div>
 
+    <!-- 财务信息 -->
+    <div class="card mb-4 border-0 shadow-lg">
+      <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+        <span>💵</span>
+        <span>财务信息</span>
+      </h3>
+      <div class="grid grid-cols-3 gap-4">
+        <div>
+          <label class="label">商品价格（元）</label>
+          <input
+            type="number"
+            step="0.01"
+            v-model="c.productPrice"
+            @change="saveField('productPrice', c.productPrice)"
+            class="input-field rounded-lg"
+          />
+        </div>
+        <div>
+          <label class="label">花费总额（元）</label>
+          <input
+            type="number"
+            step="0.01"
+            v-model="c.expense"
+            @change="saveField('expense', c.expense)"
+            class="input-field rounded-lg"
+            placeholder="维权花费总金额"
+          />
+        </div>
+        <div>
+          <label class="label">盈利金额（元）</label>
+          <input
+            type="number"
+            step="0.01"
+            v-model="c.profit"
+            @change="saveField('profit', c.profit)"
+            class="input-field rounded-lg"
+            placeholder="实际获利金额"
+          />
+        </div>
+      </div>
+    </div>
+
     <!-- 答复记录 -->
     <div class="card mb-4 border-0 shadow-lg">
       <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">

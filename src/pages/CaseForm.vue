@@ -45,6 +45,29 @@
           <input v-model="form.signDate" type="date" class="input-field rounded-lg" />
         </div>
 
+        <!-- 花费与盈利 -->
+        <div class="border-t pt-5 mt-5">
+          <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+            <span>💵</span>
+            <span>财务信息</span>
+          </h3>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="label">💰 商品价格（元）</label>
+              <input v-model.number="form.productPrice" type="number" step="0.01" class="input-field rounded-lg" placeholder="0.00" />
+            </div>
+            <div>
+              <label class="label">📤 花费总额（元）</label>
+              <input v-model.number="form.expense" type="number" step="0.01" class="input-field rounded-lg" placeholder="维权花费总金额" />
+            </div>
+            <div>
+              <label class="label">📥 盈利金额（元）</label>
+              <input v-model.number="form.profit" type="number" step="0.01" class="input-field rounded-lg" placeholder="实际获利金额" />
+            </div>
+          </div>
+        </div>
+
         <!-- 行政复议信息 -->
         <div class="border-t pt-5 mt-5">
           <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
@@ -133,6 +156,9 @@ const form = ref({
   licenseName: '',
   jurisdiction: '',
   signDate: '',
+  // 财务
+  expense: '',
+  profit: '',
   // 行政复议
   hasAdminReview: '',
   adminReviewResult: '',
@@ -154,6 +180,9 @@ onMounted(() => {
         licenseName: c.licenseName,
         jurisdiction: c.jurisdiction || '',
         signDate: c.signDate || '',
+        // 财务
+        expense: c.expense || '',
+        profit: c.profit || '',
         // 行政复议
         hasAdminReview: c.hasAdminReview || '',
         adminReviewResult: c.adminReviewResult || '',
