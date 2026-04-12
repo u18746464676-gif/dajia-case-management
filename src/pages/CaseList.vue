@@ -127,6 +127,10 @@
           <div class="text-xs text-red-500 font-medium">当月案件</div>
           <div class="text-2xl font-bold text-red-700">{{ monthlyStats.total }}</div>
         </div>
+        <div class="flex-1 min-w-[150px] bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-3 border border-orange-100">
+          <div class="text-xs text-orange-500 font-medium">当月花费</div>
+          <div class="text-2xl font-bold text-orange-700">¥{{ monthlyStats.expense.toLocaleString() }}</div>
+        </div>
         <div class="flex-1 min-w-[150px] bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border border-green-100">
           <div class="text-xs text-green-500 font-medium">当月盈利</div>
           <div class="text-2xl font-bold text-green-700">¥{{ monthlyStats.profit.toLocaleString() }}</div>
@@ -212,7 +216,6 @@
               <th class="py-3 px-4 text-left font-semibold">店铺名称</th>
               <th class="py-3 px-4 text-left font-semibold">执照名称</th>
               <th class="py-3 px-4 text-center font-semibold">状态</th>
-              <th class="py-3 px-4 text-center font-semibold">寄件日期</th>
               <th class="py-3 px-4 text-center font-semibold">签收日期</th>
               <th class="py-3 px-4 text-center font-semibold w-20">操作</th>
             </tr>
@@ -252,14 +255,6 @@
                   <option value="rejected">不予立案</option>
                   <option value="not_punished">不予处罚</option>
                 </select>
-              </td>
-              <td class="py-3 px-4 text-center" @click.stop>
-                <input
-                  type="date"
-                  :value="c.reportDate"
-                  @change="updateReportDate(c.id, $event.target.value)"
-                  class="input-field w-32 text-xs py-1.5 text-center rounded-lg"
-                />
               </td>
               <td class="py-3 px-4 text-center" @click.stop>
                 <input
