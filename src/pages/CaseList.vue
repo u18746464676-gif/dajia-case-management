@@ -120,34 +120,59 @@
     </div>
 
     <!-- 筛选栏 -->
-    <div class="mb-4 flex flex-wrap gap-3 items-center bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-      <div class="flex items-center gap-2">
+    <div class="mb-4 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+      <!-- 统计卡片 -->
+      <div class="flex flex-wrap gap-4 mb-4">
+        <div class="flex-1 min-w-[150px] bg-gradient-to-r from-red-50 to-amber-50 rounded-xl p-3 border border-red-100">
+          <div class="text-xs text-red-500 font-medium">当月案件</div>
+          <div class="text-2xl font-bold text-red-700">{{ monthlyStats.total }}</div>
+        </div>
+        <div class="flex-1 min-w-[150px] bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-3 border border-orange-100">
+          <div class="text-xs text-orange-500 font-medium">当月花费</div>
+          <div class="text-2xl font-bold text-orange-700">¥{{ monthlyStats.expense.toLocaleString() }}</div>
+        </div>
+        <div class="flex-1 min-w-[150px] bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border border-green-100">
+          <div class="text-xs text-green-500 font-medium">当月盈利</div>
+          <div class="text-2xl font-bold text-green-700">¥{{ monthlyStats.profit.toLocaleString() }}</div>
+        </div>
+      </div>
+
+      <!-- 筛选条件 -->
+      <div class="flex flex-wrap gap-3 items-center">
         <select v-model="filterYear" class="input-field w-28 text-sm rounded-lg">
-          <option value="">全部年份</option>
           <option v-for="y in availableYears" :key="y" :value="y">{{ y }}年</option>
         </select>
         <select v-model="filterMonth" class="input-field w-24 text-sm rounded-lg">
-          <option value="">全部月份</option>
           <option v-for="m in 12" :key="m" :value="String(m).padStart(2,'0')">{{ m }}月</option>
         </select>
+        <select v-model="filterStatus" class="input-field w-28 text-sm rounded-lg">
+          <option value="">全部状态</option>
+          <option value="pending_report">未受理</option>
+          <option value="accepted">已受理</option>
+          <option value="reported">已立案</option>
+          <option value="decided">已调解</option>
+          <option value="closed">已处罚</option>
+          <option value="rejected">不予立案</option>
+          <option value="not_punished">不予处罚</option>
+        </select>
+        <div class="flex-1 max-w-xs">
+          <input
+            v-model="keyword"
+            type="text"
+            placeholder="🔍 搜索店铺/商品/执照..."
+            class="input-field text-sm rounded-lg"
+          />
+        </div>
+        <button
+          v-if="selectedIds.length > 0"
+          @click="showBatchModal = true"
+          class="btn-primary text-sm flex items-center gap-2 shadow-lg shadow-red-600/20"
+        >
+          <span>📅</span>
+          <span>批量设置</span>
+          <span class="bg-white/20 px-2 py-0.5 rounded-full text-xs">{{ selectedIds.length }}</span>
+        </button>
       </div>
-      <div class="flex-1 max-w-xs">
-        <input
-          v-model="keyword"
-          type="text"
-          placeholder="🔍 搜索店铺/商品/执照..."
-          class="input-field text-sm rounded-lg"
-        />
-      </div>
-      <button
-        v-if="selectedIds.length > 0"
-        @click="showBatchModal = true"
-        class="btn-primary text-sm flex items-center gap-2 shadow-lg shadow-blue-600/20"
-      >
-        <span>📅</span>
-        <span>批量设置寄件日期</span>
-        <span class="bg-white/20 px-2 py-0.5 rounded-full text-xs">{{ selectedIds.length }}</span>
-      </button>
     </div>
 
     <!-- 批量设置寄件日期弹窗 -->
@@ -180,13 +205,15 @@
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+            <tr class="bg-gradient-to-r from-red-600 to-amber-500 text-white text-xs uppercase tracking-wider">
               <th class="py-3 px-4 text-center font-semibold w-12">
-                <input type="checkbox" v-model="selectAll" @change="toggleSelectAll" class="w-4 h-4 rounded border-slate-300" />
+                <input type="checkbox" v-model="selectAll" @change="toggleSelectAll" class="w-4 h-4 rounded border-white" />
               </th>
               <th class="py-3 px-4 text-left font-semibold">管辖局</th>
               <th class="py-3 px-4 text-left font-semibold">商品名称</th>
               <th class="py-3 px-4 text-right font-semibold">价格</th>
+              <th class="py-3 px-4 text-right font-semibold">花费</th>
+              <th class="py-3 px-4 text-right font-semibold">盈利</th>
               <th class="py-3 px-4 text-left font-semibold">店铺名称</th>
               <th class="py-3 px-4 text-left font-semibold">执照名称</th>
               <th class="py-3 px-4 text-center font-semibold">状态</th>
@@ -213,6 +240,8 @@
               <td class="py-3 px-4 text-slate-600" @click="$router.push('/case/' + c.id)">{{ c.jurisdiction || '-' }}</td>
               <td class="py-3 px-4 font-medium text-slate-800" @click="$router.push('/case/' + c.id)">{{ c.productName }}</td>
               <td class="py-3 px-4 text-right text-blue-600 font-semibold" @click="$router.push('/case/' + c.id)">¥{{ c.productPrice }}</td>
+              <td class="py-3 px-4 text-right text-orange-600" @click="$router.push('/case/' + c.id)">¥{{ c.expense || 0 }}</td>
+              <td class="py-3 px-4 text-right" :class="c.profit > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'" @click="$router.push('/case/' + c.id)">¥{{ c.profit || 0 }}</td>
               <td class="py-3 px-4 text-slate-600" @click="$router.push('/case/' + c.id)">{{ c.shopName }}</td>
               <td class="py-3 px-4 text-slate-600" @click="$router.push('/case/' + c.id)">{{ c.licenseName }}</td>
               <td class="py-3 px-4 text-center" @click.stop>
@@ -306,8 +335,10 @@ const route = useRoute()
 const router = useRouter()
 const keyword = ref('')
 const filterStatus = ref(route.query.status || '')
-const filterYear = ref('')
-const filterMonth = ref('')
+const currentYear = new Date().getFullYear()
+const currentMonth = new Date().getMonth() + 1
+const filterYear = ref(currentYear)
+const filterMonth = ref(String(currentMonth).padStart(2, '0'))
 const currentPage = ref(1)
 const selectedIds = ref([])
 const selectAll = ref(false)
@@ -356,6 +387,19 @@ const filteredCases = computed(() => {
     )
   }
   return list
+})
+
+// 当月统计
+const monthlyStats = computed(() => {
+  const monthCases = store.cases.filter(c => {
+    const created = dayjs(c.createdAt)
+    return created.year() === filterYear.value && created.month() + 1 === Number(filterMonth.value)
+  })
+  return {
+    total: monthCases.length,
+    expense: monthCases.reduce((sum, c) => sum + (Number(c.expense) || 0), 0),
+    profit: monthCases.reduce((sum, c) => sum + (Number(c.profit) || 0), 0),
+  }
 })
 
 watch([keyword, filterStatus, filterYear, filterMonth], () => {
