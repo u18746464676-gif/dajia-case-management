@@ -134,6 +134,7 @@ export const useCaseStore = defineStore('case', () => {
       decisionDate: null,
       replies: [],
       documents: [],
+      images: [],
       deadlines: [],
       notes: '',
       // 行政复议

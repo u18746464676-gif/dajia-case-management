@@ -207,6 +207,88 @@
       </div>
     </div>
 
+    <!-- 案件材料 -->
+    <div class="card mb-4 border-0 shadow-lg">
+      <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+        <span>📁</span>
+        <span>案件材料</span>
+        <span class="text-xs text-slate-400 font-normal">({{ totalMaterials }})</span>
+      </h3>
+
+      <!-- 材料分类筛选 -->
+      <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+        <button
+          v-for="tab in materialTabs"
+          :key="tab.value"
+          @click="activeMaterialTab = tab.value"
+          class="px-3 py-1.5 text-sm rounded-full whitespace-nowrap transition-colors"
+          :class="activeMaterialTab === tab.value ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+        >
+          {{ tab.label }} ({{ tab.count }})
+        </button>
+      </div>
+
+      <!-- 全部材料 -->
+      <div v-if="activeMaterialTab === 'all'">
+        <div v-if="allMaterials.length === 0" class="text-center py-8 text-slate-400">
+          <span class="text-4xl">📁</span>
+          <p class="mt-2">暂无案件材料</p>
+        </div>
+        <div v-else class="grid grid-cols-2 gap-3">
+          <div
+            v-for="(item, idx) in allMaterials"
+            :key="item.id || idx"
+            class="flex items-center gap-3 p-3 rounded-xl transition-colors"
+            :class="item.type === 'reply' ? 'bg-blue-50 hover:bg-blue-100' : item.type === 'image' ? 'bg-purple-50 hover:bg-purple-100' : 'bg-slate-50 hover:bg-slate-100'"
+          >
+            <span class="text-2xl">{{ getMaterialIcon(item.type) }}</span>
+            <div class="flex-1 min-w-0">
+              <div class="truncate text-slate-700 font-medium text-sm">{{ item.name }}</div>
+              <div class="text-xs text-slate-400">{{ item.date }}</div>
+            </div>
+            <button @click="deleteMaterial(item)" class="text-red-400 hover:text-red-600 text-xl transition-colors">×</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 信封图片 -->
+      <div v-if="activeMaterialTab === 'images'">
+        <div v-if="caseImages.length === 0" class="text-center py-8 text-slate-400">
+          <span class="text-4xl">🖼️</span>
+          <p class="mt-2">暂无上传图片</p>
+        </div>
+        <div v-else class="grid grid-cols-3 gap-3">
+          <div v-for="(img, idx) in caseImages" :key="idx" class="relative group">
+            <img :src="img.url" class="w-full aspect-square object-cover rounded-xl border-2 border-slate-100" />
+            <div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 rounded-b-xl truncate">{{ img.date }}</div>
+            <button @click="deleteImage(idx)" class="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 文书 -->
+      <div v-if="activeMaterialTab === 'documents'">
+        <div v-if="c.documents.length === 0" class="text-center py-8 text-slate-400">
+          <span class="text-4xl">📄</span>
+          <p class="mt-2">暂无上传文书</p>
+        </div>
+        <div v-else class="grid grid-cols-2 gap-3">
+          <div
+            v-for="d in c.documents"
+            :key="d.id"
+            class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"
+          >
+            <span class="text-2xl">{{ d.type === 'pdf' ? '📄' : '🖼️' }}</span>
+            <div class="flex-1 min-w-0">
+              <div class="truncate text-slate-700 font-medium">{{ d.name }}</div>
+              <div class="text-xs text-slate-400">{{ formatDate(d.uploadedAt) }}</div>
+            </div>
+            <button @click="deleteDoc(d.id)" class="text-red-400 hover:text-red-600 text-xl transition-colors">×</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 行政复议 -->
     <div class="card mb-4 border-0 shadow-lg">
       <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -453,6 +535,95 @@ const statusLabels = {
   closed: '已处罚',
   rejected: '不予立案',
   not_punished: '不予处罚',
+}
+
+// 案件材料相关
+const activeMaterialTab = ref('all')
+
+// 全部材料（答复+文书+图片）
+const allMaterials = computed(() => {
+  const materials = []
+  // 添加答复
+  if (c.value?.replies) {
+    c.value.replies.forEach(r => {
+      materials.push({
+        id: r.id,
+        type: 'reply',
+        name: r.content.substring(0, 50) + (r.content.length > 50 ? '...' : ''),
+        date: r.date,
+        data: r
+      })
+    })
+  }
+  // 添加文书
+  if (c.value?.documents) {
+    c.value.documents.forEach(d => {
+      materials.push({
+        id: d.id,
+        type: 'document',
+        name: d.name,
+        date: formatDate(d.uploadedAt),
+        data: d
+      })
+    })
+  }
+  // 添加图片
+  if (c.value?.images) {
+    c.value.images.forEach((img, idx) => {
+      materials.push({
+        id: 'img-' + idx,
+        type: 'image',
+        name: img.name || '信封图片',
+        date: img.date || '',
+        url: img.url,
+        data: img
+      })
+    })
+  }
+  return materials.sort((a, b) => new Date(b.date) - new Date(a.date))
+})
+
+// 仅图片
+const caseImages = computed(() => {
+  return c.value?.images || []
+})
+
+// 材料统计
+const materialTabs = computed(() => {
+  return [
+    { label: '全部', value: 'all', count: allMaterials.value.length },
+    { label: '信封', value: 'images', count: caseImages.value.length },
+    { label: '答复', value: 'replies', count: c.value?.replies?.length || 0 },
+    { label: '文书', value: 'documents', count: c.value?.documents?.length || 0 },
+  ]
+})
+
+const totalMaterials = computed(() => allMaterials.value.length)
+
+function getMaterialIcon(type) {
+  const icons = {
+    reply: '💬',
+    document: '📄',
+    image: '🖼️'
+  }
+  return icons[type] || '📁'
+}
+
+function deleteMaterial(item) {
+  if (item.type === 'reply') {
+    deleteReply(item.id)
+  } else if (item.type === 'document') {
+    deleteDoc(item.id)
+  } else if (item.type === 'image') {
+    const idx = caseImages.value.findIndex(img => img.url === item.url)
+    if (idx !== -1) deleteImage(idx)
+  }
+}
+
+function deleteImage(idx) {
+  const images = [...(c.value.images || [])]
+  images.splice(idx, 1)
+  saveField('images', images)
 }
 
 function statusLabel(s) {
