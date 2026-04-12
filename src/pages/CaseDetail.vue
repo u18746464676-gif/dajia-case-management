@@ -149,7 +149,7 @@
         <span>💵</span>
         <span>财务信息</span>
       </h3>
-      <div class="grid grid-cols-3 gap-4">
+      <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="label">商品价格（元）</label>
           <input
@@ -158,17 +158,6 @@
             v-model="c.productPrice"
             @change="saveField('productPrice', c.productPrice)"
             class="input-field rounded-lg"
-          />
-        </div>
-        <div>
-          <label class="label">花费总额（元）</label>
-          <input
-            type="number"
-            step="0.01"
-            v-model="c.expense"
-            @change="saveField('expense', c.expense)"
-            class="input-field rounded-lg"
-            placeholder="维权花费总金额"
           />
         </div>
         <div>
