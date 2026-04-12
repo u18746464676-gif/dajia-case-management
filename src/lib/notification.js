@@ -94,34 +94,7 @@ export function checkOverdueCases(cases) {
       }
     }
 
-    // 责令改正：整改期15日
-    if (c.acceptanceWay === '责令改正' && c.decisionDate) {
-      const rectDeadline = dayjs(c.decisionDate).add(15, 'day').format('YYYY-MM-DD')
-      const daysLeft = dayjs(rectDeadline).diff(now, 'day')
-      if (daysLeft < 0) {
-        const overdueDays = Math.abs(daysLeft)
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'rectification',
-          message: `责令改正整改期已超过${overdueDays}天`,
-          deadline: rectDeadline,
-          urgency: 'danger'
-        })
-      } else if (daysLeft <= 3) {
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'rectification',
-          message: `责令改正整改期还剩${daysLeft}天`,
-          deadline: rectDeadline,
-          urgency: 'danger'
-        })
-      }
     }
-  }
 
   return overdueList
 }
