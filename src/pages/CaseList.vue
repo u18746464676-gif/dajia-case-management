@@ -36,10 +36,49 @@
       <div v-if="ocrResult" class="p-4 bg-green-50 rounded-xl mb-3">
         <div class="flex items-center justify-between mb-2">
           <span class="text-green-600 font-semibold">✅ OCR识别结果</span>
-          <button @click="ocrResult = null" class="text-green-400 hover:text-green-600">×</button>
+          <button @click="ocrResult = null; logisticsResult = null" class="text-green-400 hover:text-green-600">×</button>
         </div>
         <div class="text-sm text-green-700 mb-2">识别到的主体：<strong>{{ ocrResult.shopName }}</strong></div>
-        <div class="text-sm text-green-700 mb-2">识别到单号：<strong>{{ ocrResult.trackingNumber }}</strong></div>
+        <div class="text-sm text-green-700 mb-2">识别到单号：<strong>{{ ocrResult.trackingNumber }}</strong>
+          <button
+            v-if="ocrResult.trackingNumber && !logisticsResult"
+            @click="queryLogistics(ocrResult.trackingNumber)"
+            :disabled="logisticsLoading"
+            class="ml-3 btn-primary text-xs py-1 px-3"
+          >
+            {{ logisticsLoading ? '查询中...' : '查物流' }}
+          </button>
+        </div>
+
+        <!-- 物流查询结果 -->
+        <div v-if="logisticsResult" class="mt-3 p-3 bg-white rounded-lg">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-semibold text-green-700">物流信息</span>
+            <span :class="logisticsResult.status === '签收' ? 'text-green-600' : 'text-yellow-600'" class="text-sm font-bold">
+              {{ logisticsResult.status }}
+            </span>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div
+              v-for="(item, idx) in logisticsResult.details"
+              :key="idx"
+              class="flex gap-3 p-2 rounded"
+              :class="idx === 0 ? 'bg-green-50' : 'bg-gray-50'"
+            >
+              <div class="text-gray-500 shrink-0">{{ item.time }}</div>
+              <div class="flex-1">{{ item.description }}</div>
+            </div>
+          </div>
+          <div v-if="logisticsResult.status === '签收' && ocrResult.matchedCases.length > 0" class="mt-3">
+            <button
+              @click="applyOcrToCaseWithSign(ocrResult.matchedCases[0].id, logisticsResult.details[0]?.time)"
+              class="btn-primary text-sm w-full"
+            >
+              一键关联并记录签收时间
+            </button>
+          </div>
+        </div>
+
         <div v-if="ocrResult.matchedCases.length > 0" class="mt-3">
           <div class="text-sm text-green-600 mb-2">匹配到的案件：</div>
           <div class="space-y-2">
@@ -260,6 +299,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCaseStore } from '@/stores/case'
 import dayjs from 'dayjs'
 import { extractFromImage } from '@/lib/doubao'
+import { queryExpress } from '@/lib/kuaidi100'
 
 const store = useCaseStore()
 const route = useRoute()
@@ -277,6 +317,8 @@ const uploadedImages = ref([])
 const uploadedFiles = ref([])
 const ocrLoading = ref(false)
 const ocrResult = ref(null)
+const logisticsLoading = ref(false)
+const logisticsResult = ref(null)
 const pageSize = 20
 
 // 监听路由变化，同步筛选状态
@@ -486,6 +528,49 @@ function applyOcrToCase(caseId) {
   store.updateCase(caseId, updates)
 
   ocrResult.value = null
+  logisticsResult.value = null
   alert('已成功关联到案件！')
+}
+
+// 查询物流
+async function queryLogistics(trackingNumber) {
+  if (!trackingNumber) return
+
+  logisticsLoading.value = true
+  logisticsResult.value = null
+
+  try {
+    const result = await queryExpress(trackingNumber)
+    if (result) {
+      logisticsResult.value = result
+    } else {
+      alert('未查询到物流信息，请稍后重试')
+    }
+  } catch (err) {
+    console.error('物流查询失败:', err)
+    alert('物流查询失败')
+  }
+
+  logisticsLoading.value = false
+}
+
+// OCR识别后一键关联并记录签收时间
+function applyOcrToCaseWithSign(caseId, signTime) {
+  if (!ocrResult.value) return
+
+  const updates = {}
+  if (ocrResult.value.trackingNumber) {
+    updates.notes = `[快递单号] ${ocrResult.value.trackingNumber}\n`
+  }
+  // 格式化签收时间
+  if (signTime) {
+    updates.signDate = signTime.split(' ')[0]
+  }
+
+  store.updateCase(caseId, updates)
+
+  ocrResult.value = null
+  logisticsResult.value = null
+  alert('已成功关联到案件并记录签收时间！')
 }
 </script>
