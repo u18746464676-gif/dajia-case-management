@@ -2,29 +2,29 @@
   <!-- 悬浮按钮 -->
   <button
     @click="showChat = true"
-    class="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg shadow-blue-600/30 flex items-center justify-center text-2xl transition-all hover:scale-110 z-40"
+    class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white rounded-full shadow-lg shadow-red-600/40 flex items-center justify-center text-2xl transition-all hover:scale-110 z-40"
   >
     💬
   </button>
 
   <!-- 聊天弹窗 -->
   <div v-if="showChat" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showChat = false">
-    <div class="bg-white rounded-2xl w-[500px] max-w-[90vw] h-[600px] max-h-[80vh] shadow-2xl flex flex-col overflow-hidden">
+    <div class="bg-white rounded-2xl w-[500px] max-w-[90vw] h-[600px] max-h-[80vh] shadow-2xl flex flex-col overflow-hidden border-2 border-red-200">
       <!-- 头部 -->
-      <div class="bg-blue-600 text-white px-4 py-3 flex items-center justify-between">
+      <div class="bg-gradient-to-r from-red-600 to-orange-500 text-white px-4 py-3 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="text-xl">🤖</span>
           <span class="font-semibold">AI 案件助手</span>
         </div>
-        <button @click="showChat = false" class="hover:bg-blue-700 p-1 rounded">×</button>
+        <button @click="showChat = false" class="hover:bg-white/20 p-1 rounded">×</button>
       </div>
 
       <!-- 对话列表 -->
-      <div ref="messagesEl" class="flex-1 overflow-y-auto p-4 space-y-4">
-        <div v-if="messages.length === 0" class="text-center text-slate-400 py-12">
+      <div ref="messagesEl" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-red-50 to-white">
+        <div v-if="messages.length === 0" class="text-center text-red-400 py-12">
           <div class="text-4xl mb-3">👋</div>
-          <p>你好！我是案件管理 AI 助手</p>
-          <p class="text-sm mt-2">可以问我关于案件的问题，或帮我分析、处理案件信息</p>
+          <p class="font-semibold">您好！我是案件管理 AI 助手</p>
+          <p class="text-sm mt-2">可咨询案件问题、分析处理流程、生成文书</p>
         </div>
 
         <div
@@ -36,22 +36,22 @@
           <div
             class="max-w-[80%] px-4 py-2 rounded-2xl text-sm"
             :class="msg.role === 'user'
-              ? 'bg-blue-600 text-white rounded-br-md'
-              : 'bg-slate-100 text-slate-700 rounded-bl-md'"
+              ? 'bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-br-md shadow-lg'
+              : 'bg-white text-red-700 rounded-bl-md border border-red-100 shadow'"
           >
             <pre class="whitespace-pre-wrap font-sans">{{ msg.content }}</pre>
           </div>
         </div>
 
         <div v-if="loading" class="flex justify-start">
-          <div class="bg-slate-100 text-slate-500 px-4 py-2 rounded-2xl rounded-bl-md text-sm">
+          <div class="bg-white text-red-500 px-4 py-2 rounded-2xl rounded-bl-md text-sm border border-red-100 shadow">
             <span class="animate-pulse">思考中...</span>
           </div>
         </div>
       </div>
 
       <!-- 输入框 -->
-      <div class="border-t p-4">
+      <div class="border-t border-red-100 p-4 bg-white">
         <div class="flex gap-2">
           <input
             v-model="inputText"
@@ -69,12 +69,12 @@
             发送
           </button>
         </div>
-        <div class="flex gap-2 mt-2 text-xs text-slate-400">
+        <div class="flex gap-2 mt-2 text-xs text-red-400">
           <button
             v-for="q in quickQuestions"
             :key="q"
             @click="inputText = q"
-            class="bg-slate-100 px-2 py-1 rounded hover:bg-slate-200 transition-colors"
+            class="bg-red-50 px-2 py-1 rounded border border-red-200 hover:bg-red-100 transition-colors"
           >
             {{ q }}
           </button>
