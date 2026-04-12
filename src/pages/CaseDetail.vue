@@ -165,6 +165,89 @@
       </div>
     </div>
 
+    <!-- 行政复议 -->
+    <div class="card mb-4 border-0 shadow-lg">
+      <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+        <span>⚖️</span>
+        <span>行政复议</span>
+        <span v-if="c.hasAdminReview === 'yes'" :class="getReviewBadgeClass(c.adminReviewResult)" class="text-xs px-2 py-0.5 rounded-full">
+          {{ c.adminReviewResult || '处理中' }}
+        </span>
+      </h3>
+
+      <div v-if="!c.hasAdminReview || c.hasAdminReview === 'no'" class="text-center py-8 text-slate-400">
+        <span class="text-4xl">⚖️</span>
+        <p class="mt-2">未申请行政复议</p>
+      </div>
+
+      <div v-else class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="label">复议申请日期</label>
+            <input
+              type="date"
+              :value="c.adminReviewApplyDate"
+              @change="saveField('adminReviewApplyDate', $event.target.value)"
+              class="input-field rounded-lg"
+            />
+          </div>
+          <div>
+            <label class="label">复议机关</label>
+            <input
+              type="text"
+              :value="c.adminReviewAuthority"
+              @change="saveField('adminReviewAuthority', $event.target.value)"
+              class="input-field rounded-lg"
+              placeholder="行政复议机关"
+            />
+          </div>
+          <div>
+            <label class="label">复议受理日期</label>
+            <input
+              type="date"
+              :value="c.adminReviewAcceptDate"
+              @change="saveField('adminReviewAcceptDate', $event.target.value)"
+              class="input-field rounded-lg"
+            />
+          </div>
+          <div>
+            <label class="label">复议决定日期</label>
+            <input
+              type="date"
+              :value="c.adminReviewDecisionDate"
+              @change="saveField('adminReviewDecisionDate', $event.target.value)"
+              class="input-field rounded-lg"
+            />
+          </div>
+        </div>
+        <div>
+          <label class="label">复议结果</label>
+          <select
+            :value="c.adminReviewResult"
+            @change="saveField('adminReviewResult', $event.target.value)"
+            class="input-field rounded-lg"
+          >
+            <option value="">请选择</option>
+            <option value="维持">维持</option>
+            <option value="撤销">撤销</option>
+            <option value="变更">变更</option>
+            <option value="责令限期履行">责令限期履行</option>
+            <option value="终止">终止</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">复议决定书编号</label>
+          <input
+            type="text"
+            :value="c.adminReviewDocNo"
+            @change="saveField('adminReviewDocNo', $event.target.value)"
+            class="input-field rounded-lg"
+            placeholder="例：x复字〔2024〕第xx号"
+          />
+        </div>
+      </div>
+    </div>
+
     <!-- 文书 -->
     <div class="card mb-4 border-0 shadow-lg">
       <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -336,6 +419,17 @@ function statusLabel(s) {
 
 function formatDate(iso) {
   return dayjs(iso).format('YYYY-MM-DD HH:mm')
+}
+
+function getReviewBadgeClass(result) {
+  const map = {
+    '维持': 'bg-green-100 text-green-700',
+    '撤销': 'bg-red-100 text-red-700',
+    '变更': 'bg-orange-100 text-orange-700',
+    '责令限期履行': 'bg-yellow-100 text-yellow-700',
+    '终止': 'bg-gray-100 text-gray-700',
+  }
+  return map[result] || 'bg-blue-100 text-blue-700'
 }
 
 function saveField(field, value) {

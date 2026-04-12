@@ -136,6 +136,14 @@ export const useCaseStore = defineStore('case', () => {
       documents: [],
       deadlines: [],
       notes: '',
+      // 行政复议
+      hasAdminReview: data.hasAdminReview || '',
+      adminReviewResult: data.adminReviewResult || '',
+      adminReviewApplyDate: data.adminReviewApplyDate || '',
+      adminReviewAuthority: data.adminReviewAuthority || '',
+      adminReviewAcceptDate: data.adminReviewAcceptDate || '',
+      adminReviewDecisionDate: data.adminReviewDecisionDate || '',
+      adminReviewDocNo: data.adminReviewDocNo || '',
     }
     cases.value.unshift(newCase)
     saveToLocalStorage(cases.value)
