@@ -211,7 +211,6 @@
               </th>
               <th class="py-3 px-4 text-left font-semibold">管辖局</th>
               <th class="py-3 px-4 text-left font-semibold">商品名称</th>
-              <th class="py-3 px-4 text-right font-semibold">价格</th>
               <th class="py-3 px-4 text-right font-semibold">花费</th>
               <th class="py-3 px-4 text-right font-semibold">盈利</th>
               <th class="py-3 px-4 text-left font-semibold">店铺名称</th>
@@ -239,7 +238,6 @@
               </td>
               <td class="py-3 px-4 text-slate-600" @click="$router.push('/case/' + c.id)">{{ c.jurisdiction || '-' }}</td>
               <td class="py-3 px-4 font-medium text-slate-800" @click="$router.push('/case/' + c.id)">{{ c.productName }}</td>
-              <td class="py-3 px-4 text-right text-blue-600 font-semibold" @click="$router.push('/case/' + c.id)">¥{{ c.productPrice }}</td>
               <td class="py-3 px-4 text-right text-orange-600" @click="$router.push('/case/' + c.id)">¥{{ c.expense || 0 }}</td>
               <td class="py-3 px-4 text-right" :class="c.profit > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'" @click="$router.push('/case/' + c.id)">¥{{ c.profit || 0 }}</td>
               <td class="py-3 px-4 text-slate-600" @click="$router.push('/case/' + c.id)">{{ c.shopName }}</td>
