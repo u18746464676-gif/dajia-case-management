@@ -5,7 +5,9 @@
     <header class="bg-gradient-to-r from-red-600 via-red-500 to-amber-500 shadow-xl">
       <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center">
         <div class="flex items-center gap-4 text-center">
-          <img src="/guohui.jpg" alt="国徽" class="w-16 h-16 object-contain rounded-lg shadow-md" />
+          <div class="w-16 h-16 relative">
+            <img src="/guohui.jpg" alt="国徽" class="w-full h-full object-contain" style="mix-blend-mode: multiply;" />
+          </div>
           <div class="flex flex-col">
             <span class="text-2xl font-bold text-white tracking-wide">打假案件管理系统</span>
             <span class="text-xs text-white/80 tracking-widest">ANTI-COUNTERFEITING CASE MANAGEMENT</span>
