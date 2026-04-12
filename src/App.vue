@@ -5,7 +5,23 @@
     <header class="bg-gradient-to-r from-red-600 via-red-500 to-amber-500 shadow-xl">
       <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center">
         <div class="flex items-center gap-4 text-center">
-          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/State_Emblem_of_the_People%27s_Republic_of_China.svg/800px-State_Emblem_of_the_People%27s_Republic_of_China.svg.png" alt="国徽" class="w-16 h-16 object-contain" />
+          <svg class="w-14 h-14" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- 天安门 -->
+            <rect x="20" y="45" width="60" height="35" fill="#de2910"/>
+            <rect x="25" y="35" width="50" height="12" fill="#de2910"/>
+            <!-- 门洞 -->
+            <rect x="35" y="55" width="8" height="25" fill="#ffde00"/>
+            <rect x="50" y="55" width="8" height="25" fill="#ffde00"/>
+            <rect x="65" y="55" width="8" height="25" fill="#ffde00"/>
+            <!-- 顶部五星 -->
+            <polygon points="50,20 53,30 63,30 55,36 58,46 50,40 42,46 45,36 37,30 47,30" fill="#ffde00"/>
+            <!-- 齿轮 -->
+            <circle cx="18" cy="65" r="8" fill="none" stroke="#ffde00" stroke-width="2"/>
+            <circle cx="82" cy="65" r="8" fill="none" stroke="#ffde00" stroke-width="2"/>
+            <!-- 麦穗 -->
+            <path d="M10 75 Q15 60 12 50" stroke="#ffde00" stroke-width="2" fill="none"/>
+            <path d="M90 75 Q85 60 88 50" stroke="#ffde00" stroke-width="2" fill="none"/>
+          </svg>
           <div class="flex flex-col">
             <span class="text-2xl font-bold text-white tracking-wide">打假案件管理系统</span>
             <span class="text-xs text-white/80 tracking-widest">ANTI-COUNTERFEITING CASE MANAGEMENT</span>
