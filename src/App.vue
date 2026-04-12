@@ -3,10 +3,10 @@
     <!-- 顶部导航 -->
     <AIChat />
     <header class="bg-gradient-to-r from-red-800 via-red-700 to-red-600 shadow-2xl">
-      <div class="max-w-7xl mx-auto px-8 py-5 flex items-center justify-center">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center">
         <div class="flex items-center gap-6 text-center">
           <div class="relative">
-            <img src="/guohui.png" alt="国徽" class="w-20 h-20 object-contain opacity-90" />
+            <img src="/guohui.png" alt="国徽" class="w-16 h-16 object-contain opacity-90" />
             <div class="absolute inset-0 bg-gradient-to-b from-red-800/10 to-transparent rounded-full"></div>
           </div>
           <div class="flex flex-col">
