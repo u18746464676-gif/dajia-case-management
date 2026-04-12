@@ -1,0 +1,191 @@
+// 逾期提醒服务
+import dayjs from 'dayjs'
+
+// 计算工作日天数
+function workingDaysDiff(startDate, endDate) {
+  let count = 0
+  let current = dayjs(startDate)
+  const end = dayjs(endDate)
+  while (current.isBefore(end) || current.isSame(end, 'day')) {
+    const dayOfWeek = current.day()
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      count++
+    }
+    current = current.add(1, 'day')
+  }
+  return count - 1
+}
+
+// 检查案件是否超期
+export function checkOverdueCases(cases) {
+  const now = dayjs()
+  const overdueList = []
+
+  for (const c of cases) {
+    // 未受理案件：签收日期超过7个工作日
+    if (c.status === 'pending_report' && c.signDate) {
+      const deadline = dayjs(c.signDate).add(7, 'day').format('YYYY-MM-DD')
+      const workingDaysLeft = workingDaysDiff(now, deadline)
+      if (workingDaysLeft < 0) {
+        const overdueDays = Math.abs(workingDaysLeft)
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'acceptance',
+          message: `签收已超过${overdueDays}个工作日未受理`,
+          deadline: deadline,
+          urgency: overdueDays > 3 ? 'danger' : 'warning'
+        })
+      }
+    }
+
+    // 已受理案件：调解期限60日
+    if ((c.status === 'accepted' || c.status === 'reported' || c.status === 'decided') && c.acceptanceDate) {
+      const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
+      const daysLeft = dayjs(mediationDeadline).diff(now, 'day')
+      if (daysLeft < 0) {
+        const overdueDays = Math.abs(daysLeft)
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'mediation',
+          message: `调解期限已超过${overdueDays}天`,
+          deadline: mediationDeadline,
+          urgency: 'danger'
+        })
+      } else if (daysLeft <= 7) {
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'mediation',
+          message: `调解期限还剩${daysLeft}天`,
+          deadline: mediationDeadline,
+          urgency: 'warning'
+        })
+      }
+
+      // 案件办结期限120日
+      const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
+      const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
+      if (completionDaysLeft < 0) {
+        const overdueDays = Math.abs(completionDaysLeft)
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'completion',
+          message: `案件办结期限已超过${overdueDays}天`,
+          deadline: completionDeadline,
+          urgency: 'danger'
+        })
+      } else if (completionDaysLeft <= 15) {
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'completion',
+          message: `案件办结期限还剩${completionDaysLeft}天`,
+          deadline: completionDeadline,
+          urgency: completionDaysLeft <= 7 ? 'danger' : 'warning'
+        })
+      }
+    }
+
+    // 责令改正：整改期15日
+    if (c.acceptanceWay === '责令改正' && c.decisionDate) {
+      const rectDeadline = dayjs(c.decisionDate).add(15, 'day').format('YYYY-MM-DD')
+      const daysLeft = dayjs(rectDeadline).diff(now, 'day')
+      if (daysLeft < 0) {
+        const overdueDays = Math.abs(daysLeft)
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'rectification',
+          message: `责令改正整改期已超过${overdueDays}天`,
+          deadline: rectDeadline,
+          urgency: 'danger'
+        })
+      } else if (daysLeft <= 3) {
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'rectification',
+          message: `责令改正整改期还剩${daysLeft}天`,
+          deadline: rectDeadline,
+          urgency: 'danger'
+        })
+      }
+    }
+  }
+
+  return overdueList
+}
+
+// 发送浏览器通知
+export async function sendBrowserNotification(title, body, icon = '/guohui.png') {
+  if (!('Notification' in window)) {
+    console.log('浏览器不支持通知')
+    return false
+  }
+
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body, icon })
+    return true
+  }
+
+  if (Notification.permission !== 'denied') {
+    const permission = await Notification.requestPermission()
+    if (permission === 'granted') {
+      new Notification(title, { body, icon })
+      return true
+    }
+  }
+
+  return false
+}
+
+// 提醒服务类
+export class ReminderService {
+  constructor(onUpdate) {
+    this.onUpdate = onUpdate
+    this.lastNotifyTime = null
+  }
+
+  // 检查并提醒
+  async checkAndNotify(cases) {
+    const overdueList = checkOverdueCases(cases)
+
+    // 触发更新回调
+    if (this.onUpdate) {
+      this.onUpdate(overdueList)
+    }
+
+    // 发送浏览器通知（每5分钟最多一次）
+    const now = Date.now()
+    if (overdueList.length > 0 && (!this.lastNotifyTime || now - this.lastNotifyTime > 5 * 60 * 1000)) {
+      const dangerCount = overdueList.filter(o => o.urgency === 'danger').length
+      const title = dangerCount > 0 ? `⚠️ ${dangerCount}个案件超期！` : `⏰ ${overdueList.length}个案件临近期限`
+      const body = overdueList.slice(0, 3).map(o => o.message).join('\n')
+      await sendBrowserNotification(title, body)
+      this.lastNotifyTime = now
+    }
+
+    return overdueList
+  }
+
+  // 启动定时检查
+  start(cases, intervalMs = 60000) {
+    // 立即检查一次
+    this.checkAndNotify(cases)
+
+    // 定时检查
+    return setInterval(() => {
+      this.checkAndNotify(cases)
+    }, intervalMs)
+  }
+}

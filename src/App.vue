@@ -3,7 +3,62 @@
     <!-- 顶部导航 -->
     <AIChat />
     <header class="bg-gradient-to-r from-red-800 via-red-700 to-red-600 shadow-2xl">
-      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center relative">
+        <!-- 提醒铃铛 -->
+        <button
+          @click="showNotifications = !showNotifications"
+          class="absolute right-6 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-white/20 transition-colors"
+        >
+          <span class="text-2xl">🔔</span>
+          <span
+            v-if="overdueList.length > 0"
+            class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold"
+          >
+            {{ overdueList.length > 9 ? '9+' : overdueList.length }}
+          </span>
+        </button>
+
+        <!-- 提醒列表弹窗 -->
+        <div
+          v-if="showNotifications"
+          class="absolute right-6 top-full mt-2 w-80 bg-white rounded-xl shadow-2xl border border-red-100 z-50 overflow-hidden"
+        >
+          <div class="bg-gradient-to-r from-red-600 to-amber-500 text-white px-4 py-2 font-semibold flex items-center justify-between">
+            <span>⚠️ 逾期提醒</span>
+            <button @click="showNotifications = false" class="hover:bg-white/20 p-1 rounded">×</button>
+          </div>
+          <div class="max-h-80 overflow-y-auto">
+            <div v-if="overdueList.length === 0" class="p-6 text-center text-gray-400">
+              <span class="text-4xl">✅</span>
+              <p class="mt-2">暂无逾期案件</p>
+            </div>
+            <div
+              v-for="item in overdueList"
+              :key="item.id + item.type"
+              class="p-3 border-b border-red-50 hover:bg-red-50 transition-colors"
+              :class="item.urgency === 'danger' ? 'bg-red-50' : 'bg-yellow-50'"
+            >
+              <div class="flex items-start gap-2">
+                <span class="text-lg">{{ item.urgency === 'danger' ? '🔴' : '🟡' }}</span>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-gray-800 truncate">{{ item.shopName }}</div>
+                  <div class="text-xs text-gray-500">{{ item.productName }}</div>
+                  <div class="text-sm mt-1" :class="item.urgency === 'danger' ? 'text-red-600' : 'text-yellow-600'">
+                    {{ item.message }}
+                  </div>
+                </div>
+                <router-link
+                  :to="'/case/' + item.id"
+                  @click="showNotifications = false"
+                  class="text-xs text-red-600 hover:text-red-800 whitespace-nowrap"
+                >
+                  查看 →
+                </router-link>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="flex items-center gap-6 text-center">
           <div class="relative">
             <img src="/guohui.png" alt="国徽" class="w-16 h-16 object-contain opacity-90" />
@@ -104,14 +159,42 @@
     <!-- 底部版权 -->
     <footer class="bg-gradient-to-r from-red-700 via-red-600 to-amber-600 text-white/80 py-4 mt-auto">
       <div class="max-w-7xl mx-auto px-6 text-center text-sm">
-        打假案件管理系统 · 政务专用版 v1.1
+        打假案件管理系统 · 政务专用版 v1.2
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useCaseStore } from '@/stores/case'
+import { ReminderService } from '@/lib/notification'
 import AIChat from '@/components/AIChat.vue'
+
 const store = useCaseStore()
+const showNotifications = ref(false)
+const overdueList = ref([])
+
+// 初始化提醒服务
+let reminderService = null
+
+onMounted(() => {
+  reminderService = new ReminderService((list) => {
+    overdueList.value = list
+  })
+
+  // 启动定时检查（每分钟检查一次）
+  reminderService.start(store.cases, 60000)
+
+  // 请求通知权限
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission()
+  }
+})
+
+onUnmounted(() => {
+  if (reminderService?.interval) {
+    clearInterval(reminderService.interval)
+  }
+})
 </script>
