@@ -5,13 +5,8 @@
       <div class="flex items-center gap-3 mb-3">
         <label class="btn-primary text-sm cursor-pointer flex items-center gap-2 shadow-lg shadow-blue-600/20">
           <span>📷</span>
-          <span>拍照上传</span>
-          <input type="file" accept="image/*" capture="environment" @change="handleImageUpload" class="hidden" />
-        </label>
-        <label class="btn-secondary text-sm cursor-pointer flex items-center gap-2">
-          <span>🖼️</span>
-          <span>相册选择</span>
-          <input type="file" accept="image/*" multiple @change="handleImageUpload" class="hidden" />
+          <span>扫码上传</span>
+          <input type="file" accept="image/*" capture="environment" @change="handleScanUpload" class="hidden" />
         </label>
         <label class="btn-secondary text-sm cursor-pointer flex items-center gap-2">
           <span>📄</span>
@@ -19,12 +14,33 @@
           <input type="file" accept=".doc,.docx,.pdf,.txt" multiple @change="handleFileUpload" class="hidden" />
         </label>
         <label class="btn-secondary text-sm cursor-pointer flex items-center gap-2">
-          <span>🔍</span>
-          <span>OCR识别</span>
-          <input type="file" accept="image/*" @change="handleOcrUpload" class="hidden" />
+          <span>📊</span>
+          <span>导入Excel</span>
+          <input type="file" accept=".xlsx,.xls" @change="importExcel" class="hidden" />
         </label>
-        <span class="text-sm text-slate-400 ml-2">图片 {{ uploadedImages.length }} | 文件 {{ uploadedFiles.length }}</span>
+        <button @click="showCloudFiles = true" class="btn-secondary text-sm flex items-center gap-2">
+          <span>☁️</span>
+          <span>云端文件</span>
+          <span v-if="totalCloudFiles > 0" class="bg-blue-500 text-white text-xs px-1.5 rounded-full">{{ totalCloudFiles }}</span>
+        </button>
       </div>
+
+      <!-- 上传加载中 -->
+      <div v-if="uploadLoading" class="flex items-center gap-3 p-4 bg-blue-50 rounded-xl mb-3">
+        <div class="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+        <span class="text-blue-600">{{ processingStatus }}</span>
+      </div>
+
+      <!-- 上传结果 -->
+      <div v-if="uploadResult" class="p-4 rounded-xl mb-3" :class="uploadResult.success ? 'bg-green-50' : 'bg-orange-50'">
+        <div class="flex items-center justify-between">
+          <span :class="uploadResult.success ? 'text-green-600' : 'text-orange-600'">
+            {{ uploadResult.message }}
+          </span>
+          <button @click="uploadResult = null" class="text-gray-400 hover:text-gray-600">×</button>
+        </div>
+      </div>
+    </div>
 
       <!-- OCR加载中 -->
       <div v-if="ocrLoading" class="flex items-center gap-3 p-4 bg-blue-50 rounded-xl mb-3">
@@ -117,7 +133,6 @@
           >×</button>
         </div>
       </div>
-    </div>
 
     <!-- 筛选栏 -->
     <div class="mb-4 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
@@ -190,6 +205,103 @@
       </div>
     </div>
 
+    <!-- 云端文件管理弹窗 -->
+    <div v-if="showCloudFiles" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showCloudFiles = false">
+      <div class="bg-white rounded-2xl p-6 w-[900px] max-h-[85vh] shadow-2xl overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-lg text-slate-800">☁️ 云端文件管理</h3>
+          <button @click="showCloudFiles = false" class="text-slate-400 hover:text-slate-600 text-2xl">×</button>
+        </div>
+
+        <div v-if="cloudFilesLoading" class="flex items-center justify-center py-8">
+          <div class="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+          <span class="ml-3 text-slate-500">加载中...</span>
+        </div>
+
+        <div v-else-if="allCloudFiles.length === 0" class="text-center py-8 text-slate-400">
+          <span class="text-4xl">☁️</span>
+          <p class="mt-2">暂无云端文件</p>
+        </div>
+
+        <div v-else class="flex-1 overflow-y-auto">
+          <div class="mb-4 flex items-center justify-between">
+            <div class="text-sm text-slate-500">
+              共 {{ allCloudFiles.length }} 个文件
+              <span class="ml-2 text-orange-500">（未关联: {{ allCloudFiles.length - assignedCount }}）</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <button
+                v-if="selectedCloudFiles.length > 0"
+                @click="batchDeleteCloudFiles"
+                class="btn-danger text-sm"
+              >
+                🗑️ 批量删除 ({{ selectedCloudFiles.length }})
+              </button>
+            </div>
+          </div>
+
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 sticky top-0">
+              <tr>
+                <th class="py-2 px-3 text-left w-10">
+                  <input type="checkbox" v-model="selectAllCloudFiles" @change="toggleSelectAllCloudFiles" class="w-4 h-4 rounded" />
+                </th>
+                <th class="py-2 px-3 text-left">预览</th>
+                <th class="py-2 px-3 text-left">文件名</th>
+                <th class="py-2 px-3 text-left">上传时间</th>
+                <th class="py-2 px-3 text-left">关联案件</th>
+                <th class="py-2 px-3 text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+              <tr v-for="file in allCloudFiles" :key="file.Key || file.url" class="hover:bg-slate-50">
+                <td class="py-2 px-3">
+                  <input
+                    type="checkbox"
+                    :checked="selectedCloudFiles.includes(file)"
+                    @change="toggleSelectCloudFile(file)"
+                    class="w-4 h-4 rounded"
+                  />
+                </td>
+                <td class="py-2 px-3">
+                  <img
+                    v-if="isImageFile(file)"
+                    :src="getCloudFileUrl(file.Key) || file.url"
+                    class="w-12 h-12 object-cover rounded cursor-pointer hover:ring-2 hover:ring-blue-400"
+                    @click="previewImage(getCloudFileUrl(file.Key) || file.url)"
+                  />
+                  <span v-else class="text-2xl">📄</span>
+                </td>
+                <td class="py-2 px-3 truncate max-w-xs">{{ getFileName(file) }}</td>
+                <td class="py-2 px-3">{{ file.LastModified ? new Date(file.LastModified).toLocaleString('zh-CN') : (file.uploadedAt ? new Date(file.uploadedAt).toLocaleString('zh-CN') : '-') }}</td>
+                <td class="py-2 px-3">
+                  <select
+                    :value="getFileCaseId(file)"
+                    @change="assignFileToCase(file, $event.target.value)"
+                    class="input-field text-xs py-1 w-40"
+                  >
+                    <option value="">未关联</option>
+                    <option v-for="c in store.cases" :key="c.id" :value="c.id">
+                      {{ c.shopName }}
+                    </option>
+                  </select>
+                </td>
+                <td class="py-2 px-3 text-center">
+                  <button @click="deleteCloudFile(file)" class="text-red-500 hover:text-red-700">删除</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片预览弹窗 -->
+    <div v-if="showImagePreview" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50" @click="showImagePreview = false">
+      <button @click="showImagePreview = false" class="absolute top-4 right-4 text-white text-3xl hover:text-gray-300">×</button>
+      <img :src="previewImageUrl" class="max-w-[90vw] max-h-[90vh] object-contain" @click.stop />
+    </div>
+
     <!-- 空状态 -->
     <div v-if="filteredCases.length === 0" class="text-center py-32 bg-white rounded-2xl shadow-sm border border-slate-100">
       <div class="text-8xl mb-6">📂</div>
@@ -235,12 +347,12 @@
                   class="w-4 h-4 rounded border-slate-300"
                 />
               </td>
-              <td class="py-3 px-4 text-slate-600" @click="$router.push('/case/' + c.id)">{{ c.jurisdiction || '-' }}</td>
-              <td class="py-3 px-4 font-medium text-slate-800" @click="$router.push('/case/' + c.id)">{{ c.productName }}</td>
-              <td class="py-3 px-4 text-right text-orange-600" @click="$router.push('/case/' + c.id)">¥{{ c.expense || 0 }}</td>
-              <td class="py-3 px-4 text-right" :class="c.profit > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'" @click="$router.push('/case/' + c.id)">¥{{ c.profit || 0 }}</td>
-              <td class="py-3 px-4 text-slate-600" @click="$router.push('/case/' + c.id)">{{ c.shopName }}</td>
-              <td class="py-3 px-4 text-slate-600" @click="$router.push('/case/' + c.id)">{{ c.licenseName }}</td>
+              <td class="py-3 px-4 text-slate-600">{{ c.jurisdiction || '-' }}</td>
+              <td class="py-3 px-4 font-medium text-slate-800">{{ c.productName }}</td>
+              <td class="py-3 px-4 text-right text-orange-600">¥{{ c.expense || 0 }}</td>
+              <td class="py-3 px-4 text-right" :class="c.profit > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'">¥{{ c.profit || 0 }}</td>
+              <td class="py-3 px-4 text-slate-600">{{ c.shopName }}</td>
+              <td class="py-3 px-4 text-slate-600">{{ c.licenseName }}</td>
               <td class="py-3 px-4 text-center" @click.stop>
                 <select
                   :value="c.status"
@@ -606,4 +718,347 @@ function applyOcrToCaseWithSign(caseId, signTime) {
   logisticsResult.value = null
   alert('已成功关联到案件并记录签收时间！')
 }
+
+// 扫码上传 - 扫描后立即AI识别并上传
+async function handleScanUpload(event) {
+  const file = event.target.files[0]
+  if (!file) return
+
+  uploadLoading.value = true
+  processingStatus.value = '识别中...'
+
+  try {
+    // 转换为base64
+    const imageBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = e => resolve(e.target.result)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+    // 先上传到云端
+    processingStatus.value = '上传中...'
+    const base64Data = imageBase64.split(',')[1]
+    const url = await uploadBase64ToTos(imageBase64, 'scan_' + Date.now() + '.jpg')
+
+    if (!url) {
+      uploadResult.value = { success: false, message: '上传失败，请重试' }
+      uploadLoading.value = false
+      return
+    }
+
+    // 保存到未关联列表
+    const unassignedImages = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
+    unassignedImages.unshift({
+      url,
+      name: '扫描_' + dayjs().format('YYYY-MM-DD HH:mm'),
+      date: dayjs().format('YYYY-MM-DD'),
+      uploadedAt: dayjs().toISOString()
+    })
+    localStorage.setItem('unassigned_images', JSON.stringify(unassignedImages))
+    totalCloudFiles.value++
+
+    // AI识别图片内容
+    processingStatus.value = 'AI匹配中...'
+    const ocrResult = await extractFromImage(base64Data)
+
+    // 尝试匹配案件
+    let matched = false
+    let matchedCaseName = ''
+
+    if (ocrResult && ocrResult.shopName && store.cases.length > 0) {
+      const matchedCase = store.cases.find(c =>
+        (c.shopName && c.shopName.includes(ocrResult.shopName)) ||
+        (ocrResult.shopName && c.shopName && ocrResult.shopName.includes(c.shopName)) ||
+        (c.licenseName && c.licenseName.includes(ocrResult.shopName)) ||
+        (ocrResult.shopName && c.licenseName && ocrResult.shopName.includes(c.licenseName))
+      )
+
+      if (matchedCase) {
+        const images = matchedCase.images || []
+        images.push({
+          url,
+          name: '扫描_' + dayjs().format('YYYY-MM-DD'),
+          date: dayjs().format('YYYY-MM-DD')
+        })
+        store.updateCase(matchedCase.id, { images })
+        matched = true
+        matchedCaseName = matchedCase.shopName
+      }
+    }
+
+    // 显示结果
+    if (matched) {
+      uploadResult.value = {
+        success: true,
+        message: `✅ 上传成功！已识别并匹配到：「${matchedCaseName}」`
+      }
+    } else {
+      uploadResult.value = {
+        success: false,
+        message: '⚠️ 上传成功，但未识别到匹配的案件，请在云端文件手动分配'
+      }
+    }
+
+  } catch (err) {
+    console.error('Scan upload failed:', err)
+    uploadResult.value = { success: false, message: '处理失败：' + err.message }
+  }
+
+  uploadLoading.value = false
+  event.target.value = ''
+}
+
+// 云端文件管理
+const showCloudFiles = ref(false)
+const allCloudFiles = ref([])
+const cloudFilesLoading = ref(false)
+const showImagePreview = ref(false)
+const previewImageUrl = ref('')
+const totalCloudFiles = ref(0)
+const uploadLoading = ref(false)
+const processingStatus = ref('')
+const uploadResult = ref(null)
+const selectedCloudFiles = ref([])
+const selectAllCloudFiles = ref(false)
+
+async function loadCloudFiles() {
+  cloudFilesLoading.value = true
+  try {
+    const client = new TosClient({
+      accessKeyId: import.meta.env.VITE_TOS_ACCESS_KEY_ID,
+      accessKeySecret: import.meta.env.VITE_TOS_SECRET_ACCESS_KEY,
+      region: import.meta.env.VITE_TOS_REGION,
+      endpoint: import.meta.env.VITE_TOS_ENDPOINT,
+    })
+    const result = await client.listObjects({
+      bucket: import.meta.env.VITE_TOS_BUCKET,
+      prefix: 'case-images/',
+    })
+    const tosFiles = result?.data?.contents || []
+
+    // 合并未关联的本地图片
+    const localUnassigned = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
+
+    // 合并并去重（根据URL）
+    const allFiles = [...localUnassigned]
+    tosFiles.forEach(f => {
+      const url = getCloudFileUrl(f.Key)
+      if (!allFiles.some(x => x.url === url)) {
+        allFiles.push({ ...f, url })
+      }
+    })
+
+    allCloudFiles.value = allFiles
+    totalCloudFiles.value = allFiles.length
+  } catch (err) {
+    console.error('加载云端文件失败:', err)
+    allCloudFiles.value = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
+    totalCloudFiles.value = allCloudFiles.value.length
+  }
+  cloudFilesLoading.value = false
+}
+
+function getCloudFileUrl(key) {
+  return `https://${import.meta.env.VITE_TOS_BUCKET}.${import.meta.env.VITE_TOS_ENDPOINT}/${key}`
+}
+
+function isImageFile(file) {
+  const key = file.Key || ''
+  const name = file.name || ''
+  const lower = (key + name).toLowerCase()
+  return lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.gif') || lower.endsWith('.webp') || lower.endsWith('.bmp')
+}
+
+function getFileName(file) {
+  if (file.name) return file.name
+  if (file.Key) {
+    const parts = file.Key.split('/')
+    return parts[parts.length - 1]
+  }
+  if (file.url) {
+    try {
+      const urlObj = new URL(file.url)
+      const pathParts = urlObj.pathname.split('/')
+      return pathParts[pathParts.length - 1]
+    } catch {
+      return '未命名文件'
+    }
+  }
+  return '未命名文件'
+}
+
+function getFileCaseId(file) {
+  const fileUrl = file.url || getCloudFileUrl(file.Key)
+  for (const c of store.cases) {
+    if (c.images && c.images.some(img => img.url === fileUrl)) {
+      return c.id
+    }
+  }
+  return ''
+}
+
+function assignFileToCase(file, caseId) {
+  const fileUrl = file.url || getCloudFileUrl(file.Key)
+
+  if (!caseId) {
+    store.cases.forEach(c => {
+      if (c.images) {
+        c.images = c.images.filter(img => img.url !== fileUrl)
+      }
+    })
+    store.saveToLocalStorage(store.cases)
+    store.saveToSupabase()
+    return
+  }
+
+  // 从其他案件移除
+  store.cases.forEach(c => {
+    if (c.images) {
+      c.images = c.images.filter(img => img.url !== fileUrl)
+    }
+  })
+
+  // 添加到目标案件
+  const caseData = store.getCase(caseId)
+  if (caseData) {
+    const images = caseData.images || []
+    images.push({
+      url: fileUrl,
+      name: getFileName(file),
+      date: dayjs().format('YYYY-MM-DD')
+    })
+    store.updateCase(caseId, { images })
+  }
+
+  alert('已关联到案件！')
+}
+
+async function deleteCloudFile(file) {
+  const fileUrl = file.url || getCloudFileUrl(file.Key)
+  const fileKey = file.Key
+
+  if (!confirm('确定要删除这个文件吗？')) return
+
+  try {
+    if (fileKey) {
+      await deleteFromTos(getCloudFileUrl(fileKey))
+    } else {
+      await deleteFromTos(fileUrl)
+    }
+  } catch (err) {
+    console.error('云端删除失败:', err)
+  }
+
+  // 从所有案件的images中移除
+  store.cases.forEach(c => {
+    if (c.images) {
+      c.images = c.images.filter(img => img.url !== fileUrl)
+    }
+  })
+  store.saveToLocalStorage(store.cases)
+  store.saveToSupabase()
+
+  // 从本地未关联列表移除
+  const localUnassigned = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
+  const updated = localUnassigned.filter(x => x.url !== fileUrl)
+  localStorage.setItem('unassigned_images', JSON.stringify(updated))
+
+  // 从列表移除
+  allCloudFiles.value = allCloudFiles.value.filter(f => (f.url || getCloudFileUrl(f.Key)) !== fileUrl)
+  totalCloudFiles.value = allCloudFiles.value.length
+
+  alert('删除成功！')
+}
+
+function toggleSelectCloudFile(file) {
+  const idx = selectedCloudFiles.value.indexOf(file)
+  if (idx === -1) {
+    selectedCloudFiles.value.push(file)
+  } else {
+    selectedCloudFiles.value.splice(idx, 1)
+  }
+}
+
+function toggleSelectAllCloudFiles() {
+  if (selectAllCloudFiles.value) {
+    selectedCloudFiles.value = [...allCloudFiles.value]
+  } else {
+    selectedCloudFiles.value = []
+  }
+}
+
+async function batchDeleteCloudFiles() {
+  if (selectedCloudFiles.value.length === 0) return
+  if (!confirm(`确定要删除选中的 ${selectedCloudFiles.value.length} 个文件吗？`)) return
+
+  let successCount = 0
+  let failCount = 0
+
+  for (const file of selectedCloudFiles.value) {
+    const fileUrl = file.url || getCloudFileUrl(file.Key)
+    const fileKey = file.Key
+
+    try {
+      if (fileKey) {
+        await deleteFromTos(getCloudFileUrl(fileKey))
+      } else {
+        await deleteFromTos(fileUrl)
+      }
+    } catch (err) {
+      console.error('云端删除失败:', err)
+    }
+
+    // 从所有案件的images中移除
+    store.cases.forEach(c => {
+      if (c.images) {
+        c.images = c.images.filter(img => img.url !== fileUrl)
+      }
+    })
+
+    // 从本地未关联列表移除
+    const localUnassigned = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
+    const updated = localUnassigned.filter(x => x.url !== fileUrl)
+    localStorage.setItem('unassigned_images', JSON.stringify(updated))
+
+    successCount++
+  }
+
+  store.saveToLocalStorage(store.cases)
+  store.saveToSupabase()
+
+  // 刷新列表
+  await loadCloudFiles()
+  selectedCloudFiles.value = []
+  selectAllCloudFiles.value = false
+
+  alert(`批量删除完成：成功 ${successCount} 个${failCount > 0 ? '，失败 ' + failCount + ' 个' : ''}`)
+}
+
+function previewImage(url) {
+  previewImageUrl.value = url
+  showImagePreview.value = true
+}
+
+// 计算未关联文件数
+const assignedCount = computed(() => {
+  let count = 0
+  allCloudFiles.value.forEach(f => {
+    const fileUrl = f.url || getCloudFileUrl(f.Key)
+    if (store.cases.some(c => c.images && c.images.some(img => img.url === fileUrl))) {
+      count++
+    }
+  })
+  return count
+})
+
+// 监听云端文件弹窗打开
+watch(showCloudFiles, (val) => {
+  if (val) {
+    loadCloudFiles()
+  } else {
+    selectedCloudFiles.value = []
+    selectAllCloudFiles.value = false
+  }
+})
 </script>
