@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import CaseList from '@/pages/CaseList.vue'
 import CaseForm from '@/pages/CaseForm.vue'
 import CaseDetail from '@/pages/CaseDetail.vue'
@@ -13,6 +13,6 @@ const routes = [
 ]
 
 export default createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes,
 })
