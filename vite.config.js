@@ -9,6 +9,7 @@ export default defineConfig({
       '@': resolve(__dirname, 'src')
     }
   },
+  base: '/dajia-case-management/',
   server: {
     port: 3000
   }
