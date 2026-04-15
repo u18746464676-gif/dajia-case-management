@@ -2,11 +2,16 @@
   <div>
     <!-- 图片上传区域 -->
     <div class="card mb-4 p-4 border-0 shadow-md">
-      <div class="flex items-center gap-3 mb-3">
+      <div class="flex flex-wrap items-center gap-3 mb-3">
         <label class="btn-primary text-sm cursor-pointer flex items-center gap-2 shadow-lg shadow-blue-600/20">
           <span>📷</span>
           <span>扫码上传</span>
           <input type="file" accept="image/*" capture="environment" @change="handleScanUpload" class="hidden" />
+        </label>
+        <label class="btn-secondary text-sm cursor-pointer flex items-center gap-2">
+          <span>🖼️</span>
+          <span>相册上传</span>
+          <input type="file" accept="image/*" multiple @change="handleAlbumUpload" class="hidden" />
         </label>
         <label class="btn-secondary text-sm cursor-pointer flex items-center gap-2">
           <span>📄</span>
@@ -23,6 +28,10 @@
           <span>云端文件</span>
           <span v-if="totalCloudFiles > 0" class="bg-blue-500 text-white text-xs px-1.5 rounded-full">{{ totalCloudFiles }}</span>
         </button>
+        <router-link to="/case/new" class="btn-primary text-sm inline-flex items-center gap-2">
+          <span>＋</span>
+          <span>新增案件</span>
+        </router-link>
       </div>
 
       <!-- 上传加载中 -->
@@ -38,6 +47,30 @@
             {{ uploadResult.message }}
           </span>
           <button @click="uploadResult = null" class="text-gray-400 hover:text-gray-600">×</button>
+        </div>
+      </div>
+
+      <div v-if="albumUploads.length > 0" class="p-4 bg-slate-50 rounded-xl mb-3 border border-slate-200">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div class="text-sm text-slate-600">已选择 {{ albumUploads.length }} 张图片，先预览，再勾选上传</div>
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="text-sm flex items-center gap-2 text-slate-600">
+              <input type="checkbox" :checked="selectAllAlbumUploads" @change="toggleSelectAllAlbumUploads" class="w-4 h-4 rounded" />
+              <span>全选</span>
+            </label>
+            <button @click="confirmAlbumUpload" class="btn-primary text-sm">上传选中</button>
+            <button @click="clearAlbumUploads" class="btn-secondary text-sm">清空</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div v-for="item in albumUploads" :key="item.id" class="relative rounded-xl overflow-hidden border border-slate-200 bg-white">
+            <label class="absolute top-2 left-2 z-10 bg-white/90 rounded-md px-1.5 py-1 flex items-center gap-1 text-xs text-slate-700">
+              <input type="checkbox" v-model="item.selected" class="w-4 h-4 rounded" />
+              <span>选中</span>
+            </label>
+            <img :src="item.url" class="w-full h-28 object-cover" />
+            <div class="p-2 text-xs text-slate-500 truncate">{{ item.name }}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -114,14 +147,7 @@
         </div>
       </div>
 
-      <div v-if="uploadedImages.length > 0 || uploadedFiles.length > 0" class="flex flex-wrap gap-3">
-        <div v-for="(img, idx) in uploadedImages" :key="'img-' + idx" class="relative group">
-          <img :src="img" class="w-16 h-16 object-cover rounded-xl border-2 border-slate-100" />
-          <button
-            @click="removeImage(idx)"
-            class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-          >×</button>
-        </div>
+      <div v-if="uploadedFiles.length > 0" class="flex flex-wrap gap-3">
         <div v-for="(file, idx) in uploadedFiles" :key="'file-' + idx" class="relative group">
           <div class="w-16 h-16 flex flex-col items-center justify-center bg-slate-100 rounded-xl border-2 border-slate-100">
             <span class="text-2xl">📄</span>
@@ -145,10 +171,6 @@
         <div class="flex-1 min-w-[150px] bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-3 border border-orange-100">
           <div class="text-xs text-orange-500 font-medium">当月花费</div>
           <div class="text-2xl font-bold text-orange-700">¥{{ monthlyStats.expense.toLocaleString() }}</div>
-        </div>
-        <div class="flex-1 min-w-[150px] bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border border-green-100">
-          <div class="text-xs text-green-500 font-medium">当月盈利</div>
-          <div class="text-2xl font-bold text-green-700">¥{{ monthlyStats.profit.toLocaleString() }}</div>
         </div>
       </div>
 
@@ -183,24 +205,84 @@
           @click="showBatchModal = true"
           class="btn-primary text-sm flex items-center gap-2 shadow-lg shadow-red-600/20"
         >
-          <span>📅</span>
-          <span>批量设置</span>
+          <span>🧰</span>
+          <span>批量操作</span>
           <span class="bg-white/20 px-2 py-0.5 rounded-full text-xs">{{ selectedIds.length }}</span>
         </button>
+        <router-link to="/case/new" class="btn-secondary text-sm inline-flex items-center gap-2">
+          <span>＋</span>
+          <span>新增案件</span>
+        </router-link>
       </div>
     </div>
 
-    <!-- 批量设置寄件日期弹窗 -->
+    <!-- 批量操作弹窗 -->
     <div v-if="showBatchModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showBatchModal = false">
-      <div class="bg-white rounded-2xl p-6 w-96 shadow-2xl">
-        <h3 class="font-bold text-lg mb-4 text-slate-800">批量设置寄件日期</h3>
+      <div class="bg-white rounded-2xl p-6 w-[460px] shadow-2xl">
+        <h3 class="font-bold text-lg mb-2 text-slate-800">批量操作</h3>
+        <p class="text-sm text-slate-500 mb-4">已选 {{ selectedIds.length }} 个案件</p>
         <div class="mb-6">
-          <label class="label">选择日期</label>
+          <label class="label">批量设置寄件日期</label>
           <input type="date" v-model="batchReportDate" class="input-field rounded-lg" />
         </div>
-        <div class="flex gap-3">
-          <button @click="batchUpdateReportDate" class="btn-primary flex-1 shadow-lg shadow-blue-600/20">确认</button>
+        <div class="flex gap-3 mb-3">
+          <button @click="batchUpdateReportDate" class="btn-primary flex-1 shadow-lg shadow-blue-600/20">保存日期</button>
           <button @click="showBatchModal = false" class="btn-secondary flex-1">取消</button>
+        </div>
+        <button @click="batchDeleteCases" class="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl py-3 text-sm font-medium transition-colors">批量删除选中案件</button>
+      </div>
+    </div>
+
+    <!-- Excel导入预览弹窗 -->
+    <div v-if="showImportPreview" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" @click.self="closeImportPreview">
+      <div class="bg-white rounded-2xl p-6 w-[1100px] max-h-[85vh] shadow-2xl overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="font-bold text-lg text-slate-800">Excel 导入预览</h3>
+            <p class="text-sm text-slate-500 mt-1">先预览，再选择全选或单选后导入</p>
+          </div>
+          <button @click="closeImportPreview" class="text-slate-400 hover:text-slate-600 text-2xl">×</button>
+        </div>
+        <div class="flex items-center justify-between mb-3 text-sm">
+          <label class="flex items-center gap-2 text-slate-600">
+            <input type="checkbox" :checked="selectAllImportRows" @change="toggleSelectAllImportRows" class="w-4 h-4 rounded" />
+            <span>全选</span>
+          </label>
+          <span class="text-slate-500">共 {{ importPreviewRows.length }} 条，已选 {{ selectedImportRows.length }} 条</span>
+        </div>
+        <div class="flex-1 overflow-auto border border-slate-100 rounded-xl">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 sticky top-0">
+              <tr>
+                <th class="py-2 px-3 text-left w-10"></th>
+                <th class="py-2 px-3 text-left">管辖局</th>
+                <th class="py-2 px-3 text-left">执照名称</th>
+                <th class="py-2 px-3 text-left">店铺名称</th>
+                <th class="py-2 px-3 text-left">商品名称</th>
+                <th class="py-2 px-3 text-right">花费</th>
+                <th class="py-2 px-3 text-left">快递单号</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="row in importPreviewRows" :key="row.__importId" class="hover:bg-slate-50">
+                <td class="py-2 px-3">
+                  <input type="checkbox" :checked="selectedImportRows.includes(row.__importId)" @change="toggleImportRow(row.__importId)" class="w-4 h-4 rounded" />
+                </td>
+                <td class="py-2 px-3">{{ row.jurisdiction || '-' }}</td>
+                <td class="py-2 px-3">{{ row.licenseName || '-' }}</td>
+                <td class="py-2 px-3">{{ row.shopName || '-' }}</td>
+                <td class="py-2 px-3">{{ row.productName || '-' }}</td>
+                <td class="py-2 px-3 text-right">¥{{ Number(row.expense || 0) }}</td>
+                <td class="py-2 px-3">{{ row.trackingNumber || '-' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex gap-3 mt-4">
+          <button @click="confirmImportRows" :disabled="selectedImportRows.length === 0 || excelImporting" class="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ excelImporting ? '导入中...' : `导入选中 ${selectedImportRows.length} 条` }}
+          </button>
+          <button @click="closeImportPreview" class="btn-secondary flex-1">取消</button>
         </div>
       </div>
     </div>
@@ -322,11 +404,10 @@
                 <input type="checkbox" v-model="selectAll" @change="toggleSelectAll" class="w-4 h-4 rounded border-white" />
               </th>
               <th class="py-3 px-4 text-left font-semibold">管辖局</th>
+              <th class="py-3 px-4 text-left font-semibold">执照名称</th>
+              <th class="py-3 px-4 text-left font-semibold">店铺名称</th>
               <th class="py-3 px-4 text-left font-semibold">商品名称</th>
               <th class="py-3 px-4 text-right font-semibold">花费</th>
-              <th class="py-3 px-4 text-right font-semibold">盈利</th>
-              <th class="py-3 px-4 text-left font-semibold">店铺名称</th>
-              <th class="py-3 px-4 text-left font-semibold">执照名称</th>
               <th class="py-3 px-4 text-center font-semibold">状态</th>
               <th class="py-3 px-4 text-center font-semibold">签收日期</th>
               <th class="py-3 px-4 text-center font-semibold w-20">操作</th>
@@ -348,11 +429,10 @@
                 />
               </td>
               <td class="py-3 px-4 text-slate-600">{{ c.jurisdiction || '-' }}</td>
-              <td class="py-3 px-4 font-medium text-slate-800">{{ c.productName }}</td>
+              <td class="py-3 px-4 text-slate-600">{{ c.licenseName || '-' }}</td>
+              <td class="py-3 px-4 text-slate-600">{{ c.shopName || '-' }}</td>
+              <td class="py-3 px-4 font-medium text-slate-800">{{ c.productName || '-' }}</td>
               <td class="py-3 px-4 text-right text-orange-600">¥{{ c.expense || 0 }}</td>
-              <td class="py-3 px-4 text-right" :class="c.profit > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'">¥{{ c.profit || 0 }}</td>
-              <td class="py-3 px-4 text-slate-600">{{ c.shopName }}</td>
-              <td class="py-3 px-4 text-slate-600">{{ c.licenseName }}</td>
               <td class="py-3 px-4 text-center" @click.stop>
                 <select
                   :value="c.status"
@@ -425,7 +505,8 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
+import * as XLSX from 'xlsx'
 import { useCaseStore } from '@/stores/case'
 import dayjs from 'dayjs'
 import { extractFromImage } from '@/lib/doubao'
@@ -434,7 +515,6 @@ import { uploadBase64ToTos, deleteFromTos, listTosObjects, getTosFileUrl } from 
 
 const store = useCaseStore()
 const route = useRoute()
-const router = useRouter()
 const keyword = ref('')
 const filterStatus = ref(route.query.status || '')
 const currentYear = new Date().getFullYear()
@@ -446,13 +526,17 @@ const selectedIds = ref([])
 const selectAll = ref(false)
 const showBatchModal = ref(false)
 const batchReportDate = ref('')
-const uploadedImages = ref([])
 const uploadedFiles = ref([])
 const ocrLoading = ref(false)
 const ocrResult = ref(null)
 const logisticsLoading = ref(false)
 const logisticsResult = ref(null)
 const pageSize = 20
+const albumUploads = ref([])
+const showImportPreview = ref(false)
+const importPreviewRows = ref([])
+const selectedImportRows = ref([])
+const excelImporting = ref(false)
 
 // 监听路由变化，同步筛选状态
 watch(() => route.query.status, (newStatus) => {
@@ -500,7 +584,6 @@ const monthlyStats = computed(() => {
   return {
     total: monthCases.length,
     expense: monthCases.reduce((sum, c) => sum + (Number(c.expense) || 0), 0),
-    profit: monthCases.reduce((sum, c) => sum + (Number(c.profit) || 0), 0),
   }
 })
 
@@ -551,6 +634,7 @@ function toggleSelect(id) {
   } else {
     selectedIds.value.splice(idx, 1)
   }
+  selectAll.value = selectedIds.value.length > 0 && selectedIds.value.length === paginatedCases.value.length
 }
 
 function toggleSelectAll() {
@@ -561,31 +645,184 @@ function toggleSelectAll() {
   }
 }
 
-function batchUpdateReportDate() {
+async function batchUpdateReportDate() {
   if (!batchReportDate.value) return
-  selectedIds.value.forEach(id => {
-    store.updateCase(id, { reportDate: batchReportDate.value })
-  })
+  await store.batchUpdateCases(selectedIds.value, { reportDate: batchReportDate.value })
   selectedIds.value = []
   selectAll.value = false
   batchReportDate.value = ''
   showBatchModal.value = false
 }
 
-function handleImageUpload(event) {
-  const files = event.target.files
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      uploadedImages.value.push(e.target.result)
-    }
-    reader.readAsDataURL(file)
+async function batchDeleteCases() {
+  if (selectedIds.value.length === 0) return
+  if (!confirm(`确定要删除选中的 ${selectedIds.value.length} 个案件吗？`)) return
+
+  await store.deleteCases(selectedIds.value)
+  selectedIds.value = []
+  selectAll.value = false
+  batchReportDate.value = ''
+  showBatchModal.value = false
+  alert('批量删除完成')
+}
+
+function makeUploadPreview(file, url) {
+  return {
+    id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    file,
+    name: file.name,
+    url,
+    selected: true,
   }
 }
 
-function removeImage(idx) {
-  uploadedImages.value.splice(idx, 1)
+async function handleAlbumUpload(event) {
+  const files = Array.from(event.target.files || [])
+  if (files.length === 0) return
+
+  const previews = await Promise.all(files.map(file => new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = e => resolve(makeUploadPreview(file, e.target.result))
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })))
+
+  albumUploads.value = [...albumUploads.value, ...previews]
+  event.target.value = ''
+}
+
+const selectAllAlbumUploads = computed(() => albumUploads.value.length > 0 && albumUploads.value.every(item => item.selected))
+
+function toggleSelectAllAlbumUploads(event) {
+  const checked = typeof event?.target?.checked === 'boolean' ? event.target.checked : !selectAllAlbumUploads.value
+  albumUploads.value.forEach(item => {
+    item.selected = checked
+  })
+}
+
+function clearAlbumUploads() {
+  albumUploads.value = []
+}
+
+function getCellValue(row, keys = []) {
+  for (const key of keys) {
+    const value = row?.[key]
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return value
+    }
+  }
+  return ''
+}
+
+function normalizeStatus(value) {
+  const text = String(value || '').trim()
+  const map = {
+    '未受理': 'pending_report',
+    '待举报': 'pending_report',
+    '已受理': 'accepted',
+    '已立案': 'reported',
+    '已调解': 'decided',
+    '已处罚': 'closed',
+    '不予立案': 'rejected',
+    '不予处罚': 'not_punished',
+  }
+  return map[text] || 'pending_report'
+}
+
+function normalizeExcelRow(row, index) {
+  const expense = Number(getCellValue(row, ['花费', '费用', '商品价格', '价格', '金额']) || 0)
+  const productPrice = Number(getCellValue(row, ['商品价格', '价格', '花费', '金额']) || expense || 0)
+  const reportDate = getCellValue(row, ['举报日期', '寄件日期']) || null
+  const signDate = getCellValue(row, ['签收日期']) || null
+
+  return {
+    __importId: `import_${index}_${Date.now()}`,
+    jurisdiction: String(getCellValue(row, ['管辖局', '辖区', '所属管辖局']) || '').trim(),
+    licenseName: String(getCellValue(row, ['执照名称', '主体名称', '经营者名称']) || '').trim(),
+    shopName: String(getCellValue(row, ['店铺名称', '店铺', '店名']) || '').trim(),
+    productName: String(getCellValue(row, ['商品名称', '商品', '商品名']) || '').trim(),
+    expense,
+    productPrice,
+    trackingNumber: String(getCellValue(row, ['快递单号', '物流单号', '单号']) || '').trim(),
+    reportDate,
+    signDate,
+    notes: String(getCellValue(row, ['备注', '说明']) || '').trim(),
+    status: normalizeStatus(getCellValue(row, ['状态'])),
+  }
+}
+
+async function importExcel(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  try {
+    const buffer = await file.arrayBuffer()
+    const workbook = XLSX.read(buffer, { type: 'array' })
+    const sheetName = workbook.SheetNames[0]
+    if (!sheetName) {
+      alert('Excel 里没有可读取的工作表')
+      return
+    }
+
+    const sheet = workbook.Sheets[sheetName]
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+    const normalized = rows
+      .map((row, index) => normalizeExcelRow(row, index))
+      .filter(row => row.jurisdiction || row.licenseName || row.shopName || row.productName || row.expense || row.trackingNumber)
+
+    if (normalized.length === 0) {
+      alert('没有识别到可导入的数据，请检查表头是否正确')
+      return
+    }
+
+    importPreviewRows.value = normalized
+    selectedImportRows.value = normalized.map(row => row.__importId)
+    showImportPreview.value = true
+  } catch (err) {
+    console.error('Excel导入失败:', err)
+    alert('Excel 解析失败，请检查文件格式')
+  } finally {
+    event.target.value = ''
+  }
+}
+
+const selectAllImportRows = computed(() => importPreviewRows.value.length > 0 && selectedImportRows.value.length === importPreviewRows.value.length)
+
+function toggleImportRow(id) {
+  const idx = selectedImportRows.value.indexOf(id)
+  if (idx === -1) {
+    selectedImportRows.value.push(id)
+  } else {
+    selectedImportRows.value.splice(idx, 1)
+  }
+}
+
+function toggleSelectAllImportRows(event) {
+  const checked = typeof event?.target?.checked === 'boolean' ? event.target.checked : !selectAllImportRows.value
+  selectedImportRows.value = checked ? importPreviewRows.value.map(row => row.__importId) : []
+}
+
+function closeImportPreview() {
+  showImportPreview.value = false
+  importPreviewRows.value = []
+  selectedImportRows.value = []
+  excelImporting.value = false
+}
+
+async function confirmImportRows() {
+  const selected = importPreviewRows.value.filter(row => selectedImportRows.value.includes(row.__importId))
+  if (selected.length === 0) return
+
+  excelImporting.value = true
+  try {
+    await store.createCasesBulk(selected.map(({ __importId, ...row }) => row))
+    closeImportPreview()
+    alert(`已成功导入 ${selected.length} 条案件`)
+  } catch (err) {
+    console.error('导入保存失败:', err)
+    alert('导入保存失败，请稍后重试')
+    excelImporting.value = false
+  }
 }
 
 function handleFileUpload(event) {
@@ -720,9 +957,50 @@ function applyOcrToCaseWithSign(caseId, signTime) {
   alert('已成功关联到案件并记录签收时间！')
 }
 
+function findMatchedCase(shopName = '') {
+  if (!shopName) return null
+  return store.cases.find(c =>
+    (c.shopName && c.shopName.includes(shopName)) ||
+    (shopName && c.shopName && shopName.includes(c.shopName)) ||
+    (c.licenseName && c.licenseName.includes(shopName)) ||
+    (shopName && c.licenseName && shopName.includes(c.licenseName))
+  )
+}
+
+async function processImageUpload(imageBase64, fileName, labelPrefix = '图片') {
+  processingStatus.value = '上传中...'
+  const base64Data = imageBase64.split(',')[1]
+  const url = await uploadBase64ToTos(imageBase64, fileName)
+
+  if (!url) {
+    throw new Error('上传失败，请重试')
+  }
+
+  const fileMeta = {
+    url,
+    name: `${labelPrefix}_${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+    date: dayjs().format('YYYY-MM-DD'),
+    uploadedAt: dayjs().toISOString()
+  }
+
+  processingStatus.value = 'AI匹配中...'
+  const result = await extractFromImage(base64Data)
+  const matchedCase = result?.shopName ? findMatchedCase(result.shopName) : null
+
+  if (matchedCase) {
+    await store.assignCloudFile(url, matchedCase.id, fileMeta)
+    totalCloudFiles.value += 1
+    return { matched: true, matchedCaseName: matchedCase.shopName }
+  }
+
+  await store.addUnassignedImage(fileMeta)
+  totalCloudFiles.value += 1
+  return { matched: false }
+}
+
 // 扫码上传 - 扫描后立即AI识别并上传
 async function handleScanUpload(event) {
-  const file = event.target.files[0]
+  const file = event.target.files?.[0]
   if (!file) return
 
   uploadLoading.value = true
@@ -736,62 +1014,14 @@ async function handleScanUpload(event) {
       reader.readAsDataURL(file)
     })
 
-    processingStatus.value = '上传中...'
-    const base64Data = imageBase64.split(',')[1]
-    const url = await uploadBase64ToTos(imageBase64, 'scan_' + Date.now() + '.jpg')
+    const result = await processImageUpload(imageBase64, `scan_${Date.now()}.jpg`, '扫描')
+    uploadResult.value = result.matched
+      ? { success: true, message: `✅ 上传成功！已识别并匹配到：「${result.matchedCaseName}」` }
+      : { success: false, message: '⚠️ 上传成功，但未识别到匹配的案件，请在云端文件手动分配' }
 
-    if (!url) {
-      uploadResult.value = { success: false, message: '上传失败，请重试' }
-      uploadLoading.value = false
-      return
+    if (showCloudFiles.value) {
+      await loadCloudFiles()
     }
-
-    totalCloudFiles.value++
-
-    const fileMeta = {
-      url,
-      name: '扫描_' + dayjs().format('YYYY-MM-DD HH:mm'),
-      date: dayjs().format('YYYY-MM-DD'),
-      uploadedAt: dayjs().toISOString()
-    }
-
-    processingStatus.value = 'AI匹配中...'
-    const ocrResult = await extractFromImage(base64Data)
-
-    let matched = false
-    let matchedCaseName = ''
-
-    if (ocrResult && ocrResult.shopName && store.cases.length > 0) {
-      const matchedCase = store.cases.find(c =>
-        (c.shopName && c.shopName.includes(ocrResult.shopName)) ||
-        (ocrResult.shopName && c.shopName && ocrResult.shopName.includes(c.shopName)) ||
-        (c.licenseName && c.licenseName.includes(ocrResult.shopName)) ||
-        (ocrResult.shopName && c.licenseName && ocrResult.shopName.includes(c.licenseName))
-      )
-
-      if (matchedCase) {
-        await store.assignCloudFile(url, matchedCase.id, fileMeta)
-        matched = true
-        matchedCaseName = matchedCase.shopName
-      }
-    }
-
-    if (!matched) {
-      await store.addUnassignedImage(fileMeta)
-    }
-
-    if (matched) {
-      uploadResult.value = {
-        success: true,
-        message: `✅ 上传成功！已识别并匹配到：「${matchedCaseName}」`
-      }
-    } else {
-      uploadResult.value = {
-        success: false,
-        message: '⚠️ 上传成功，但未识别到匹配的案件，请在云端文件手动分配'
-      }
-    }
-
   } catch (err) {
     console.error('Scan upload failed:', err)
     uploadResult.value = { success: false, message: '处理失败：' + err.message }
@@ -799,6 +1029,45 @@ async function handleScanUpload(event) {
 
   uploadLoading.value = false
   event.target.value = ''
+}
+
+async function confirmAlbumUpload() {
+  const selected = albumUploads.value.filter(item => item.selected)
+  if (selected.length === 0) {
+    alert('请先选择要上传的图片')
+    return
+  }
+
+  uploadLoading.value = true
+  let successCount = 0
+  let unmatchedCount = 0
+
+  try {
+    for (const item of selected) {
+      processingStatus.value = `正在处理 ${item.name}`
+      const result = await processImageUpload(item.url, item.name || `album_${Date.now()}.jpg`, '相册')
+      if (result.matched) {
+        successCount++
+      } else {
+        unmatchedCount++
+      }
+    }
+
+    uploadResult.value = {
+      success: true,
+      message: `相册上传完成：匹配成功 ${successCount} 张，待手动分配 ${unmatchedCount} 张`
+    }
+    albumUploads.value = albumUploads.value.filter(item => !item.selected)
+
+    if (showCloudFiles.value) {
+      await loadCloudFiles()
+    }
+  } catch (err) {
+    console.error('Album upload failed:', err)
+    uploadResult.value = { success: false, message: '相册上传失败：' + err.message }
+  }
+
+  uploadLoading.value = false
 }
 
 // 云端文件管理
@@ -814,24 +1083,40 @@ const uploadResult = ref(null)
 const selectedCloudFiles = ref([])
 const selectAllCloudFiles = ref(false)
 
+function dedupeCloudFiles(list = []) {
+  const map = new Map()
+  list.filter(Boolean).forEach(file => {
+    const key = file.url || file.Key || getCloudFileUrl(file.Key)
+    if (!key) return
+    map.set(key, { ...file, url: file.url || getCloudFileUrl(file.Key) || key })
+  })
+  return Array.from(map.values())
+}
+
 async function loadCloudFiles() {
   cloudFilesLoading.value = true
   try {
-    const tosFiles = await listTosObjects('case-images/')
-    const allFiles = [...store.unassignedImages]
+    const storageFiles = await listTosObjects('case-images/')
+    const assignedFiles = store.cases.flatMap(c => (Array.isArray(c.images) ? c.images : []).map(img => ({
+      ...img,
+      url: img.url,
+      name: img.name || `${c.shopName || c.licenseName || '案件文件'}`,
+    })))
 
-    tosFiles.forEach(f => {
-      const url = getCloudFileUrl(f.Key)
-      if (!allFiles.some(x => x.url === url)) {
-        allFiles.push({ ...f, url })
-      }
-    })
+    const mergedFiles = dedupeCloudFiles([
+      ...store.unassignedImages,
+      ...assignedFiles,
+      ...storageFiles.map(file => ({ ...file, url: getCloudFileUrl(file.Key) }))
+    ])
 
-    allCloudFiles.value = allFiles
-    totalCloudFiles.value = allFiles.length
+    allCloudFiles.value = mergedFiles
+    totalCloudFiles.value = mergedFiles.length
   } catch (err) {
     console.error('加载云端文件失败:', err)
-    allCloudFiles.value = [...store.unassignedImages]
+    allCloudFiles.value = dedupeCloudFiles([
+      ...store.unassignedImages,
+      ...store.cases.flatMap(c => Array.isArray(c.images) ? c.images : [])
+    ])
     totalCloudFiles.value = allCloudFiles.value.length
   }
   cloudFilesLoading.value = false

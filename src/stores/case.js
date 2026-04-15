@@ -109,8 +109,6 @@ export const useCaseStore = defineStore('case', () => {
 
   async function saveToSupabase() {
     try {
-      await supabase.from('cases').delete().neq('id', APP_META_ID)
-
       const records = cases.value.map(c => ({
         id: c.id,
         data: c,
@@ -121,8 +119,26 @@ export const useCaseStore = defineStore('case', () => {
         data: buildAppMeta(),
       })
 
-      const { error } = await supabase.from('cases').upsert(records)
-      if (error) throw error
+      const { error: upsertError } = await supabase.from('cases').upsert(records)
+      if (upsertError) throw upsertError
+
+      const { data: remoteRows, error: remoteError } = await supabase
+        .from('cases')
+        .select('id')
+        .neq('id', APP_META_ID)
+
+      if (remoteError) throw remoteError
+
+      const localIds = new Set(cases.value.map(c => c.id))
+      const staleIds = (remoteRows || [])
+        .map(row => row.id)
+        .filter(id => !localIds.has(id))
+
+      if (staleIds.length > 0) {
+        const { error: deleteError } = await supabase.from('cases').delete().in('id', staleIds)
+        if (deleteError) throw deleteError
+      }
+
       isSynced.value = true
     } catch (err) {
       console.error('保存到云失败:', err)
@@ -176,33 +192,37 @@ export const useCaseStore = defineStore('case', () => {
     return cases.value.find(c => c.id === id)
   }
 
-  async function createCase(data) {
+  function buildCaseRecord(data = {}) {
     const now = dayjs().toISOString()
-    const newCase = {
-      id: uuid(),
-      createdAt: now,
+    const status = data.status || 'pending_report'
+
+    return {
+      id: data.id || uuid(),
+      createdAt: data.createdAt || now,
       updatedAt: now,
       shopName: data.shopName || '',
       productName: data.productName || '',
-      productPrice: Number(data.productPrice) || 0,
+      productPrice: Number(data.productPrice ?? data.expense) || 0,
       licenseName: data.licenseName || '',
       jurisdiction: data.jurisdiction || '',
-      expense: Number(data.expense) || 0,
+      expense: Number(data.expense ?? data.productPrice) || 0,
       profit: Number(data.profit) || 0,
-      status: 'pending_report',
-      statusHistory: [{ from: '', to: 'pending_report', changedAt: now }],
-      reportDate: null,
+      status,
+      statusHistory: Array.isArray(data.statusHistory) && data.statusHistory.length > 0
+        ? data.statusHistory
+        : [{ from: '', to: status, changedAt: now }],
+      reportDate: data.reportDate || null,
       signDate: data.signDate || null,
       trackingNumber: data.trackingNumber || '',
-      reportPlatform: '',
-      acceptanceDate: null,
-      acceptanceWay: '',
-      decisionDate: null,
-      replies: [],
-      documents: [],
-      images: [],
-      deadlines: [],
-      notes: '',
+      reportPlatform: data.reportPlatform || '',
+      acceptanceDate: data.acceptanceDate || null,
+      acceptanceWay: data.acceptanceWay || '',
+      decisionDate: data.decisionDate || null,
+      replies: Array.isArray(data.replies) ? data.replies : [],
+      documents: Array.isArray(data.documents) ? data.documents : [],
+      images: Array.isArray(data.images) ? data.images : [],
+      deadlines: Array.isArray(data.deadlines) ? data.deadlines : [],
+      notes: data.notes || '',
       hasAdminReview: data.hasAdminReview || '',
       adminReviewResult: data.adminReviewResult || '',
       adminReviewApplyDate: data.adminReviewApplyDate || '',
@@ -211,9 +231,25 @@ export const useCaseStore = defineStore('case', () => {
       adminReviewDecisionDate: data.adminReviewDecisionDate || '',
       adminReviewDocNo: data.adminReviewDocNo || '',
     }
+  }
+
+  async function createCase(data) {
+    const newCase = buildCaseRecord(data)
     cases.value.unshift(newCase)
     await syncState()
     return newCase
+  }
+
+  async function createCasesBulk(list = []) {
+    const nextCases = list
+      .filter(Boolean)
+      .map(item => buildCaseRecord(item))
+
+    if (nextCases.length === 0) return []
+
+    cases.value = [...nextCases, ...cases.value]
+    await syncState()
+    return nextCases
   }
 
   async function updateCase(id, data) {
@@ -268,6 +304,39 @@ export const useCaseStore = defineStore('case', () => {
 
   async function deleteCase(id) {
     cases.value = cases.value.filter(c => c.id !== id)
+    await syncState()
+  }
+
+  async function batchUpdateCases(ids = [], patch = {}) {
+    const idSet = new Set((ids || []).filter(Boolean))
+    if (idSet.size === 0) return
+
+    const now = dayjs().toISOString()
+    let changed = false
+
+    cases.value = cases.value.map(item => {
+      if (!idSet.has(item.id)) return item
+      changed = true
+      return {
+        ...item,
+        ...patch,
+        updatedAt: now,
+      }
+    })
+
+    if (changed) {
+      await syncState()
+    }
+  }
+
+  async function deleteCases(ids = []) {
+    const idSet = new Set((ids || []).filter(Boolean))
+    if (idSet.size === 0) return
+
+    const nextCases = cases.value.filter(c => !idSet.has(c.id))
+    if (nextCases.length === cases.value.length) return
+
+    cases.value = nextCases
     await syncState()
   }
 
@@ -376,11 +445,14 @@ export const useCaseStore = defineStore('case', () => {
     init,
     getCase,
     createCase,
+    createCasesBulk,
     updateCase,
     changeStatus,
     addReply,
     addDocument,
     deleteCase,
+    batchUpdateCases,
+    deleteCases,
     saveToLocalStorage,
     saveToSupabase,
     setUnassignedImages,
