@@ -7,11 +7,49 @@ const REGION = import.meta.env.VITE_TOS_REGION || ''
 const ENDPOINT = import.meta.env.VITE_TOS_ENDPOINT || ''
 const ACCESS_KEY_ID = import.meta.env.VITE_TOS_ACCESS_KEY_ID || ''
 const SECRET_ACCESS_KEY = import.meta.env.VITE_TOS_SECRET_ACCESS_KEY || ''
+const STORAGE_API_BASE = (import.meta.env.VITE_STORAGE_API_BASE || '').replace(/\/$/, '')
 
 let tosClient = null
 
+function normalizeTosError(error) {
+  const statusCode = error?.statusCode || error?.data?.StatusCode || error?.status || 0
+  const code = error?.data?.Code || error?.code || error?.error || ''
+
+  if (statusCode === 403 || code === 'SignatureDoesNotMatch') {
+    return new Error('云存储鉴权失败（403）。当前 TOS 密钥或签名配置不正确，请更新后再试。')
+  }
+
+  if (error?.message) {
+    return new Error(`云存储异常：${error.message}`)
+  }
+
+  return new Error('云存储异常，请稍后重试')
+}
+
+async function requestStorageApi(path, options = {}) {
+  const response = await fetch(`${STORAGE_API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw normalizeTosError({ status: response.status, ...data })
+  }
+
+  return data
+}
+
+function useStorageApi() {
+  return Boolean(STORAGE_API_BASE)
+}
+
 export function isTosConfigured() {
-  return !!(BUCKET && REGION && ENDPOINT && ACCESS_KEY_ID && SECRET_ACCESS_KEY)
+  return useStorageApi() || !!(BUCKET && REGION && ENDPOINT && ACCESS_KEY_ID && SECRET_ACCESS_KEY)
 }
 
 export function getTosFileUrl(key = '') {
@@ -48,52 +86,86 @@ export function getTosClient() {
 }
 
 export async function listTosObjects(prefix = 'case-images/') {
-  const client = getTosClient()
-  const result = await client.listObjects({
-    bucket: BUCKET,
-    prefix,
-  })
-  return result?.data?.contents || []
+  try {
+    if (useStorageApi()) {
+      const data = await requestStorageApi(`/api/storage/files?prefix=${encodeURIComponent(prefix)}`, {
+        method: 'GET',
+      })
+      return data.files || []
+    }
+
+    const client = getTosClient()
+    const result = await client.listObjects({
+      bucket: BUCKET,
+      prefix,
+    })
+    return result?.data?.contents || []
+  } catch (error) {
+    throw normalizeTosError(error)
+  }
 }
 
 export async function uploadBase64ToTos(base64Data, fileName = 'image.jpg') {
   if (!isBrowser) return null
 
-  const base64Response = await fetch(base64Data)
-  const blob = await base64Response.blob()
-  const client = getTosClient()
-  const timestamp = Date.now()
-  const key = `case-images/${timestamp}_${fileName}`
+  try {
+    if (useStorageApi()) {
+      const data = await requestStorageApi('/api/storage/upload', {
+        method: 'POST',
+        body: JSON.stringify({ base64Data, fileName }),
+      })
+      return data.url
+    }
 
-  const result = await client.putObject({
-    bucket: BUCKET,
-    key,
-    body: blob,
-    contentType: blob.type || 'image/jpeg',
-  })
+    const base64Response = await fetch(base64Data)
+    const blob = await base64Response.blob()
+    const client = getTosClient()
+    const timestamp = Date.now()
+    const key = `case-images/${timestamp}_${fileName}`
 
-  if (!result || (result.statusCode && result.statusCode >= 400)) {
-    throw new Error('云端上传失败，未收到有效响应')
+    const result = await client.putObject({
+      bucket: BUCKET,
+      key,
+      body: blob,
+      contentType: blob.type || 'image/jpeg',
+    })
+
+    if (!result || (result.statusCode && result.statusCode >= 400)) {
+      throw new Error('云端上传失败，未收到有效响应')
+    }
+
+    await client.headObject({
+      bucket: BUCKET,
+      key,
+    })
+
+    return getTosFileUrl(key)
+  } catch (error) {
+    throw normalizeTosError(error)
   }
-
-  await client.headObject({
-    bucket: BUCKET,
-    key,
-  })
-
-  return getTosFileUrl(key)
 }
 
 export async function deleteFromTos(urlOrKey) {
   if (!isBrowser || !urlOrKey) return false
 
-  const key = getTosKeyFromUrl(urlOrKey)
-  const client = getTosClient()
+  try {
+    if (useStorageApi()) {
+      await requestStorageApi(`/api/storage/file?urlOrKey=${encodeURIComponent(urlOrKey)}`, {
+        method: 'DELETE',
+      })
+      return true
+    }
 
-  await client.deleteObject({
-    bucket: BUCKET,
-    key,
-  })
+    const key = getTosKeyFromUrl(urlOrKey)
+    const client = getTosClient()
 
-  return true
+    await client.deleteObject({
+      bucket: BUCKET,
+      key,
+    })
+
+    return true
+  } catch (error) {
+    throw normalizeTosError(error)
+  }
 }
