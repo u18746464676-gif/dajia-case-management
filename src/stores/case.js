@@ -4,8 +4,9 @@ import dayjs from 'dayjs'
 import { supabase } from '@/lib/supabase'
 
 const STORAGE_KEY = 'pdd_case_list_v1'
+const UNASSIGNED_IMAGES_KEY = 'unassigned_images'
+const APP_META_ID = '00000000-0000-0000-0000-000000000000'
 
-// 生成UUID
 function uuid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0
@@ -13,12 +14,31 @@ function uuid() {
   })
 }
 
+function dedupeByUrl(list = []) {
+  const map = new Map()
+  list.filter(Boolean).forEach(item => {
+    if (!item.url) return
+    map.set(item.url, item)
+  })
+  return Array.from(map.values())
+}
+
+function normalizeImageRecord(image = {}) {
+  const now = dayjs().toISOString()
+  return {
+    url: image.url || '',
+    name: image.name || '未命名文件',
+    date: image.date || dayjs().format('YYYY-MM-DD'),
+    uploadedAt: image.uploadedAt || now,
+  }
+}
+
 export const useCaseStore = defineStore('case', () => {
   const cases = ref([])
+  const unassignedImages = ref([])
   const isLoading = ref(false)
   const isSynced = ref(false)
 
-  // 从localStorage加载（首次加载用）
   function loadFromLocalStorage() {
     try {
       const data = localStorage.getItem(STORAGE_KEY)
@@ -28,69 +48,116 @@ export const useCaseStore = defineStore('case', () => {
     }
   }
 
-  // 保存到localStorage
-  function saveToLocalStorage(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  function saveToLocalStorage(data = cases.value) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data || []))
   }
 
-  // 从Supabase加载
+  function loadUnassignedImagesFromLocalStorage() {
+    try {
+      const data = localStorage.getItem(UNASSIGNED_IMAGES_KEY)
+      return dedupeByUrl(data ? JSON.parse(data) : [])
+    } catch {
+      return []
+    }
+  }
+
+  function saveUnassignedImagesToLocalStorage(data = unassignedImages.value) {
+    localStorage.setItem(UNASSIGNED_IMAGES_KEY, JSON.stringify(dedupeByUrl(data || [])))
+  }
+
+  function persistToLocal() {
+    saveToLocalStorage(cases.value)
+    saveUnassignedImagesToLocalStorage(unassignedImages.value)
+  }
+
+  function buildAppMeta() {
+    return {
+      id: APP_META_ID,
+      type: '__app_meta__',
+      updatedAt: dayjs().toISOString(),
+      unassignedImages: dedupeByUrl(unassignedImages.value),
+    }
+  }
+
   async function loadFromSupabase() {
     isLoading.value = true
     try {
       const { data, error } = await supabase
         .from('cases')
-        .select('data')
+        .select('id, data')
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      if (data && data.length > 0) {
-        cases.value = data.map(row => row.data)
-      }
+      const rows = data || []
+      const appMetaRow = rows.find(row => row.id === APP_META_ID || row.data?.id === APP_META_ID || row.data?.type === '__app_meta__')
+      const caseRows = rows.filter(row => row.id !== APP_META_ID && row.data?.type !== '__app_meta__')
+
+      cases.value = caseRows.map(row => row.data).filter(Boolean)
+      unassignedImages.value = dedupeByUrl(appMetaRow?.data?.unassignedImages || loadUnassignedImagesFromLocalStorage())
+      persistToLocal()
       isSynced.value = true
     } catch (err) {
       console.error('加载失败，尝试本地数据:', err)
       cases.value = loadFromLocalStorage()
+      unassignedImages.value = loadUnassignedImagesFromLocalStorage()
+      isSynced.value = false
     } finally {
       isLoading.value = false
     }
   }
 
-  // 保存到Supabase
   async function saveToSupabase() {
     try {
-      // 先删除所有旧数据
-      await supabase.from('cases').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('cases').delete().neq('id', APP_META_ID)
 
-      // 批量插入新数据
       const records = cases.value.map(c => ({
         id: c.id,
-        data: c
+        data: c,
       }))
 
-      if (records.length > 0) {
-        const { error } = await supabase.from('cases').upsert(records)
-        if (error) throw error
-      }
+      records.push({
+        id: APP_META_ID,
+        data: buildAppMeta(),
+      })
+
+      const { error } = await supabase.from('cases').upsert(records)
+      if (error) throw error
+      isSynced.value = true
     } catch (err) {
       console.error('保存到云失败:', err)
+      isSynced.value = false
     }
   }
 
-  // 初始化加载
+  async function syncState() {
+    persistToLocal()
+    await saveToSupabase()
+  }
+
   async function init() {
     await loadFromSupabase()
-    // 如果云端没数据，从本地读取
+
     if (cases.value.length === 0) {
       const localData = loadFromLocalStorage()
       if (localData.length > 0) {
         cases.value = localData
-        await saveToSupabase()
       }
+    }
+
+    if (unassignedImages.value.length === 0) {
+      const localUnassigned = loadUnassignedImagesFromLocalStorage()
+      if (localUnassigned.length > 0) {
+        unassignedImages.value = localUnassigned
+      }
+    }
+
+    if (cases.value.length > 0 || unassignedImages.value.length > 0) {
+      persistToLocal()
+      await saveToSupabase()
     }
   }
 
-  // 统计
   const stats = computed(() => {
     const list = cases.value
     return {
@@ -105,12 +172,10 @@ export const useCaseStore = defineStore('case', () => {
     }
   })
 
-  // 获取单个案件
   function getCase(id) {
     return cases.value.find(c => c.id === id)
   }
 
-  // 新增案件
   async function createCase(data) {
     const now = dayjs().toISOString()
     const newCase = {
@@ -128,6 +193,7 @@ export const useCaseStore = defineStore('case', () => {
       statusHistory: [{ from: '', to: 'pending_report', changedAt: now }],
       reportDate: null,
       signDate: data.signDate || null,
+      trackingNumber: data.trackingNumber || '',
       reportPlatform: '',
       acceptanceDate: null,
       acceptanceWay: '',
@@ -137,7 +203,6 @@ export const useCaseStore = defineStore('case', () => {
       images: [],
       deadlines: [],
       notes: '',
-      // 行政复议
       hasAdminReview: data.hasAdminReview || '',
       adminReviewResult: data.adminReviewResult || '',
       adminReviewApplyDate: data.adminReviewApplyDate || '',
@@ -147,25 +212,20 @@ export const useCaseStore = defineStore('case', () => {
       adminReviewDocNo: data.adminReviewDocNo || '',
     }
     cases.value.unshift(newCase)
-    saveToLocalStorage(cases.value)
-    await saveToSupabase()
+    await syncState()
     return newCase
   }
 
-  // 更新案件
   async function updateCase(id, data) {
     const idx = cases.value.findIndex(c => c.id === id)
     if (idx === -1) return null
     const now = dayjs().toISOString()
     const old = cases.value[idx]
-    const updated = { ...old, ...data, updatedAt: now }
-    cases.value[idx] = updated
-    saveToLocalStorage(cases.value)
-    await saveToSupabase()
-    return updated
+    cases.value[idx] = { ...old, ...data, updatedAt: now }
+    await syncState()
+    return cases.value[idx]
   }
 
-  // 变更状态
   async function changeStatus(id, newStatus, extra = {}) {
     const idx = cases.value.findIndex(c => c.id === id)
     if (idx === -1) return null
@@ -173,15 +233,13 @@ export const useCaseStore = defineStore('case', () => {
     const old = cases.value[idx]
     old.statusHistory.push({ from: old.status, to: newStatus, changedAt: now })
     cases.value[idx] = { ...old, status: newStatus, updatedAt: now, ...extra }
-    saveToLocalStorage(cases.value)
-    await saveToSupabase()
+    await syncState()
     return cases.value[idx]
   }
 
-  // 添加答复
   async function addReply(caseId, reply) {
     const c = cases.value.find(c => c.id === caseId)
-    if (!c) return
+    if (!c) return null
     c.replies.unshift({
       id: uuid(),
       date: reply.date || dayjs().format('YYYY-MM-DD'),
@@ -189,15 +247,13 @@ export const useCaseStore = defineStore('case', () => {
       attachmentUrls: reply.attachmentUrls || [],
     })
     c.updatedAt = dayjs().toISOString()
-    saveToLocalStorage(cases.value)
-    await saveToSupabase()
+    await syncState()
     return c
   }
 
-  // 上传文书
   async function addDocument(caseId, doc) {
     const c = cases.value.find(c => c.id === caseId)
-    if (!c) return
+    if (!c) return null
     c.documents.push({
       id: uuid(),
       name: doc.name || '未命名',
@@ -206,20 +262,114 @@ export const useCaseStore = defineStore('case', () => {
       uploadedAt: dayjs().toISOString(),
     })
     c.updatedAt = dayjs().toISOString()
-    saveToLocalStorage(cases.value)
-    await saveToSupabase()
+    await syncState()
     return c
   }
 
-  // 删除案件
   async function deleteCase(id) {
     cases.value = cases.value.filter(c => c.id !== id)
-    saveToLocalStorage(cases.value)
-    await saveToSupabase()
+    await syncState()
+  }
+
+  async function setUnassignedImages(list) {
+    unassignedImages.value = dedupeByUrl(list)
+    await syncState()
+    return unassignedImages.value
+  }
+
+  async function addUnassignedImage(image) {
+    if (!image?.url) return null
+    const normalized = normalizeImageRecord(image)
+    unassignedImages.value = [normalized, ...unassignedImages.value.filter(item => item.url !== normalized.url)]
+    await syncState()
+    return normalized
+  }
+
+  async function removeUnassignedImage(url) {
+    if (!url) return
+    const next = unassignedImages.value.filter(item => item.url !== url)
+    if (next.length === unassignedImages.value.length) return
+    unassignedImages.value = next
+    await syncState()
+  }
+
+  async function assignCloudFile(fileUrl, caseId, image = {}) {
+    if (!fileUrl) return null
+
+    const imageRecord = normalizeImageRecord({ ...image, url: fileUrl })
+    const now = dayjs().toISOString()
+    let changed = false
+
+    cases.value = cases.value.map(c => {
+      const currentImages = Array.isArray(c.images) ? c.images : []
+      const filteredImages = currentImages.filter(img => img.url !== fileUrl)
+      let nextImages = filteredImages
+
+      if (caseId && c.id === caseId) {
+        nextImages = [...filteredImages, imageRecord]
+      }
+
+      if (nextImages.length !== currentImages.length || (caseId && c.id === caseId)) {
+        changed = true
+        return { ...c, images: nextImages, updatedAt: now }
+      }
+
+      return c
+    })
+
+    if (caseId) {
+      const nextUnassigned = unassignedImages.value.filter(item => item.url !== fileUrl)
+      if (nextUnassigned.length !== unassignedImages.value.length) {
+        unassignedImages.value = nextUnassigned
+        changed = true
+      }
+    } else {
+      const existing = unassignedImages.value.find(item => item.url === fileUrl)
+      const nextUnassigned = [imageRecord, ...unassignedImages.value.filter(item => item.url !== fileUrl)]
+      if (!existing || JSON.stringify(existing) !== JSON.stringify(imageRecord)) {
+        unassignedImages.value = nextUnassigned
+        changed = true
+      }
+    }
+
+    if (changed) {
+      await syncState()
+    }
+
+    return imageRecord
+  }
+
+  async function removeCloudFileReferences(fileUrls) {
+    const urls = Array.isArray(fileUrls) ? fileUrls.filter(Boolean) : [fileUrls].filter(Boolean)
+    if (urls.length === 0) return
+
+    const urlSet = new Set(urls)
+    let changed = false
+
+    cases.value = cases.value.map(c => {
+      const currentImages = Array.isArray(c.images) ? c.images : []
+      const nextImages = currentImages.filter(img => !urlSet.has(img.url))
+      if (nextImages.length !== currentImages.length) {
+        changed = true
+        return { ...c, images: nextImages, updatedAt: dayjs().toISOString() }
+      }
+      return c
+    })
+
+    const nextUnassigned = unassignedImages.value.filter(item => !urlSet.has(item.url))
+    if (nextUnassigned.length !== unassignedImages.value.length) {
+      unassignedImages.value = nextUnassigned
+      changed = true
+    }
+
+    if (changed) {
+      await syncState()
+    }
   }
 
   return {
     cases,
+    unassignedImages,
     stats,
     isLoading,
     isSynced,
@@ -231,5 +381,12 @@ export const useCaseStore = defineStore('case', () => {
     addReply,
     addDocument,
     deleteCase,
+    saveToLocalStorage,
+    saveToSupabase,
+    setUnassignedImages,
+    addUnassignedImage,
+    removeUnassignedImage,
+    assignCloudFile,
+    removeCloudFileReferences,
   }
 })

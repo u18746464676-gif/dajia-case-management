@@ -430,6 +430,7 @@ import { useCaseStore } from '@/stores/case'
 import dayjs from 'dayjs'
 import { extractFromImage } from '@/lib/doubao'
 import { queryExpress } from '@/lib/kuaidi100'
+import { uploadBase64ToTos, deleteFromTos, listTosObjects, getTosFileUrl } from '@/lib/tos'
 
 const store = useCaseStore()
 const route = useRoute()
@@ -668,7 +669,7 @@ function applyOcrToCase(caseId) {
 
   const updates = {}
   if (ocrResult.value.trackingNumber) {
-    updates.notes = `[快递单号] ${ocrResult.value.trackingNumber}\n`
+    updates.trackingNumber = ocrResult.value.trackingNumber
   }
   store.updateCase(caseId, updates)
 
@@ -705,7 +706,7 @@ function applyOcrToCaseWithSign(caseId, signTime) {
 
   const updates = {}
   if (ocrResult.value.trackingNumber) {
-    updates.notes = `[快递单号] ${ocrResult.value.trackingNumber}\n`
+    updates.trackingNumber = ocrResult.value.trackingNumber
   }
   // 格式化签收时间
   if (signTime) {
@@ -728,7 +729,6 @@ async function handleScanUpload(event) {
   processingStatus.value = '识别中...'
 
   try {
-    // 转换为base64
     const imageBase64 = await new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = e => resolve(e.target.result)
@@ -736,7 +736,6 @@ async function handleScanUpload(event) {
       reader.readAsDataURL(file)
     })
 
-    // 先上传到云端
     processingStatus.value = '上传中...'
     const base64Data = imageBase64.split(',')[1]
     const url = await uploadBase64ToTos(imageBase64, 'scan_' + Date.now() + '.jpg')
@@ -747,22 +746,18 @@ async function handleScanUpload(event) {
       return
     }
 
-    // 保存到未关联列表
-    const unassignedImages = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
-    unassignedImages.unshift({
+    totalCloudFiles.value++
+
+    const fileMeta = {
       url,
       name: '扫描_' + dayjs().format('YYYY-MM-DD HH:mm'),
       date: dayjs().format('YYYY-MM-DD'),
       uploadedAt: dayjs().toISOString()
-    })
-    localStorage.setItem('unassigned_images', JSON.stringify(unassignedImages))
-    totalCloudFiles.value++
+    }
 
-    // AI识别图片内容
     processingStatus.value = 'AI匹配中...'
     const ocrResult = await extractFromImage(base64Data)
 
-    // 尝试匹配案件
     let matched = false
     let matchedCaseName = ''
 
@@ -775,19 +770,16 @@ async function handleScanUpload(event) {
       )
 
       if (matchedCase) {
-        const images = matchedCase.images || []
-        images.push({
-          url,
-          name: '扫描_' + dayjs().format('YYYY-MM-DD'),
-          date: dayjs().format('YYYY-MM-DD')
-        })
-        store.updateCase(matchedCase.id, { images })
+        await store.assignCloudFile(url, matchedCase.id, fileMeta)
         matched = true
         matchedCaseName = matchedCase.shopName
       }
     }
 
-    // 显示结果
+    if (!matched) {
+      await store.addUnassignedImage(fileMeta)
+    }
+
     if (matched) {
       uploadResult.value = {
         success: true,
@@ -825,23 +817,9 @@ const selectAllCloudFiles = ref(false)
 async function loadCloudFiles() {
   cloudFilesLoading.value = true
   try {
-    const client = new TosClient({
-      accessKeyId: import.meta.env.VITE_TOS_ACCESS_KEY_ID,
-      accessKeySecret: import.meta.env.VITE_TOS_SECRET_ACCESS_KEY,
-      region: import.meta.env.VITE_TOS_REGION,
-      endpoint: import.meta.env.VITE_TOS_ENDPOINT,
-    })
-    const result = await client.listObjects({
-      bucket: import.meta.env.VITE_TOS_BUCKET,
-      prefix: 'case-images/',
-    })
-    const tosFiles = result?.data?.contents || []
+    const tosFiles = await listTosObjects('case-images/')
+    const allFiles = [...store.unassignedImages]
 
-    // 合并未关联的本地图片
-    const localUnassigned = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
-
-    // 合并并去重（根据URL）
-    const allFiles = [...localUnassigned]
     tosFiles.forEach(f => {
       const url = getCloudFileUrl(f.Key)
       if (!allFiles.some(x => x.url === url)) {
@@ -853,14 +831,14 @@ async function loadCloudFiles() {
     totalCloudFiles.value = allFiles.length
   } catch (err) {
     console.error('加载云端文件失败:', err)
-    allCloudFiles.value = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
+    allCloudFiles.value = [...store.unassignedImages]
     totalCloudFiles.value = allCloudFiles.value.length
   }
   cloudFilesLoading.value = false
 }
 
 function getCloudFileUrl(key) {
-  return `https://${import.meta.env.VITE_TOS_BUCKET}.${import.meta.env.VITE_TOS_ENDPOINT}/${key}`
+  return getTosFileUrl(key)
 }
 
 function isImageFile(file) {
@@ -898,40 +876,17 @@ function getFileCaseId(file) {
   return ''
 }
 
-function assignFileToCase(file, caseId) {
+async function assignFileToCase(file, caseId) {
   const fileUrl = file.url || getCloudFileUrl(file.Key)
-
-  if (!caseId) {
-    store.cases.forEach(c => {
-      if (c.images) {
-        c.images = c.images.filter(img => img.url !== fileUrl)
-      }
-    })
-    store.saveToLocalStorage(store.cases)
-    store.saveToSupabase()
-    return
-  }
-
-  // 从其他案件移除
-  store.cases.forEach(c => {
-    if (c.images) {
-      c.images = c.images.filter(img => img.url !== fileUrl)
-    }
+  await store.assignCloudFile(fileUrl, caseId, {
+    name: getFileName(file),
+    date: file.date || dayjs().format('YYYY-MM-DD'),
+    uploadedAt: file.uploadedAt || file.LastModified || dayjs().toISOString()
   })
 
-  // 添加到目标案件
-  const caseData = store.getCase(caseId)
-  if (caseData) {
-    const images = caseData.images || []
-    images.push({
-      url: fileUrl,
-      name: getFileName(file),
-      date: dayjs().format('YYYY-MM-DD')
-    })
-    store.updateCase(caseId, { images })
+  if (caseId) {
+    alert('已关联到案件！')
   }
-
-  alert('已关联到案件！')
 }
 
 async function deleteCloudFile(file) {
@@ -948,23 +903,12 @@ async function deleteCloudFile(file) {
     }
   } catch (err) {
     console.error('云端删除失败:', err)
+    alert('删除失败，请稍后重试')
+    return
   }
 
-  // 从所有案件的images中移除
-  store.cases.forEach(c => {
-    if (c.images) {
-      c.images = c.images.filter(img => img.url !== fileUrl)
-    }
-  })
-  store.saveToLocalStorage(store.cases)
-  store.saveToSupabase()
+  await store.removeCloudFileReferences(fileUrl)
 
-  // 从本地未关联列表移除
-  const localUnassigned = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
-  const updated = localUnassigned.filter(x => x.url !== fileUrl)
-  localStorage.setItem('unassigned_images', JSON.stringify(updated))
-
-  // 从列表移除
   allCloudFiles.value = allCloudFiles.value.filter(f => (f.url || getCloudFileUrl(f.Key)) !== fileUrl)
   totalCloudFiles.value = allCloudFiles.value.length
 
@@ -994,6 +938,7 @@ async function batchDeleteCloudFiles() {
 
   let successCount = 0
   let failCount = 0
+  const removedUrls = []
 
   for (const file of selectedCloudFiles.value) {
     const fileUrl = file.url || getCloudFileUrl(file.Key)
@@ -1005,29 +950,18 @@ async function batchDeleteCloudFiles() {
       } else {
         await deleteFromTos(fileUrl)
       }
+      removedUrls.push(fileUrl)
+      successCount++
     } catch (err) {
       console.error('云端删除失败:', err)
+      failCount++
     }
-
-    // 从所有案件的images中移除
-    store.cases.forEach(c => {
-      if (c.images) {
-        c.images = c.images.filter(img => img.url !== fileUrl)
-      }
-    })
-
-    // 从本地未关联列表移除
-    const localUnassigned = JSON.parse(localStorage.getItem('unassigned_images') || '[]')
-    const updated = localUnassigned.filter(x => x.url !== fileUrl)
-    localStorage.setItem('unassigned_images', JSON.stringify(updated))
-
-    successCount++
   }
 
-  store.saveToLocalStorage(store.cases)
-  store.saveToSupabase()
+  if (removedUrls.length > 0) {
+    await store.removeCloudFileReferences(removedUrls)
+  }
 
-  // 刷新列表
   await loadCloudFiles()
   selectedCloudFiles.value = []
   selectAllCloudFiles.value = false

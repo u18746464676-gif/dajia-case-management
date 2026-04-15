@@ -26,6 +26,10 @@
               <span class="text-slate-400">🏛️</span>
               <span>{{ c.jurisdiction || '-' }}</span>
             </span>
+            <span class="flex items-center gap-1">
+              <span class="text-slate-400">📦</span>
+              <span>快递单号：{{ c.trackingNumber || '-' }}</span>
+            </span>
           </div>
         </div>
         <div class="text-right shrink-0 ml-4">
@@ -79,7 +83,7 @@
         <span>📋</span>
         <span>举报/受理信息</span>
       </h3>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="label">管辖局</label>
           <input
@@ -106,6 +110,16 @@
             v-model="c.signDate"
             @change="saveField('signDate', c.signDate)"
             class="input-field rounded-lg"
+          />
+        </div>
+        <div>
+          <label class="label">快递单号</label>
+          <input
+            type="text"
+            v-model="c.trackingNumber"
+            @change="saveField('trackingNumber', c.trackingNumber)"
+            class="input-field rounded-lg"
+            placeholder="识别出的快递单号会显示在这里"
           />
         </div>
         <div>
@@ -149,7 +163,7 @@
         <span>💵</span>
         <span>财务信息</span>
       </h3>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="label">商品价格（元）</label>
           <input
