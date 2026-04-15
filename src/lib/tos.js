@@ -53,7 +53,20 @@ export function isTosConfigured() {
 }
 
 export function getTosFileUrl(key = '') {
-  return `https://${BUCKET}.${ENDPOINT}/${key}`
+  const raw = String(key || '')
+
+  if (!raw) return ''
+  if (/^https?:\/\//i.test(raw)) return raw
+
+  if (BUCKET && ENDPOINT) {
+    return `https://${BUCKET}.${ENDPOINT}/${raw.replace(/^\//, '')}`
+  }
+
+  if (STORAGE_API_BASE) {
+    return `${STORAGE_API_BASE}${raw.startsWith('/') ? '' : '/'}${raw}`
+  }
+
+  return raw
 }
 
 function getTosKeyFromUrl(urlOrKey = '') {
