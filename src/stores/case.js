@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase'
 const STORAGE_KEY = 'pdd_case_list_v1'
 const UNASSIGNED_IMAGES_KEY = 'unassigned_images'
 const APP_META_ID = '00000000-0000-0000-0000-000000000000'
+const CASE_NUMBER_PREFIX = 'AJ'
+const CASE_NUMBER_PATTERN = /^AJ-(\d{8})-(\d{4})$/
 
 function uuid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -31,6 +33,54 @@ function normalizeImageRecord(image = {}) {
     date: image.date || dayjs().format('YYYY-MM-DD'),
     uploadedAt: image.uploadedAt || now,
   }
+}
+
+function formatCaseNumber(dateLike, sequence) {
+  const dayKey = dayjs(dateLike).isValid() ? dayjs(dateLike).format('YYYYMMDD') : dayjs().format('YYYYMMDD')
+  return `${CASE_NUMBER_PREFIX}-${dayKey}-${String(sequence).padStart(4, '0')}`
+}
+
+function parseCaseNumber(caseNumber = '') {
+  const match = String(caseNumber || '').match(CASE_NUMBER_PATTERN)
+  if (!match) return null
+
+  return {
+    dayKey: match[1],
+    sequence: Number(match[2]),
+  }
+}
+
+function ensureCaseNumbers(list = []) {
+  const sorted = [...(list || [])].sort((a, b) => {
+    const aTime = dayjs(a?.createdAt).valueOf() || 0
+    const bTime = dayjs(b?.createdAt).valueOf() || 0
+    if (aTime !== bTime) return aTime - bTime
+    return String(a?.id || '').localeCompare(String(b?.id || ''))
+  })
+
+  const counters = new Map()
+  const assigned = new Map()
+
+  sorted.forEach(item => {
+    const parsed = parseCaseNumber(item?.caseNumber)
+    if (!parsed) return
+    counters.set(parsed.dayKey, Math.max(counters.get(parsed.dayKey) || 0, parsed.sequence))
+    assigned.set(item.id, item.caseNumber)
+  })
+
+  sorted.forEach(item => {
+    if (assigned.has(item.id)) return
+    const createdAt = item?.createdAt || dayjs().toISOString()
+    const dayKey = dayjs(createdAt).isValid() ? dayjs(createdAt).format('YYYYMMDD') : dayjs().format('YYYYMMDD')
+    const nextSequence = (counters.get(dayKey) || 0) + 1
+    counters.set(dayKey, nextSequence)
+    assigned.set(item.id, formatCaseNumber(createdAt, nextSequence))
+  })
+
+  return (list || []).map(item => ({
+    ...item,
+    caseNumber: assigned.get(item.id) || item.caseNumber || '',
+  }))
 }
 
 export const useCaseStore = defineStore('case', () => {
@@ -93,13 +143,13 @@ export const useCaseStore = defineStore('case', () => {
       const appMetaRow = rows.find(row => row.id === APP_META_ID || row.data?.id === APP_META_ID || row.data?.type === '__app_meta__')
       const caseRows = rows.filter(row => row.id !== APP_META_ID && row.data?.type !== '__app_meta__')
 
-      cases.value = caseRows.map(row => row.data).filter(Boolean)
+      cases.value = ensureCaseNumbers(caseRows.map(row => row.data).filter(Boolean))
       unassignedImages.value = dedupeByUrl(appMetaRow?.data?.unassignedImages || loadUnassignedImagesFromLocalStorage())
       persistToLocal()
       isSynced.value = true
     } catch (err) {
       console.error('加载失败，尝试本地数据:', err)
-      cases.value = loadFromLocalStorage()
+      cases.value = ensureCaseNumbers(loadFromLocalStorage())
       unassignedImages.value = loadUnassignedImagesFromLocalStorage()
       isSynced.value = false
     } finally {
@@ -157,7 +207,7 @@ export const useCaseStore = defineStore('case', () => {
     if (cases.value.length === 0) {
       const localData = loadFromLocalStorage()
       if (localData.length > 0) {
-        cases.value = localData
+        cases.value = ensureCaseNumbers(localData)
       }
     }
 
@@ -177,7 +227,7 @@ export const useCaseStore = defineStore('case', () => {
   const stats = computed(() => {
     const list = cases.value
     return {
-      total: list.length,
+      total: list.filter(c => !(c.status === 'decided' && Number(c.profit) > 0)).length,
       pending: list.filter(c => c.status === 'pending_report').length,
       reported: list.filter(c => c.status === 'reported').length,
       accepted: list.filter(c => c.status === 'accepted').length,
@@ -198,6 +248,7 @@ export const useCaseStore = defineStore('case', () => {
 
     return {
       id: data.id || uuid(),
+      caseNumber: data.caseNumber || '',
       createdAt: data.createdAt || now,
       updatedAt: now,
       shopName: data.shopName || '',
@@ -235,9 +286,9 @@ export const useCaseStore = defineStore('case', () => {
 
   async function createCase(data) {
     const newCase = buildCaseRecord(data)
-    cases.value.unshift(newCase)
+    cases.value = ensureCaseNumbers([newCase, ...cases.value])
     await syncState()
-    return newCase
+    return cases.value.find(item => item.id === newCase.id)
   }
 
   async function createCasesBulk(list = []) {
@@ -247,9 +298,9 @@ export const useCaseStore = defineStore('case', () => {
 
     if (nextCases.length === 0) return []
 
-    cases.value = [...nextCases, ...cases.value]
+    cases.value = ensureCaseNumbers([...nextCases, ...cases.value])
     await syncState()
-    return nextCases
+    return cases.value.filter(item => nextCases.some(next => next.id === item.id))
   }
 
   async function updateCase(id, data) {
@@ -257,7 +308,10 @@ export const useCaseStore = defineStore('case', () => {
     if (idx === -1) return null
     const now = dayjs().toISOString()
     const old = cases.value[idx]
-    cases.value[idx] = { ...old, ...data, updatedAt: now }
+    const nextCaseNumber = data.caseNumber === '' || data.caseNumber === null || data.caseNumber === undefined
+      ? old.caseNumber
+      : data.caseNumber
+    cases.value[idx] = { ...old, ...data, caseNumber: nextCaseNumber, updatedAt: now }
     await syncState()
     return cases.value[idx]
   }
@@ -268,7 +322,17 @@ export const useCaseStore = defineStore('case', () => {
     const now = dayjs().toISOString()
     const old = cases.value[idx]
     old.statusHistory.push({ from: old.status, to: newStatus, changedAt: now })
-    cases.value[idx] = { ...old, status: newStatus, updatedAt: now, ...extra }
+
+    const normalizedExtra = { ...extra }
+    if ((newStatus === 'accepted' || newStatus === 'reported') && !old.acceptanceDate && !normalizedExtra.acceptanceDate) {
+      normalizedExtra.acceptanceDate = dayjs().format('YYYY-MM-DD')
+    }
+
+    if (['decided', 'closed', 'rejected', 'not_punished'].includes(newStatus) && !old.decisionDate && !normalizedExtra.decisionDate) {
+      normalizedExtra.decisionDate = dayjs().format('YYYY-MM-DD')
+    }
+
+    cases.value[idx] = { ...old, status: newStatus, updatedAt: now, ...normalizedExtra }
     await syncState()
     return cases.value[idx]
   }
@@ -294,6 +358,8 @@ export const useCaseStore = defineStore('case', () => {
       id: uuid(),
       name: doc.name || '未命名',
       type: doc.type || 'other',
+      category: doc.category || 'other',
+      note: doc.note || '',
       url: doc.url || '',
       uploadedAt: dayjs().toISOString(),
     })
@@ -362,10 +428,11 @@ export const useCaseStore = defineStore('case', () => {
     await syncState()
   }
 
-  async function assignCloudFile(fileUrl, caseId, image = {}) {
+  async function assignCloudFile(fileUrl, caseId, image = {}, casePatch = null) {
     if (!fileUrl) return null
 
     const imageRecord = normalizeImageRecord({ ...image, url: fileUrl })
+    const patch = casePatch && typeof casePatch === 'object' ? casePatch : null
     const now = dayjs().toISOString()
     let changed = false
 
@@ -378,9 +445,15 @@ export const useCaseStore = defineStore('case', () => {
         nextImages = [...filteredImages, imageRecord]
       }
 
-      if (nextImages.length !== currentImages.length || (caseId && c.id === caseId)) {
+      const shouldApplyPatch = Boolean(caseId && c.id === caseId && patch)
+      if (nextImages.length !== currentImages.length || (caseId && c.id === caseId) || shouldApplyPatch) {
         changed = true
-        return { ...c, images: nextImages, updatedAt: now }
+        return {
+          ...c,
+          ...(shouldApplyPatch ? patch : {}),
+          images: nextImages,
+          updatedAt: now,
+        }
       }
 
       return c

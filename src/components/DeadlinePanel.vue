@@ -54,7 +54,7 @@
         <span class="text-xl">⚠️</span>
         <span class="font-semibold">已超过法定受理期限</span>
       </div>
-      <p class="text-sm text-red-500 mt-1">自签收之日起已超过7个工作日，请尽快处理</p>
+      <p class="text-sm text-red-500 mt-1">自签收之日起已超过10个工作日，请尽快处理</p>
     </div>
 
     <!-- 自定义时限 -->
@@ -130,12 +130,26 @@ function workingDaysDiff(startDate, endDate) {
   return count - 1
 }
 
-// 检查是否超过法定受理期限（未受理状态下，签收日期超过7个工作日）
+function addWorkingDays(startDate, days) {
+  let current = dayjs(startDate)
+  let added = 0
+
+  while (added < days) {
+    current = current.add(1, 'day')
+    const dayOfWeek = current.day()
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      added++
+    }
+  }
+
+  return current.format('YYYY-MM-DD')
+}
+
+// 检查是否超过法定受理期限（未受理状态下，签收日期起10个工作日）
 const overdueAlert = computed(() => {
   const c = props.caseObj
-  // 只有在未受理状态且有签收日期时才检查
   if (c.status === 'pending_report' && c.signDate) {
-    const deadline = dayjs(c.signDate).add(7, 'day').format('YYYY-MM-DD')
+    const deadline = addWorkingDays(c.signDate, 10)
     const workingDaysLeft = workingDaysDiff(dayjs(), deadline)
     return workingDaysLeft < 0
   }
@@ -147,22 +161,35 @@ const legalDeadlines = computed(() => {
   const now = dayjs()
   const c = props.caseObj
 
-  // 只有已受理状态才显示调解和办结倒计时
-  if (c.status === 'accepted' || c.status === 'reported' || c.status === 'decided' || c.status === 'closed') {
-    // 调解倒计时60自然日（从受理日期算起）
-    if (c.acceptanceDate) {
-      const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
-      const mediationDaysLeft = dayjs(mediationDeadline).diff(now, 'day')
-      list.push({
-        name: '调解倒计时（60日）',
-        date: mediationDeadline,
-        daysLeft: mediationDaysLeft,
-        urgent: mediationDaysLeft <= 7,
-        expired: mediationDaysLeft < 0,
-        type: 'mediation'
-      })
+  if (c.status === 'pending_report' && c.signDate) {
+    const acceptanceDeadline = addWorkingDays(c.signDate, 10)
+    const acceptanceDaysLeft = workingDaysDiff(dayjs(), acceptanceDeadline)
+    list.push({
+      name: '受理到期日（10个工作日）',
+      date: acceptanceDeadline,
+      daysLeft: acceptanceDaysLeft,
+      urgent: acceptanceDaysLeft <= 3,
+      expired: acceptanceDaysLeft < 0,
+      type: 'acceptance'
+    })
+  }
 
-      // 案件办结到期日120日（从受理日期算起）
+  // 受理相关状态显示法定时限，不予受理只保留案件办结到期日
+  if (c.status === 'accepted' || c.status === 'reported' || c.status === 'decided' || c.status === 'closed') {
+    if (c.acceptanceDate) {
+      if (c.status !== 'reported') {
+        const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
+        const mediationDaysLeft = dayjs(mediationDeadline).diff(now, 'day')
+        list.push({
+          name: '调解倒计时（60日）',
+          date: mediationDeadline,
+          daysLeft: mediationDaysLeft,
+          urgent: mediationDaysLeft <= 7,
+          expired: mediationDaysLeft < 0,
+          type: 'mediation'
+        })
+      }
+
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
       list.push({

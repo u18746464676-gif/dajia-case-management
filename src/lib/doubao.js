@@ -156,24 +156,36 @@ ${caseList}
 
 // 提取OCR文字并理解
 export async function extractFromImage(imageBase64) {
-  const prompt = `你是一个专业的OCR和文档理解助手。请仔细分析这张图片，提取其中的关键信息：
+  const prompt = `你是一个专业的OCR和文档理解助手。请仔细分析这张图片，提取其中的关键信息，并且只返回 JSON。
 
-1. 识别主体/公司/店铺名称
-2. 识别快递单号或运单号（通常是一串数字或字母组合）
-3. 识别日期（如签收日期、收件日期等）
-4. 识别金额
-5. 其他有价值的信息
+请重点识别：
+1. 执照名称/公司主体名称
+2. 店铺名称
+3. 快递单号或运单号（通常是一串数字或字母组合）
+4. 文档类型：信封、受理通知书、举报不予立案告知书、答复函、其他文书、普通图片
+5. 文书标题（如果图片里有明确标题，原样返回）
+6. 日期（如签收日期、收件日期等）
+7. 金额
+8. 其他有价值的信息
 
-请用JSON格式返回，格式如下：
+返回格式：
 {
-  "shopName": "识别到的主体名称",
+  "licenseName": "识别到的执照/主体名称",
+  "shopName": "识别到的店铺名称",
   "trackingNumber": "快递单号",
+  "documentType": "信封/受理通知书/举报不予立案告知书/答复函/其他文书/普通图片",
+  "documentTitle": "文书标题",
+  "isEnvelope": true,
   "dates": ["日期1", "日期2"],
   "amounts": ["金额1", "金额2"],
   "other": "其他重要信息"
 }
 
-如果某项无法识别，填写null。`
+规则：
+- 如果图片中包含明显快递面单、物流单号、二维码/条码对应的物流面单信息，优先判断为“信封”。
+- 如果存在执照名称，licenseName 必须尽量返回执照/公司主体，而不是店铺名。
+- 只返回 JSON，不要解释，不要 markdown 代码块。
+- 无法识别的字段返回 null。`
 
   try {
     const response = await fetch(`${BASE_URL}/chat/completions`, {
@@ -207,15 +219,17 @@ export async function extractFromImage(imageBase64) {
     const data = await response.json()
     const content = data.choices?.[0]?.message?.content || ''
 
-    // 尝试解析JSON
     try {
-      // 提取JSON部分
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      const cleaned = String(content)
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```$/i, '')
+        .trim()
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0])
       }
     } catch {
-      // 返回原始文本
       return { raw: content }
     }
 

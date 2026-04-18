@@ -1,109 +1,142 @@
 <template>
-  <div>
-    <!-- 图片上传区域 -->
-    <div class="card mb-4 p-4 border-0 shadow-md">
-      <div class="flex flex-wrap items-center gap-3 mb-3">
-        <label class="btn-primary text-sm cursor-pointer flex items-center gap-2 shadow-lg shadow-blue-600/20">
-          <span>📷</span>
-          <span>扫码上传</span>
-          <input type="file" accept="image/*" capture="environment" @change="handleScanUpload" class="hidden" />
-        </label>
-        <label class="btn-secondary text-sm cursor-pointer flex items-center gap-2">
-          <span>🖼️</span>
-          <span>相册上传</span>
-          <input type="file" accept="image/*" multiple @change="handleAlbumUpload" class="hidden" />
-        </label>
-        <label class="btn-secondary text-sm cursor-pointer flex items-center gap-2">
-          <span>📄</span>
-          <span>上传文件</span>
-          <input type="file" accept=".doc,.docx,.pdf,.txt" multiple @change="handleFileUpload" class="hidden" />
-        </label>
-        <label class="btn-secondary text-sm cursor-pointer flex items-center gap-2">
-          <span>📊</span>
-          <span>导入Excel</span>
-          <input type="file" accept=".xlsx,.xls" @change="importExcel" class="hidden" />
-        </label>
-        <button @click="showCloudFiles = true" class="btn-secondary text-sm flex items-center gap-2">
-          <span>☁️</span>
-          <span>云端文件</span>
-          <span v-if="totalCloudFiles > 0" class="bg-blue-500 text-white text-xs px-1.5 rounded-full">{{ totalCloudFiles }}</span>
-        </button>
-        <router-link to="/case/new" class="btn-primary text-sm inline-flex items-center gap-2">
-          <span>＋</span>
-          <span>新增案件</span>
-        </router-link>
-      </div>
+  <div class="space-y-4">
+    <section class="card overflow-hidden">
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div class="space-y-3">
+          <div>
+            <div class="text-xs uppercase tracking-[0.24em] text-slate-400">案件总览</div>
+            <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">待跟进案件</h1>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">先筛出当前要处理的案件，再补材料、查单号、批量跟进，减少来回切换。</p>
+        </div>
+          <div class="flex flex-wrap gap-2">
+            <span class="soft-tag">检索结果 {{ filteredCases.length }}</span>
+            <span class="soft-tag">本页已选 {{ selectedIds.length }}</span>
+            <span class="soft-tag">云端文件 {{ totalCloudFiles }}</span>
+          </div>
+        </div>
 
-      <!-- 上传加载中 -->
-      <div v-if="uploadLoading" class="flex items-center gap-3 p-4 bg-blue-50 rounded-xl mb-3">
-        <div class="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-        <span class="text-blue-600">{{ processingStatus }}</span>
-      </div>
+        <div class="w-full xl:max-w-2xl">
+          <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap xl:justify-end">
+            <button type="button" @click="triggerPhotoUpload" class="btn-primary flex-1 sm:flex-none">
+              <span>拍照上传</span>
+            </button>
+            <router-link to="/case/new" class="btn-primary flex-1 sm:flex-none">
+              <span>新增案件</span>
+            </router-link>
+            <button type="button" @click="showMoreActions = !showMoreActions" class="btn-secondary flex-1 sm:flex-none">
+              <span>{{ showMoreActions ? '收起操作' : '更多操作' }}</span>
+            </button>
+          </div>
 
-      <!-- 上传结果 -->
-      <div v-if="uploadResult" class="p-4 rounded-xl mb-3" :class="uploadResult.success ? 'bg-green-50' : 'bg-orange-50'">
-        <div class="flex items-center justify-between">
-          <span :class="uploadResult.success ? 'text-green-600' : 'text-orange-600'">
-            {{ uploadResult.message }}
-          </span>
-          <button @click="uploadResult = null" class="text-gray-400 hover:text-gray-600">×</button>
+          <div v-if="showMoreActions" class="grid grid-cols-1 gap-3 mt-3 sm:grid-cols-2">
+            <button type="button" @click="showMoreActions = false; triggerAlbumUpload()" class="action-tile">
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-800">相册上传</span>
+                <span class="mt-1 block text-xs text-slate-500">批量挑图后再统一上传</span>
+              </span>
+            </button>
+            <button type="button" @click="showMoreActions = false; triggerFileUpload()" class="action-tile">
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-800">上传文件</span>
+                <span class="mt-1 block text-xs text-slate-500">支持文档类附件暂存</span>
+              </span>
+            </button>
+            <button type="button" @click="showMoreActions = false; triggerExcelUpload()" class="action-tile">
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-800">导入 Excel</span>
+                <span class="mt-1 block text-xs text-slate-500">先预览再勾选导入</span>
+              </span>
+            </button>
+            <button type="button" @click="showMoreActions = false; exportCasesToExcel()" class="action-tile">
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-800">导出台账</span>
+                <span class="mt-1 block text-xs text-slate-500">有选中导出选中，否则导出当前筛选结果</span>
+              </span>
+            </button>
+            <button type="button" @click="showMoreActions = false; showCloudFiles = true" class="action-tile">
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-800">云端文件</span>
+                <span class="mt-1 block text-xs text-slate-500">当前 {{ totalCloudFiles }} 个文件可管理</span>
+              </span>
+            </button>
+          </div>
+
+          <input ref="photoInputRef" type="file" accept="image/*,.heic,.heif" capture="environment" @change="handleScanUpload" class="hidden" />
+          <input ref="albumInputRef" type="file" accept="image/*,.heic,.heif" multiple @change="handleAlbumUpload" class="hidden" />
+          <input ref="fileInputRef" type="file" accept=".doc,.docx,.pdf,.txt" multiple @change="handleFileUpload" class="hidden" />
+          <input ref="excelInputRef" type="file" accept=".xlsx,.xls,.csv" @change="importExcel" class="hidden" />
         </div>
       </div>
 
-      <div v-if="albumUploads.length > 0" class="p-4 bg-slate-50 rounded-xl mb-3 border border-slate-200">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <div class="text-sm text-slate-600">已选择 {{ albumUploads.length }} 张图片，先预览，再勾选上传</div>
+      <div v-if="uploadLoading" class="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+        <div class="flex items-center gap-3">
+          <div class="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+          <span>{{ processingStatus }}</span>
+        </div>
+      </div>
+
+      <div v-if="uploadResult" class="mt-4 rounded-2xl border px-4 py-3 text-sm" :class="uploadResult.success ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-orange-100 bg-orange-50 text-orange-700'">
+        <div class="flex items-start justify-between gap-3">
+          <span>{{ uploadResult.message }}</span>
+          <button @click="uploadResult = null" class="btn-ghost p-0 text-current">×</button>
+        </div>
+      </div>
+
+      <div v-if="albumUploads.length > 0" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+        <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="text-sm text-slate-600">已选择 {{ albumUploads.length }} 张图片，先预览，再勾选上传。</div>
           <div class="flex flex-wrap items-center gap-2">
-            <label class="text-sm flex items-center gap-2 text-slate-600">
-              <input type="checkbox" :checked="selectAllAlbumUploads" @change="toggleSelectAllAlbumUploads" class="w-4 h-4 rounded" />
+            <label class="flex items-center gap-2 text-sm text-slate-600">
+              <input type="checkbox" :checked="selectAllAlbumUploads" @change="toggleSelectAllAlbumUploads" class="h-4 w-4 rounded" />
               <span>全选</span>
             </label>
-            <button @click="confirmAlbumUpload" class="btn-primary text-sm">上传选中</button>
-            <button @click="clearAlbumUploads" class="btn-secondary text-sm">清空</button>
+            <button @click="confirmAlbumUpload" class="btn-primary">上传选中</button>
+            <button @click="clearAlbumUploads" class="btn-secondary">清空</button>
           </div>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          <div v-for="item in albumUploads" :key="item.id" class="relative rounded-xl overflow-hidden border border-slate-200 bg-white">
-            <label class="absolute top-2 left-2 z-10 bg-white/90 rounded-md px-1.5 py-1 flex items-center gap-1 text-xs text-slate-700">
-              <input type="checkbox" v-model="item.selected" class="w-4 h-4 rounded" />
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+          <div v-for="item in albumUploads" :key="item.id" class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <label class="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-white/90 px-1.5 py-1 text-xs text-slate-700">
+              <input type="checkbox" v-model="item.selected" class="h-4 w-4 rounded" />
               <span>选中</span>
             </label>
-            <img :src="item.url" class="w-full h-28 object-cover" />
-            <div class="p-2 text-xs text-slate-500 truncate">{{ item.name }}</div>
+            <img :src="item.url" class="h-28 w-full bg-slate-50 object-contain" />
+            <div class="truncate p-2 text-xs text-slate-500">{{ item.name }}</div>
           </div>
         </div>
       </div>
-    </div>
 
-      <!-- OCR加载中 -->
-      <div v-if="ocrLoading" class="flex items-center gap-3 p-4 bg-blue-50 rounded-xl mb-3">
-        <div class="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-        <span class="text-blue-600">正在识别图片，请稍候...</span>
+      <div v-if="ocrLoading" class="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+        <div class="flex items-center gap-3">
+          <div class="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+          <span>正在识别图片，请稍候...</span>
+        </div>
       </div>
 
-      <!-- OCR结果 -->
-      <div v-if="ocrResult" class="p-4 bg-green-50 rounded-xl mb-3">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-green-600 font-semibold">✅ OCR识别结果</span>
-          <button @click="ocrResult = null; logisticsResult = null" class="text-green-400 hover:text-green-600">×</button>
+      <div v-if="ocrResult" class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-sm font-semibold text-emerald-700">✅ OCR 识别结果</span>
+          <button @click="ocrResult = null; logisticsResult = null" class="btn-ghost p-0 text-emerald-600">×</button>
         </div>
-        <div class="text-sm text-green-700 mb-2">识别到的主体：<strong>{{ ocrResult.shopName }}</strong></div>
-        <div class="text-sm text-green-700 mb-2">识别到单号：<strong>{{ ocrResult.trackingNumber }}</strong>
-          <button
-            v-if="ocrResult.trackingNumber && !logisticsResult"
-            @click="queryLogistics(ocrResult.trackingNumber)"
-            :disabled="logisticsLoading"
-            class="ml-3 btn-primary text-xs py-1 px-3"
-          >
-            {{ logisticsLoading ? '查询中...' : '查物流' }}
-          </button>
+        <div class="mt-3 space-y-2 text-sm text-emerald-700">
+          <div>识别到的执照名称：<strong>{{ ocrResult.licenseName || ocrResult.shopName || '-' }}</strong></div>
+          <div>
+            识别到单号：<strong>{{ ocrResult.trackingNumber }}</strong>
+            <button
+              v-if="ocrResult.trackingNumber && !logisticsResult"
+              @click="queryLogistics(ocrResult.trackingNumber)"
+              :disabled="logisticsLoading"
+              class="btn-primary ml-3 px-3 py-1 text-xs"
+            >
+              {{ logisticsLoading ? '查询中...' : '查物流' }}
+            </button>
+          </div>
         </div>
 
-        <!-- 物流查询结果 -->
-        <div v-if="logisticsResult" class="mt-3 p-3 bg-white rounded-lg">
-          <div class="flex items-center justify-between mb-2">
-            <span class="font-semibold text-green-700">物流信息</span>
-            <span :class="logisticsResult.status === '签收' ? 'text-green-600' : 'text-yellow-600'" class="text-sm font-bold">
+        <div v-if="logisticsResult" class="mt-3 rounded-2xl bg-white p-3 shadow-sm">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="font-semibold text-emerald-700">物流信息</span>
+            <span :class="logisticsResult.status === '签收' ? 'text-emerald-600' : 'text-yellow-600'" class="text-sm font-bold">
               {{ logisticsResult.status }}
             </span>
           </div>
@@ -111,150 +144,170 @@
             <div
               v-for="(item, idx) in logisticsResult.details"
               :key="idx"
-              class="flex gap-3 p-2 rounded"
-              :class="idx === 0 ? 'bg-green-50' : 'bg-gray-50'"
+              class="flex gap-3 rounded-xl p-2"
+              :class="idx === 0 ? 'bg-emerald-50' : 'bg-slate-50'"
             >
-              <div class="text-gray-500 shrink-0">{{ item.time }}</div>
+              <div class="shrink-0 text-slate-500">{{ item.time }}</div>
               <div class="flex-1">{{ item.description }}</div>
             </div>
           </div>
           <div v-if="logisticsResult.status === '签收' && ocrResult.matchedCases.length > 0" class="mt-3">
-            <button
-              @click="applyOcrToCaseWithSign(ocrResult.matchedCases[0].id, logisticsResult.details[0]?.time)"
-              class="btn-primary text-sm w-full"
-            >
+            <button @click="applyOcrToCaseWithSign(ocrResult.matchedCases[0].id, logisticsResult.details[0]?.time)" class="btn-primary w-full">
               一键关联并记录签收时间
             </button>
           </div>
         </div>
 
         <div v-if="ocrResult.matchedCases.length > 0" class="mt-3">
-          <div class="text-sm text-green-600 mb-2">匹配到的案件：</div>
+          <div class="mb-2 text-sm text-emerald-600">匹配到的案件：</div>
           <div class="space-y-2">
-            <div
-              v-for="c in ocrResult.matchedCases"
-              :key="c.id"
-              @click="applyOcrToCase(c.id)"
-              class="p-2 bg-white rounded-lg cursor-pointer hover:bg-green-100 transition-colors text-sm"
+            <button
+              v-for="matched in ocrResult.matchedCases"
+              :key="matched.id"
+              @click="applyOcrToCase(matched.id)"
+              class="w-full rounded-xl bg-white p-3 text-left text-sm transition hover:bg-emerald-100"
             >
-              <span class="font-medium">{{ c.shopName }}</span>
-              <span class="text-slate-400 ml-2">{{ c.productName }}</span>
-            </div>
+              <span class="font-medium">{{ matched.licenseName || matched.shopName }}</span>
+              <span class="ml-2 text-slate-400">{{ matched.productName }}</span>
+            </button>
           </div>
         </div>
-        <div v-else class="text-sm text-orange-600 mt-2">
-          未匹配到相关案件，请手动选择
-        </div>
+        <div v-else class="mt-2 text-sm text-orange-600">未匹配到相关案件，请手动选择</div>
       </div>
 
-      <div v-if="uploadedFiles.length > 0" class="flex flex-wrap gap-3">
-        <div v-for="(file, idx) in uploadedFiles" :key="'file-' + idx" class="relative group">
-          <div class="w-16 h-16 flex flex-col items-center justify-center bg-slate-100 rounded-xl border-2 border-slate-100">
+      <div v-if="uploadedFiles.length > 0" class="mt-4 flex flex-wrap gap-3">
+        <div v-for="(file, idx) in uploadedFiles" :key="'file-' + idx" class="group relative">
+          <div class="flex h-16 w-16 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-100">
             <span class="text-2xl">📄</span>
-            <span class="text-xs text-slate-500 truncate w-full text-center px-1">{{ file.name.substring(0, 8) }}</span>
+            <span class="w-full truncate px-1 text-center text-xs text-slate-500">{{ file.name.substring(0, 8) }}</span>
           </div>
-          <button
-            @click="removeFile(idx)"
-            class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-          >×</button>
+          <button @click="removeFile(idx)" class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-sm text-white opacity-0 transition group-hover:opacity-100">×</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <button type="button" @click="focusMonthlyCases" class="metric-card text-left transition hover:border-slate-300 hover:shadow-md">
+          <div class="text-xs font-medium text-slate-500">当月花费</div>
+          <div class="mt-1 text-2xl font-bold text-slate-800">¥{{ monthlyStats.expense.toLocaleString() }}</div>
+          <div class="mt-1 text-xs text-slate-400">点击定位到案件列表</div>
+        </button>
+        <button type="button" @click="focusMonthlyCases" class="metric-card text-left transition hover:border-slate-300 hover:shadow-md">
+          <div class="text-xs font-medium text-slate-500">当月盈利</div>
+          <div class="mt-1 text-2xl font-bold text-slate-800">¥{{ monthlyStats.profit.toLocaleString() }}</div>
+          <div class="mt-1 text-xs text-slate-400">点击定位到案件列表</div>
+        </button>
+      </div>
+
+      <div class="mt-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <div class="text-sm font-semibold text-slate-800">检索与筛选</div>
+          <p class="mt-1 text-xs leading-5 text-slate-500">按月份、状态和关键词快速缩小范围，把今天要处理的案件先拎出来。</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span v-if="selectedIds.length > 0" class="soft-tag">已选 {{ selectedIds.length }} 条</span>
+          <button v-if="hasActiveFilters" type="button" @click="clearFilters" class="btn-ghost text-xs text-slate-500">清空筛选</button>
         </div>
       </div>
 
-    <!-- 筛选栏 -->
-    <div class="mb-4 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-      <!-- 统计卡片 -->
-      <div class="flex flex-wrap gap-4 mb-4">
-        <div class="flex-1 min-w-[150px] bg-gradient-to-r from-red-50 to-amber-50 rounded-xl p-3 border border-red-100">
-          <div class="text-xs text-red-500 font-medium">当月案件</div>
-          <div class="text-2xl font-bold text-red-700">{{ monthlyStats.total }}</div>
+      <div class="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center">
+        <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <select v-model="filterYear" class="input-field sm:w-28">
+            <option v-for="y in availableYears" :key="y" :value="y">{{ y }}年</option>
+          </select>
+          <select v-model="filterMonth" class="input-field sm:w-24">
+            <option v-for="m in 12" :key="m" :value="String(m).padStart(2, '0')">{{ m }}月</option>
+          </select>
+          <select v-model="filterStatus" class="input-field sm:w-32">
+            <option value="">全部状态</option>
+            <option value="pending_report">未受理</option>
+            <option value="accepted">已受理</option>
+            <option value="reported">不予受理</option>
+            <option value="decided">已调解</option>
+            <option value="closed">已处罚</option>
+            <option value="rejected">不予立案</option>
+            <option value="not_punished">不予处罚</option>
+          </select>
+          <div class="min-w-0 flex-1 xl:max-w-md">
+            <input
+              v-model="keyword"
+              type="text"
+              placeholder="搜索编号 / 店铺 / 商品 / 执照 / 单号..."
+              class="input-field"
+            />
+          </div>
         </div>
-        <div class="flex-1 min-w-[150px] bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-3 border border-orange-100">
-          <div class="text-xs text-orange-500 font-medium">当月花费</div>
-          <div class="text-2xl font-bold text-orange-700">¥{{ monthlyStats.expense.toLocaleString() }}</div>
-        </div>
-      </div>
 
-      <!-- 筛选条件 -->
-      <div class="flex flex-wrap gap-3 items-center">
-        <select v-model="filterYear" class="input-field w-28 text-sm rounded-lg">
-          <option v-for="y in availableYears" :key="y" :value="y">{{ y }}年</option>
-        </select>
-        <select v-model="filterMonth" class="input-field w-24 text-sm rounded-lg">
-          <option v-for="m in 12" :key="m" :value="String(m).padStart(2,'0')">{{ m }}月</option>
-        </select>
-        <select v-model="filterStatus" class="input-field w-28 text-sm rounded-lg">
-          <option value="">全部状态</option>
-          <option value="pending_report">未受理</option>
-          <option value="accepted">已受理</option>
-          <option value="reported">已立案</option>
-          <option value="decided">已调解</option>
-          <option value="closed">已处罚</option>
-          <option value="rejected">不予立案</option>
-          <option value="not_punished">不予处罚</option>
-        </select>
-        <div class="flex-1 max-w-xs">
-          <input
-            v-model="keyword"
-            type="text"
-            placeholder="🔍 搜索店铺/商品/执照..."
-            class="input-field text-sm rounded-lg"
-          />
-        </div>
-        <button
-          v-if="selectedIds.length > 0"
-          @click="showBatchModal = true"
-          class="btn-primary text-sm flex items-center gap-2 shadow-lg shadow-red-600/20"
-        >
+        <button v-if="selectedIds.length > 0" @click="showBatchModal = true" class="btn-primary w-full xl:w-auto">
           <span>🧰</span>
           <span>批量操作</span>
-          <span class="bg-white/20 px-2 py-0.5 rounded-full text-xs">{{ selectedIds.length }}</span>
+          <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ selectedIds.length }}</span>
         </button>
-        <router-link to="/case/new" class="btn-secondary text-sm inline-flex items-center gap-2">
-          <span>＋</span>
-          <span>新增案件</span>
-        </router-link>
       </div>
-    </div>
 
-    <!-- 批量操作弹窗 -->
-    <div v-if="showBatchModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showBatchModal = false">
-      <div class="bg-white rounded-2xl p-6 w-[460px] shadow-2xl">
-        <h3 class="font-bold text-lg mb-2 text-slate-800">批量操作</h3>
-        <p class="text-sm text-slate-500 mb-4">已选 {{ selectedIds.length }} 个案件</p>
-        <div class="mb-6">
+      <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span class="soft-tag">当前共 {{ filteredCases.length }} 条</span>
+        <label class="flex items-center gap-1 cursor-pointer select-none">
+          <input type="checkbox" :checked="isAllPageSelected" @change="toggleSelectAllPage" class="h-3.5 w-3.5 rounded" />
+          <span>本页全选</span>
+        </label>
+        <button type="button" @click="toggleSelectAllAll" class="cursor-pointer select-none">
+          <span class="soft-tag">所有页面全选</span>
+        </button>
+        <span v-if="keyword" class="soft-tag">关键词：{{ keyword }}</span>
+        <span v-if="filterStatus" class="soft-tag">状态已筛选</span>
+        <span class="soft-tag">{{ filterYear }} 年 {{ Number(filterMonth) }} 月</span>
+      </div>
+    </section>
+
+    <div v-if="showBatchModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showBatchModal = false">
+      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <h3 class="text-lg font-bold text-slate-800">批量操作</h3>
+        <p class="mt-1 text-sm text-slate-500">已选 {{ selectedIds.length }} 个案件</p>
+        <div class="mt-4">
+          <button
+            @click="batchQueryLogisticsForSelected"
+            :disabled="batchLogisticsLoading"
+            class="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span>📦</span>
+            <span>{{ batchLogisticsLoading ? `查询快递中 ${batchLogisticsProgress}` : '批量查询快递' }}</span>
+          </button>
+        </div>
+        <div class="mt-4">
           <label class="label">批量设置寄件日期</label>
-          <input type="date" v-model="batchReportDate" class="input-field rounded-lg" />
+          <input type="date" v-model="batchReportDate" class="input-field" />
         </div>
-        <div class="flex gap-3 mb-3">
-          <button @click="batchUpdateReportDate" class="btn-primary flex-1 shadow-lg shadow-blue-600/20">保存日期</button>
+        <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
           <button @click="showBatchModal = false" class="btn-secondary flex-1">取消</button>
+          <button @click="batchUpdateReportDate" class="btn-primary flex-1">保存日期</button>
         </div>
-        <button @click="batchDeleteCases" class="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl py-3 text-sm font-medium transition-colors">批量删除选中案件</button>
+        <button @click="batchDeleteCases" class="btn-danger mt-3 w-full">批量删除选中案件</button>
       </div>
     </div>
 
-    <!-- Excel导入预览弹窗 -->
-    <div v-if="showImportPreview" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" @click.self="closeImportPreview">
-      <div class="bg-white rounded-2xl p-6 w-[1100px] max-h-[85vh] shadow-2xl overflow-hidden flex flex-col">
-        <div class="flex items-center justify-between mb-4">
+    <div v-if="showImportPreview" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm" @click.self="closeImportPreview">
+      <div class="flex max-h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
+        <div class="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h3 class="font-bold text-lg text-slate-800">Excel 导入预览</h3>
-            <p class="text-sm text-slate-500 mt-1">先预览，再选择全选或单选后导入</p>
+            <h3 class="text-lg font-bold text-slate-800">Excel 导入预览</h3>
+            <p class="mt-1 text-sm text-slate-500">先预览，再选择全选或单选后导入</p>
           </div>
-          <button @click="closeImportPreview" class="text-slate-400 hover:text-slate-600 text-2xl">×</button>
+          <button @click="closeImportPreview" class="btn-ghost p-0 text-2xl text-slate-400">×</button>
         </div>
-        <div class="flex items-center justify-between mb-3 text-sm">
+        <div class="mb-3 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
           <label class="flex items-center gap-2 text-slate-600">
-            <input type="checkbox" :checked="selectAllImportRows" @change="toggleSelectAllImportRows" class="w-4 h-4 rounded" />
+            <input type="checkbox" :checked="selectAllImportRows" @change="toggleSelectAllImportRows" class="h-4 w-4 rounded" />
             <span>全选</span>
           </label>
           <span class="text-slate-500">共 {{ importPreviewRows.length }} 条，已选 {{ selectedImportRows.length }} 条</span>
         </div>
-        <div class="flex-1 overflow-auto border border-slate-100 rounded-xl">
+        <div class="flex-1 overflow-auto rounded-2xl border border-slate-100">
           <table class="w-full text-sm">
-            <thead class="bg-slate-50 sticky top-0">
+            <thead class="sticky top-0 bg-slate-50">
               <tr>
-                <th class="py-2 px-3 text-left w-10"></th>
+                <th class="w-10 py-2 px-3 text-left"></th>
                 <th class="py-2 px-3 text-left">管辖局</th>
                 <th class="py-2 px-3 text-left">执照名称</th>
                 <th class="py-2 px-3 text-left">店铺名称</th>
@@ -266,7 +319,7 @@
             <tbody class="divide-y divide-slate-100">
               <tr v-for="row in importPreviewRows" :key="row.__importId" class="hover:bg-slate-50">
                 <td class="py-2 px-3">
-                  <input type="checkbox" :checked="selectedImportRows.includes(row.__importId)" @change="toggleImportRow(row.__importId)" class="w-4 h-4 rounded" />
+                  <input type="checkbox" :checked="selectedImportRows.includes(row.__importId)" @change="toggleImportRow(row.__importId)" class="h-4 w-4 rounded" />
                 </td>
                 <td class="py-2 px-3">{{ row.jurisdiction || '-' }}</td>
                 <td class="py-2 px-3">{{ row.licenseName || '-' }}</td>
@@ -278,55 +331,51 @@
             </tbody>
           </table>
         </div>
-        <div class="flex gap-3 mt-4">
-          <button @click="confirmImportRows" :disabled="selectedImportRows.length === 0 || excelImporting" class="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed">
+        <div class="mt-4 flex flex-col-reverse gap-3 sm:flex-row">
+          <button @click="closeImportPreview" class="btn-secondary flex-1">取消</button>
+          <button @click="confirmImportRows" :disabled="selectedImportRows.length === 0 || excelImporting" class="btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-50">
             {{ excelImporting ? '导入中...' : `导入选中 ${selectedImportRows.length} 条` }}
           </button>
-          <button @click="closeImportPreview" class="btn-secondary flex-1">取消</button>
         </div>
       </div>
     </div>
 
-    <!-- 云端文件管理弹窗 -->
-    <div v-if="showCloudFiles" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showCloudFiles = false">
-      <div class="bg-white rounded-2xl p-6 w-[900px] max-h-[85vh] shadow-2xl overflow-hidden flex flex-col">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-lg text-slate-800">☁️ 云端文件管理</h3>
-          <button @click="showCloudFiles = false" class="text-slate-400 hover:text-slate-600 text-2xl">×</button>
+    <div v-if="showCloudFiles" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm" @click.self="showCloudFiles = false">
+      <div class="flex max-h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
+        <div class="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 class="text-lg font-bold text-slate-800">☁️ 云端文件管理</h3>
+            <p class="mt-1 text-sm text-slate-500">统一查看未关联文件、图片与已上传材料。</p>
+          </div>
+          <button @click="showCloudFiles = false" class="btn-ghost p-0 text-2xl text-slate-400">×</button>
         </div>
 
         <div v-if="cloudFilesLoading" class="flex items-center justify-center py-8">
-          <div class="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+          <div class="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
           <span class="ml-3 text-slate-500">加载中...</span>
         </div>
 
-        <div v-else-if="allCloudFiles.length === 0" class="text-center py-8 text-slate-400">
+        <div v-else-if="allCloudFiles.length === 0" class="py-8 text-center text-slate-400">
           <span class="text-4xl">☁️</span>
           <p class="mt-2">暂无云端文件</p>
         </div>
 
         <div v-else class="flex-1 overflow-y-auto">
-          <div class="mb-4 flex items-center justify-between">
+          <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-slate-500">
               共 {{ allCloudFiles.length }} 个文件
               <span class="ml-2 text-orange-500">（未关联: {{ allCloudFiles.length - assignedCount }}）</span>
             </div>
-            <div class="flex items-center gap-3">
-              <button
-                v-if="selectedCloudFiles.length > 0"
-                @click="batchDeleteCloudFiles"
-                class="btn-danger text-sm"
-              >
-                🗑️ 批量删除 ({{ selectedCloudFiles.length }})
-              </button>
-            </div>
+            <button v-if="selectedCloudFiles.length > 0" @click="batchDeleteCloudFiles" class="btn-danger">
+              🗑️ 批量删除 ({{ selectedCloudFiles.length }})
+            </button>
           </div>
 
           <table class="w-full text-sm">
-            <thead class="bg-slate-50 sticky top-0">
+            <thead class="sticky top-0 bg-slate-50">
               <tr>
-                <th class="py-2 px-3 text-left w-10">
-                  <input type="checkbox" v-model="selectAllCloudFiles" @change="toggleSelectAllCloudFiles" class="w-4 h-4 rounded" />
+                <th class="w-10 py-2 px-3 text-left">
+                  <input type="checkbox" v-model="selectAllCloudFiles" @change="toggleSelectAllCloudFiles" class="h-4 w-4 rounded" />
                 </th>
                 <th class="py-2 px-3 text-left">预览</th>
                 <th class="py-2 px-3 text-left">文件名</th>
@@ -338,38 +387,29 @@
             <tbody class="divide-y divide-slate-50">
               <tr v-for="file in allCloudFiles" :key="file.Key || file.url" class="hover:bg-slate-50">
                 <td class="py-2 px-3">
-                  <input
-                    type="checkbox"
-                    :checked="selectedCloudFiles.includes(file)"
-                    @change="toggleSelectCloudFile(file)"
-                    class="w-4 h-4 rounded"
-                  />
+                  <input :checked="selectedCloudFiles.includes(file)" @change="toggleSelectCloudFile(file)" type="checkbox" class="h-4 w-4 rounded" />
                 </td>
                 <td class="py-2 px-3">
-                  <img
-                    v-if="isImageFile(file)"
-                    :src="getCloudFileUrl(file.Key) || file.url"
-                    class="w-12 h-12 object-cover rounded cursor-pointer hover:ring-2 hover:ring-blue-400"
-                    @click="previewImage(getCloudFileUrl(file.Key) || file.url)"
-                  />
-                  <span v-else class="text-2xl">📄</span>
+                  <button type="button" @click="openFilePreview(file)" class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-blue-400 hover:ring-2 hover:ring-blue-100">
+                    <img v-if="isImageFile(file)" :src="getCloudFileUrl(file.Key) || file.url" class="h-full w-full bg-slate-50 object-contain p-1" />
+                    <span v-else class="text-2xl">{{ getFileIcon(file) }}</span>
+                  </button>
                 </td>
-                <td class="py-2 px-3 truncate max-w-xs">{{ getFileName(file) }}</td>
+                <td class="max-w-xs truncate py-2 px-3">{{ getFileName(file) }}</td>
                 <td class="py-2 px-3">{{ file.LastModified ? new Date(file.LastModified).toLocaleString('zh-CN') : (file.uploadedAt ? new Date(file.uploadedAt).toLocaleString('zh-CN') : '-') }}</td>
                 <td class="py-2 px-3">
-                  <select
-                    :value="getFileCaseId(file)"
-                    @change="assignFileToCase(file, $event.target.value)"
-                    class="input-field text-xs py-1 w-40"
-                  >
+                  <select :value="getFileCaseId(file)" @change="assignFileToCase(file, $event.target.value)" class="input-field py-2 text-xs sm:w-44">
                     <option value="">未关联</option>
-                    <option v-for="c in store.cases" :key="c.id" :value="c.id">
-                      {{ c.shopName }}
+                    <option v-for="caseItem in store.cases" :key="caseItem.id" :value="caseItem.id">
+                      {{ caseItem.licenseName || caseItem.shopName }}
                     </option>
                   </select>
                 </td>
                 <td class="py-2 px-3 text-center">
-                  <button @click="deleteCloudFile(file)" class="text-red-500 hover:text-red-700">删除</button>
+                  <div class="flex items-center justify-center gap-3">
+                    <button @click="openFilePreview(file)" class="text-blue-500 hover:text-blue-700">预览</button>
+                    <button @click="deleteCloudFile(file)" class="text-red-500 hover:text-red-700">删除</button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -378,131 +418,141 @@
       </div>
     </div>
 
-    <!-- 图片预览弹窗 -->
-    <div v-if="showImagePreview" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50" @click="showImagePreview = false">
-      <button @click="showImagePreview = false" class="absolute top-4 right-4 text-white text-3xl hover:text-gray-300">×</button>
-      <img :src="previewImageUrl" class="max-w-[90vw] max-h-[90vh] object-contain" @click.stop />
-    </div>
-
-    <!-- 空状态 -->
-    <div v-if="filteredCases.length === 0" class="text-center py-32 bg-white rounded-2xl shadow-sm border border-slate-100">
-      <div class="text-8xl mb-6">📂</div>
-      <p class="text-xl text-slate-400 mb-6">{{ keyword || filterStatus || filterYear || filterMonth ? '没有找到符合条件的案件' : '还没有任何案件' }}</p>
-      <router-link to="/case/new" class="btn-primary inline-flex items-center gap-2 text-lg px-6 py-3 shadow-lg shadow-blue-600/20">
-        <span class="text-xl">+</span>
-        <span>添加第一个案件</span>
-      </router-link>
-    </div>
-
-    <!-- 案件列表 -->
-    <div v-else class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="bg-gradient-to-r from-red-600 to-amber-500 text-white text-xs uppercase tracking-wider">
-              <th class="py-3 px-4 text-center font-semibold w-12">
-                <input type="checkbox" v-model="selectAll" @change="toggleSelectAll" class="w-4 h-4 rounded border-white" />
-              </th>
-              <th class="py-3 px-4 text-left font-semibold">管辖局</th>
-              <th class="py-3 px-4 text-left font-semibold">执照名称</th>
-              <th class="py-3 px-4 text-left font-semibold">店铺名称</th>
-              <th class="py-3 px-4 text-left font-semibold">商品名称</th>
-              <th class="py-3 px-4 text-right font-semibold">花费</th>
-              <th class="py-3 px-4 text-center font-semibold">状态</th>
-              <th class="py-3 px-4 text-center font-semibold">签收日期</th>
-              <th class="py-3 px-4 text-center font-semibold w-20">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr
-              v-for="c in paginatedCases"
-              :key="c.id"
-              class="hover:bg-blue-50/30 transition-colors cursor-pointer"
-              :class="{ 'bg-blue-50/50': selectedIds.includes(c.id) }"
-            >
-              <td class="py-3 px-4 text-center" @click.stop>
-                <input
-                  type="checkbox"
-                  :checked="selectedIds.includes(c.id)"
-                  @change="toggleSelect(c.id)"
-                  class="w-4 h-4 rounded border-slate-300"
-                />
-              </td>
-              <td class="py-3 px-4 text-slate-600">{{ c.jurisdiction || '-' }}</td>
-              <td class="py-3 px-4 text-slate-600">{{ c.licenseName || '-' }}</td>
-              <td class="py-3 px-4 text-slate-600">{{ c.shopName || '-' }}</td>
-              <td class="py-3 px-4 font-medium text-slate-800">{{ c.productName || '-' }}</td>
-              <td class="py-3 px-4 text-right text-orange-600">¥{{ c.expense || 0 }}</td>
-              <td class="py-3 px-4 text-center" @click.stop>
-                <select
-                  :value="c.status"
-                  @change="changeCaseStatus(c.id, $event.target.value)"
-                  class="input-field w-28 text-xs py-1.5 text-center rounded-lg"
-                >
-                  <option value="pending_report">未受理</option>
-                  <option value="accepted">已受理</option>
-                  <option value="reported">已立案</option>
-                  <option value="decided">已调解</option>
-                  <option value="closed">已处罚</option>
-                  <option value="rejected">不予立案</option>
-                  <option value="not_punished">不予处罚</option>
-                </select>
-              </td>
-              <td class="py-3 px-4 text-center" @click.stop>
-                <input
-                  type="date"
-                  :value="c.signDate"
-                  @change="updateSignDate(c.id, $event.target.value)"
-                  class="input-field w-32 text-xs py-1.5 text-center rounded-lg"
-                />
-              </td>
-              <td class="py-3 px-4 text-center" @click.stop>
-                <router-link :to="'/case/' + c.id" class="text-blue-500 hover:text-blue-700 text-sm font-medium">查看</router-link>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- 分页 -->
-      <div class="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-slate-100">
-        <div class="text-sm text-slate-500">
-          共 <span class="font-semibold text-slate-700">{{ filteredCases.length }}</span> 条，第 <span class="font-semibold text-slate-700">{{ currentPage }}</span> / <span class="font-semibold text-slate-700">{{ totalPages }}</span> 页
+    <div v-if="showImagePreview" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" @click="closeFilePreview">
+      <button @click="closeFilePreview" class="absolute right-4 top-4 text-3xl text-white hover:text-gray-300">×</button>
+      <div class="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" @click.stop>
+        <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+          <div class="min-w-0">
+            <div class="truncate font-semibold text-slate-800">{{ previewFile.name || '文件预览' }}</div>
+            <div class="truncate text-xs text-slate-400">{{ previewFile.url }}</div>
+          </div>
+          <button @click="openPreviewInNewTab" class="text-sm text-blue-500 hover:text-blue-700">新窗口打开</button>
         </div>
-        <div class="flex items-center gap-1">
-          <button
-            @click="currentPage = 1"
-            :disabled="currentPage === 1"
-            class="px-3 py-1.5 text-xs rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >首页</button>
-          <button
-            @click="currentPage--"
-            :disabled="currentPage === 1"
-            class="px-3 py-1.5 text-xs rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >上一页</button>
-          <button
-            v-for="p in pageNumbers"
-            :key="p"
-            @click="currentPage = p"
-            class="w-8 h-8 text-xs rounded-lg transition-colors"
-            :class="p === currentPage ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'hover:bg-white'"
-          >{{ p }}</button>
-          <button
-            @click="currentPage++"
-            :disabled="currentPage === totalPages"
-            class="px-3 py-1.5 text-xs rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >下一页</button>
-          <button
-            @click="currentPage = totalPages"
-            :disabled="currentPage === totalPages"
-            class="px-3 py-1.5 text-xs rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >末页</button>
+        <div class="flex min-h-[70vh] max-h-[80vh] items-center justify-center overflow-auto bg-slate-50 p-4">
+          <img v-if="previewFile.kind === 'image'" :src="previewFile.url" class="max-h-[78vh] max-w-full rounded-xl object-contain shadow" />
+          <iframe v-else-if="previewFile.kind === 'pdf'" :src="previewFile.url" class="h-[78vh] w-full rounded-xl bg-white"></iframe>
+          <div v-else-if="previewFile.kind === 'text'" class="h-[78vh] w-full overflow-auto whitespace-pre-wrap rounded-xl bg-white p-4 text-sm text-slate-700">{{ previewTextContent || '正在加载文本预览...' }}</div>
+          <div v-else class="space-y-3 text-center text-slate-500">
+            <div class="text-5xl">{{ getFileIcon(previewFile) }}</div>
+            <div>当前格式暂不支持弹窗内预览，请点击“新窗口打开”。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="filteredCases.length === 0" class="rounded-2xl border border-slate-100 bg-white py-24 text-center shadow-sm">
+      <div class="mb-6 text-7xl">📂</div>
+      <p class="mb-3 text-lg text-slate-400">{{ hasActiveFilters ? '没有找到符合条件的案件' : '还没有任何案件' }}</p>
+      <p class="mb-6 text-sm text-slate-400">{{ hasActiveFilters ? '可以试试清空筛选，或者换个关键词。' : '现在就新建第一条案件，后面批量处理会顺很多。' }}</p>
+      <div class="flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <router-link to="/case/new" class="btn-primary">
+          <span>+</span>
+          <span>添加第一个案件</span>
+        </router-link>
+        <button v-if="hasActiveFilters" type="button" @click="clearFilters" class="btn-secondary">
+          <span>重置筛选</span>
+        </button>
+      </div>
+    </div>
+
+    <div v-else ref="caseListSectionRef" class="space-y-3">
+      <section
+        v-for="caseItem in paginatedCases"
+        :key="caseItem.id"
+        class="card p-0 transition"
+        :class="selectedIds.includes(caseItem.id) ? 'border-blue-200 ring-2 ring-blue-100' : 'hover:border-slate-200 hover:shadow-md'"
+      >
+        <div class="flex flex-col gap-4 p-4 md:p-5 lg:flex-row lg:items-start lg:justify-between">
+          <div class="flex min-w-0 flex-1 gap-3">
+            <div class="pt-1" @click.stop>
+              <input
+                type="checkbox"
+                :checked="selectedIds.includes(caseItem.id)"
+                @change="toggleSelect(caseItem.id)"
+                class="h-4 w-4 rounded border-slate-300"
+              />
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div class="min-w-0">
+                  <div class="mb-2 flex flex-wrap gap-2">
+                    <span class="soft-tag">编号 {{ caseItem.caseNumber || '待生成' }}</span>
+                  </div>
+                  <router-link :to="'/case/' + caseItem.id" class="block break-words text-lg font-semibold text-slate-900 hover:text-slate-600">
+                    {{ getPrimaryCaseName(caseItem) }}
+                  </router-link>
+                  <p class="mt-1 text-sm text-slate-500">{{ getSecondaryCaseName(caseItem) }}</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 md:justify-end">
+                  <StatusBadge :status="caseItem.status" :profit="caseItem.profit" />
+                  <span v-if="selectedIds.includes(caseItem.id)" class="soft-tag border-blue-200 bg-blue-50 text-blue-600">已选中</span>
+                  <div class="rounded-2xl bg-slate-100 px-3 py-2 text-right">
+                    <div class="text-[11px] text-slate-500">花费</div>
+                    <div class="text-base font-semibold text-slate-800">¥{{ formatMoney(caseItem.expense) }}</div>
+                  </div>
+                  <div v-if="Number(caseItem.profit)" class="rounded-2xl bg-slate-100 px-3 py-2 text-right">
+                    <div class="text-[11px] text-slate-500">赔偿</div>
+                    <div class="text-base font-semibold text-slate-800">¥{{ formatMoney(caseItem.profit) }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                <div class="rounded-2xl bg-slate-50/80 px-3 py-2">
+                  <div class="text-[11px] text-slate-400">商品</div>
+                  <div class="mt-1 text-sm font-medium text-slate-700">{{ caseItem.productName || '未填写商品名称' }}</div>
+                </div>
+                <div class="rounded-2xl bg-slate-50/80 px-3 py-2">
+                  <div class="text-[11px] text-slate-400">快递单号</div>
+                  <div class="mt-1 break-all text-sm font-medium text-slate-700">{{ caseItem.trackingNumber || '暂无单号' }}</div>
+                </div>
+                <div class="rounded-2xl bg-slate-50/80 px-3 py-2">
+                  <div class="text-[11px] text-slate-400">管辖局</div>
+                  <div class="mt-1 text-sm font-medium text-slate-700">{{ caseItem.jurisdiction || '未填写' }}</div>
+                </div>
+              </div>
+
+              <div class="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
+                <span class="soft-tag">创建 {{ formatCaseDate(caseItem.createdAt) }}</span>
+                <span class="soft-tag">更新 {{ formatCaseDate(caseItem.updatedAt) }}</span>
+                <span v-if="caseItem.profit" class="soft-tag text-slate-600">赔偿 ¥{{ formatMoney(caseItem.profit) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex gap-2 lg:w-36 lg:flex-col" @click.stop>
+            <router-link :to="'/case/' + caseItem.id" class="btn-primary flex-1">查看详情</router-link>
+            <button @click="deleteSingleCase(caseItem)" class="btn-secondary flex-1 text-rose-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">删除案件</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="card">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="text-sm text-slate-500">
+            共 <span class="font-semibold text-slate-700">{{ filteredCases.length }}</span> 条，第 <span class="font-semibold text-slate-700">{{ currentPage }}</span> / <span class="font-semibold text-slate-700">{{ totalPages }}</span> 页
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button @click="currentPage = 1" :disabled="currentPage === 1" class="btn-secondary px-3 py-2 text-xs disabled:opacity-40">首页</button>
+            <button @click="currentPage--" :disabled="currentPage === 1" class="btn-secondary px-3 py-2 text-xs disabled:opacity-40">上一页</button>
+            <template v-for="p in pageNumbers" :key="`page-${p}`">
+              <span v-if="p === '...'" class="px-1 text-sm text-slate-400">...</span>
+              <button
+                v-else
+                @click="currentPage = p"
+                class="flex h-9 w-9 items-center justify-center rounded-xl text-xs font-medium transition"
+                :class="p === currentPage ? 'bg-slate-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+              >{{ p }}</button>
+            </template>
+            <button @click="currentPage++" :disabled="currentPage === totalPages" class="btn-secondary px-3 py-2 text-xs disabled:opacity-40">下一页</button>
+            <button @click="currentPage = totalPages" :disabled="currentPage === totalPages" class="btn-secondary px-3 py-2 text-xs disabled:opacity-40">末页</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </template>
-
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -512,6 +562,11 @@ import dayjs from 'dayjs'
 import { extractFromImage } from '@/lib/doubao'
 import { queryExpress } from '@/lib/kuaidi100'
 import { uploadBase64ToTos, deleteFromTos, listTosObjects, getTosFileUrl } from '@/lib/tos'
+import { readFileAsDataUrl } from '@/lib/document-processing'
+import { detectBarcodeFromDataUrl } from '@/lib/barcode'
+import { extractTrackingCandidates, normalizeTrackingNumber, pickBestTrackingNumber, isBlockedTrackingCode } from '@/lib/tracking'
+import StatusBadge from '@/components/StatusBadge.vue'
+import { formatAmount } from '@/lib/case-status'
 
 const store = useCaseStore()
 const route = useRoute()
@@ -531,18 +586,168 @@ const ocrLoading = ref(false)
 const ocrResult = ref(null)
 const logisticsLoading = ref(false)
 const logisticsResult = ref(null)
+const batchLogisticsLoading = ref(false)
+const batchLogisticsProgress = ref('')
 const pageSize = 20
 const albumUploads = ref([])
 const showImportPreview = ref(false)
 const importPreviewRows = ref([])
 const selectedImportRows = ref([])
 const excelImporting = ref(false)
+const photoInputRef = ref(null)
+const albumInputRef = ref(null)
+const fileInputRef = ref(null)
+const excelInputRef = ref(null)
+const caseListSectionRef = ref(null)
+
+// ── 全选逻辑 ──────────────────────────────────────────
+const isAllPageSelected = computed(() => {
+  return paginatedCases.value.length > 0 && paginatedCases.value.every(c => selectedIds.value.includes(c.id))
+})
+
+function toggleSelectAllPage() {
+  if (isAllPageSelected.value) {
+    // 取消本页全选
+    for (const c of paginatedCases.value) {
+      const idx = selectedIds.value.indexOf(c.id)
+      if (idx !== -1) selectedIds.value.splice(idx, 1)
+    }
+  } else {
+    // 选中本页
+    for (const c of paginatedCases.value) {
+      if (!selectedIds.value.includes(c.id)) selectedIds.value.push(c.id)
+    }
+  }
+}
+
+function toggleSelectAllAll() {
+  if (selectedIds.value.length === filteredCases.value.length) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = filteredCases.value.map(c => c.id)
+  }
+}
+const showMoreActions = ref(false)
 
 // 监听路由变化，同步筛选状态
 watch(() => route.query.status, (newStatus) => {
   filterStatus.value = newStatus || ''
   currentPage.value = 1
 })
+
+function triggerInput(inputRef) {
+  if (!inputRef?.value) return
+  inputRef.value.value = ''
+  inputRef.value.click()
+}
+
+function triggerPhotoUpload() {
+  triggerInput(photoInputRef)
+}
+
+function triggerAlbumUpload() {
+  triggerInput(albumInputRef)
+}
+
+function triggerFileUpload() {
+  triggerInput(fileInputRef)
+}
+
+function triggerExcelUpload() {
+  triggerInput(excelInputRef)
+}
+
+function focusMonthlyCases() {
+  filterYear.value = currentYear
+  filterMonth.value = String(currentMonth).padStart(2, '0')
+  currentPage.value = 1
+  caseListSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function formatMoney(value) {
+  return formatAmount(value)
+}
+
+function formatCaseDate(value) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('MM-DD HH:mm') : String(value)
+}
+
+function getStatusLabel(status = '') {
+  const labels = {
+    pending_report: '未受理',
+    accepted: '已受理',
+    reported: '不予受理',
+    decided: '已调解',
+    closed: '已处罚',
+    rejected: '不予立案',
+    not_punished: '不予处罚',
+  }
+  return labels[status] || status || '-'
+}
+
+function exportCasesToExcel() {
+  const exportList = selectedIds.value.length > 0
+    ? store.cases.filter(item => selectedIds.value.includes(item.id))
+    : filteredCases.value
+
+  if (!exportList.length) {
+    alert('当前没有可导出的案件')
+    return
+  }
+
+  const rows = exportList.map(item => ({
+    案件编号: item.caseNumber || '',
+    当前状态: getStatusLabel(item.status),
+    执照名称: item.licenseName || '',
+    店铺名称: item.shopName || '',
+    商品名称: item.productName || '',
+    管辖局: item.jurisdiction || '',
+    快递单号: item.trackingNumber || '',
+    举报寄件日期: item.reportDate || '',
+    签收日期: item.signDate || '',
+    受理日期: item.acceptanceDate || '',
+    受理方式: item.acceptanceWay || '',
+    结果日期: item.decisionDate || '',
+    商品价格: Number(item.productPrice || 0),
+    花费总额: Number(item.expense || 0),
+    赔偿金额: Number(item.profit || 0),
+    行政复议: item.hasAdminReview === 'yes' ? '已申请' : '未申请',
+    复议结果: item.adminReviewResult || '',
+    复议机关: item.adminReviewAuthority || '',
+    备注: item.notes || '',
+    创建时间: dayjs(item.createdAt).isValid() ? dayjs(item.createdAt).format('YYYY-MM-DD HH:mm') : (item.createdAt || ''),
+    更新时间: dayjs(item.updatedAt).isValid() ? dayjs(item.updatedAt).format('YYYY-MM-DD HH:mm') : (item.updatedAt || ''),
+  }))
+
+  const workbook = XLSX.utils.book_new()
+  const worksheet = XLSX.utils.json_to_sheet(rows)
+  worksheet['!cols'] = [
+    { wch: 18 }, { wch: 12 }, { wch: 24 }, { wch: 18 }, { wch: 24 },
+    { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+    { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 30 }, { wch: 18 }, { wch: 18 },
+  ]
+  XLSX.utils.book_append_sheet(workbook, worksheet, '案件台账')
+
+  const fileLabel = selectedIds.value.length > 0 ? `选中${exportList.length}条` : `筛选结果${exportList.length}条`
+  const fileName = `案件台账_${fileLabel}_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`
+  XLSX.writeFile(workbook, fileName)
+}
+
+function getPrimaryCaseName(caseItem = {}) {
+  return caseItem.licenseName || caseItem.shopName || '未命名案件'
+}
+
+function getSecondaryCaseName(caseItem = {}) {
+  const primary = getPrimaryCaseName(caseItem)
+  const lines = []
+  if (caseItem.shopName && caseItem.shopName !== primary) lines.push(`店铺：${caseItem.shopName}`)
+  if (caseItem.licenseName && caseItem.licenseName !== primary) lines.push(`执照：${caseItem.licenseName}`)
+  if (caseItem.productName) lines.push(`商品：${caseItem.productName}`)
+  return lines.length > 0 ? lines.join(' · ') : '补充店铺、执照或商品信息后更方便跟进'
+}
 
 const availableYears = computed(() => {
   const years = [...new Set(store.cases.map(c => dayjs(c.createdAt).year()))]
@@ -554,6 +759,11 @@ const availableYears = computed(() => {
 
 const filteredCases = computed(() => {
   let list = store.cases
+
+  if (!filterStatus.value) {
+    list = list.filter(c => !(c.status === 'decided' && Number(c.profit) > 0))
+  }
+
   if (filterYear.value) {
     list = list.filter(c => dayjs(c.createdAt).year() === Number(filterYear.value))
   }
@@ -569,7 +779,9 @@ const filteredCases = computed(() => {
       (c.shopName || '').toLowerCase().includes(kw) ||
       (c.productName || '').toLowerCase().includes(kw) ||
       (c.licenseName || '').toLowerCase().includes(kw) ||
-      (c.jurisdiction || '').toLowerCase().includes(kw)
+      (c.jurisdiction || '').toLowerCase().includes(kw) ||
+      (c.trackingNumber || '').toLowerCase().includes(kw) ||
+      (c.caseNumber || '').toLowerCase().includes(kw)
     )
   }
   return list
@@ -579,12 +791,21 @@ const filteredCases = computed(() => {
 const monthlyStats = computed(() => {
   const monthCases = store.cases.filter(c => {
     const created = dayjs(c.createdAt)
-    return created.year() === filterYear.value && created.month() + 1 === Number(filterMonth.value)
+    return created.year() === currentYear && created.month() + 1 === currentMonth
   })
   return {
-    total: monthCases.length,
     expense: monthCases.reduce((sum, c) => sum + (Number(c.expense) || 0), 0),
+    profit: monthCases.reduce((sum, c) => sum + ((Number(c.profit) || 0) - (Number(c.expense) || 0)), 0),
   }
+})
+
+const hasActiveFilters = computed(() => {
+  return Boolean(
+    keyword.value ||
+    filterStatus.value ||
+    Number(filterYear.value) !== currentYear ||
+    Number(filterMonth.value) !== currentMonth
+  )
 })
 
 watch([keyword, filterStatus, filterYear, filterMonth], () => {
@@ -627,6 +848,14 @@ function updateReportDate(id, date) {
   store.updateCase(id, { reportDate: date })
 }
 
+function clearFilters() {
+  keyword.value = ''
+  filterStatus.value = ''
+  filterYear.value = currentYear
+  filterMonth.value = String(currentMonth).padStart(2, '0')
+  currentPage.value = 1
+}
+
 function toggleSelect(id) {
   const idx = selectedIds.value.indexOf(id)
   if (idx === -1) {
@@ -664,6 +893,59 @@ async function batchDeleteCases() {
   batchReportDate.value = ''
   showBatchModal.value = false
   alert('批量删除完成')
+}
+
+function extractSignDateFromLogistics(result) {
+  if (!result || result.status !== '签收') return ''
+  const signEntry = (result.details || []).find(item => /签收/.test(item.description || '')) || result.details?.[0]
+  const rawTime = signEntry?.time
+  if (!rawTime) return ''
+  const parsed = dayjs(rawTime)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : String(rawTime).split(' ')[0]
+}
+
+async function batchQueryLogisticsForSelected() {
+  if (selectedIds.value.length === 0 || batchLogisticsLoading.value) return
+
+  const casesToQuery = store.cases.filter(c => selectedIds.value.includes(c.id) && c.trackingNumber)
+  if (casesToQuery.length === 0) {
+    alert('选中的案件里没有可查询的快递单号')
+    return
+  }
+
+  batchLogisticsLoading.value = true
+  let checkedCount = 0
+  let signedCount = 0
+  let updatedCount = 0
+  let failedCount = 0
+
+  try {
+    for (let i = 0; i < casesToQuery.length; i++) {
+      const item = casesToQuery[i]
+      batchLogisticsProgress.value = `${i + 1}/${casesToQuery.length}`
+      checkedCount++
+
+      try {
+        const result = await queryExpress(item.trackingNumber)
+        if (!result || result.status !== '签收') continue
+
+        signedCount++
+        const signDate = extractSignDateFromLogistics(result)
+        if (signDate) {
+          await store.updateCase(item.id, { signDate })
+          updatedCount++
+        }
+      } catch (error) {
+        console.error('批量查询快递失败:', item.trackingNumber, error)
+        failedCount++
+      }
+    }
+
+    alert(`批量查询完成：查询 ${checkedCount} 个，识别签收 ${signedCount} 个，更新签收日期 ${updatedCount} 个${failedCount > 0 ? `，失败 ${failedCount} 个` : ''}`)
+  } finally {
+    batchLogisticsLoading.value = false
+    batchLogisticsProgress.value = ''
+  }
 }
 
 function makeUploadPreview(file, url) {
@@ -720,7 +1002,7 @@ function normalizeStatus(value) {
     '未受理': 'pending_report',
     '待举报': 'pending_report',
     '已受理': 'accepted',
-    '已立案': 'reported',
+    '不予受理': 'reported',
     '已调解': 'decided',
     '已处罚': 'closed',
     '不予立案': 'rejected',
@@ -729,26 +1011,223 @@ function normalizeStatus(value) {
   return map[text] || 'pending_report'
 }
 
-function normalizeExcelRow(row, index) {
-  const expense = Number(getCellValue(row, ['花费', '费用', '商品价格', '价格', '金额']) || 0)
-  const productPrice = Number(getCellValue(row, ['商品价格', '价格', '花费', '金额']) || expense || 0)
-  const reportDate = getCellValue(row, ['举报日期', '寄件日期']) || null
-  const signDate = getCellValue(row, ['签收日期']) || null
+function normalizeHeaderName(value = '') {
+  return String(value || '')
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u200B-\u200D\u2060\u00A0\u3000]/g, '')
+    .replace(/[\s\n\r\t]/g, '')
+    .replace(/[~!@#$%^&*()_+\-=|\\{}\[\]:;"'“”‘’<>,.?/·！￥…（）—【】、；：，。？《》]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+const excelFieldAliases = {
+  jurisdiction: ['管辖局', '辖区', '所属管辖局', '受理机关', '办理机关'],
+  licenseName: ['执照名称', '主体名称', '经营者名称', '营业执照名称'],
+  shopName: ['店铺名称', '店铺', '店名', '店铺名', '商铺名称'],
+  productName: ['商品名称', '商品', '商品名', '链接商品', '商品标题', '产品名称', '商品信息', '产品信息'],
+  expense: ['花费', '费用', '商品价格', '价格', '金额', '购买金额', '花费金额', '支付金额', '付款金额', '实付金额', '订单金额', '商品实付', '实付款'],
+  productPrice: ['商品价格', '价格', '花费', '金额', '购买金额', '支付金额', '付款金额', '实付金额'],
+  trackingNumber: ['快递单号', '物流单号', '单号', '运单号', '快递号'],
+  reportDate: ['举报日期', '寄件日期', '投诉日期'],
+  signDate: ['签收日期', '签收时间'],
+  notes: ['备注', '说明', '备注信息'],
+  status: ['状态', '案件状态'],
+}
+
+const excelCoreFields = ['licenseName', 'shopName', 'productName', 'expense']
+const excelSupplementaryFields = ['jurisdiction', 'trackingNumber', 'reportDate', 'signDate', 'notes', 'status', 'productPrice']
+
+function parseNumericCell(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  const text = String(value || '')
+    .replace(/[￥¥,\s]/g, '')
+    .trim()
+  if (!text) return 0
+  const number = Number(text)
+  return Number.isFinite(number) ? number : 0
+}
+
+function parseExcelDate(value) {
+  if (value === null || value === undefined || value === '') return null
+
+  if (typeof value === 'number') {
+    const parsedCode = XLSX.SSF.parse_date_code(value)
+    if (parsedCode) {
+      return dayjs(new Date(parsedCode.y, parsedCode.m - 1, parsedCode.d)).format('YYYY-MM-DD')
+    }
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return dayjs(value).format('YYYY-MM-DD')
+  }
+
+  const normalized = String(value)
+    .trim()
+    .replace(/[年/.]/g, '-')
+    .replace(/月/g, '-')
+    .replace(/日/g, '')
+
+  const parsed = dayjs(normalized)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : String(value).trim()
+}
+
+function scoreExcelHeaderMatch(header = '', alias = '') {
+  if (!header || !alias) return -1
+  if (header === alias) return 1000 + alias.length
+
+  const shortAlias = alias.length <= 2
+  if (shortAlias) return -1
+
+  if (header.startsWith(alias) || header.endsWith(alias)) return 800 + alias.length
+  if (alias.startsWith(header) || alias.endsWith(header)) return header.length >= 4 ? 650 + header.length : -1
+  if (alias.length >= 4 && header.includes(alias)) return 500 + alias.length
+  if (header.length >= 4 && alias.includes(header)) return 300 + header.length
+
+  return -1
+}
+
+function buildExcelFieldIndexMap(row = []) {
+  const normalizedRow = row.map(normalizeHeaderName)
+  const fieldIndexMap = {}
+
+  Object.entries(excelFieldAliases).forEach(([field, aliases]) => {
+    const normalizedAliases = aliases.map(normalizeHeaderName)
+    let bestMatchIndex = -1
+    let bestMatchScore = -1
+
+    normalizedRow.forEach((header, index) => {
+      normalizedAliases.forEach(alias => {
+        const score = scoreExcelHeaderMatch(header, alias)
+        if (score > bestMatchScore) {
+          bestMatchScore = score
+          bestMatchIndex = index
+        }
+      })
+    })
+
+    if (bestMatchIndex !== -1) fieldIndexMap[field] = bestMatchIndex
+  })
+
+  return fieldIndexMap
+}
+
+function normalizeExcelRow(row, fieldIndexMap, index) {
+  const getValue = field => {
+    const columnIndex = fieldIndexMap[field]
+    if (columnIndex === undefined) return ''
+    return row[columnIndex] ?? ''
+  }
+
+  const expense = parseNumericCell(getValue('expense'))
+  const productPrice = parseNumericCell(getValue('productPrice')) || expense || 0
 
   return {
     __importId: `import_${index}_${Date.now()}`,
-    jurisdiction: String(getCellValue(row, ['管辖局', '辖区', '所属管辖局']) || '').trim(),
-    licenseName: String(getCellValue(row, ['执照名称', '主体名称', '经营者名称']) || '').trim(),
-    shopName: String(getCellValue(row, ['店铺名称', '店铺', '店名']) || '').trim(),
-    productName: String(getCellValue(row, ['商品名称', '商品', '商品名']) || '').trim(),
+    jurisdiction: String(getValue('jurisdiction')).trim(),
+    licenseName: String(getValue('licenseName')).trim(),
+    shopName: String(getValue('shopName')).trim(),
+    productName: String(getValue('productName')).trim(),
     expense,
     productPrice,
-    trackingNumber: String(getCellValue(row, ['快递单号', '物流单号', '单号']) || '').trim(),
-    reportDate,
-    signDate,
-    notes: String(getCellValue(row, ['备注', '说明']) || '').trim(),
-    status: normalizeStatus(getCellValue(row, ['状态'])),
+    trackingNumber: normalizeTrackingNumber(getValue('trackingNumber')),
+    reportDate: parseExcelDate(getValue('reportDate')),
+    signDate: parseExcelDate(getValue('signDate')),
+    notes: String(getValue('notes')).trim(),
+    status: normalizeStatus(getValue('status')),
   }
+}
+
+function isImportRowUseful(row) {
+  return Boolean(
+    row.jurisdiction ||
+    row.licenseName ||
+    row.shopName ||
+    row.productName ||
+    row.expense ||
+    row.productPrice ||
+    row.trackingNumber ||
+    row.notes
+  )
+}
+
+function scoreExcelCandidate(fieldIndexMap, rows = []) {
+  const uniqueMatchedColumns = new Set(Object.values(fieldIndexMap)).size
+  const coreFieldCount = excelCoreFields.filter(field => fieldIndexMap[field] !== undefined).length
+  const supplementaryFieldCount = excelSupplementaryFields.filter(field => fieldIndexMap[field] !== undefined).length
+  const sampleRows = rows.slice(0, Math.min(rows.length, 50))
+
+  const rowsWithProductName = rows.filter(row => row.productName).length
+  const rowsWithExpense = rows.filter(row => Number(row.expense || row.productPrice)).length
+  const rowsWithCorePair = rows.filter(row => row.productName && Number(row.expense || row.productPrice)).length
+
+  const sampleCompleteness = sampleRows.reduce((total, row) => {
+    return total
+      + (row.licenseName ? 1 : 0)
+      + (row.shopName ? 1 : 0)
+      + (row.productName ? 1 : 0)
+      + (Number(row.expense || row.productPrice) ? 1 : 0)
+  }, 0)
+
+  return coreFieldCount * 100000
+    + supplementaryFieldCount * 5000
+    + uniqueMatchedColumns * 500
+    + rowsWithCorePair * 50
+    + rowsWithProductName * 20
+    + rowsWithExpense * 20
+    + sampleCompleteness
+    + rows.length
+}
+
+function analyzeExcelSheet(sheet) {
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: true })
+  if (!rows.length) return null
+
+  const maxHeaderScanRows = Math.min(rows.length, 8)
+  let best = null
+
+  for (let headerRowIndex = 0; headerRowIndex < maxHeaderScanRows; headerRowIndex++) {
+    const fieldIndexMap = buildExcelFieldIndexMap(rows[headerRowIndex] || [])
+    const matchedFieldCount = Object.keys(fieldIndexMap).length
+    if (matchedFieldCount === 0) continue
+
+    const normalizedRows = rows
+      .slice(headerRowIndex + 1)
+      .map((row, index) => normalizeExcelRow(row, fieldIndexMap, index))
+      .filter(isImportRowUseful)
+
+    const score = scoreExcelCandidate(fieldIndexMap, normalizedRows)
+    if (!best || score > best.score) {
+      best = {
+        headerRowIndex,
+        fieldIndexMap,
+        matchedFieldCount,
+        rows: normalizedRows,
+        score,
+      }
+    }
+  }
+
+  return best
+}
+
+function pickBestWorkbookSheet(workbook) {
+  let best = null
+
+  for (const sheetName of workbook.SheetNames || []) {
+    const sheet = workbook.Sheets[sheetName]
+    const analysis = analyzeExcelSheet(sheet)
+    if (!analysis) continue
+
+    if (!best || analysis.score > best.score) {
+      best = {
+        ...analysis,
+        sheetName,
+      }
+    }
+  }
+
+  return best
 }
 
 async function importExcel(event) {
@@ -757,18 +1236,14 @@ async function importExcel(event) {
 
   try {
     const buffer = await file.arrayBuffer()
-    const workbook = XLSX.read(buffer, { type: 'array' })
-    const sheetName = workbook.SheetNames[0]
-    if (!sheetName) {
+    const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+    const bestSheet = pickBestWorkbookSheet(workbook)
+    if (!bestSheet) {
       alert('Excel 里没有可读取的工作表')
       return
     }
 
-    const sheet = workbook.Sheets[sheetName]
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-    const normalized = rows
-      .map((row, index) => normalizeExcelRow(row, index))
-      .filter(row => row.jurisdiction || row.licenseName || row.shopName || row.productName || row.expense || row.trackingNumber)
+    const normalized = bestSheet.rows
 
     if (normalized.length === 0) {
       alert('没有识别到可导入的数据，请检查表头是否正确')
@@ -836,17 +1311,87 @@ function removeFile(idx) {
   uploadedFiles.value.splice(idx, 1)
 }
 
-function changeCaseStatus(id, newStatus) {
-  const updates = {}
-  // 当变更为"已受理"状态时，自动设置受理日期为今天
-  if (newStatus === 'accepted') {
-    updates.acceptanceDate = dayjs().format('YYYY-MM-DD')
-  }
-  store.changeStatus(id, newStatus, updates)
+async function deleteSingleCase(caseItem) {
+  if (!caseItem?.id) return
+  if (!confirm(`确定要删除案件「${getPrimaryCaseName(caseItem)}」吗？`)) return
+
+  await store.deleteCase(caseItem.id)
+  selectedIds.value = selectedIds.value.filter(id => id !== caseItem.id)
+  selectAll.value = false
+  alert('案件已删除')
 }
 
-function updateSignDate(id, date) {
-  store.updateCase(id, { signDate: date })
+function getFileExtension(fileName = '') {
+  const match = String(fileName || '').match(/\.[a-zA-Z0-9]+$/)
+  return match ? match[0].toLowerCase() : '.jpg'
+}
+
+function getPreferredEntityName(result = {}) {
+  return result.licenseName || result.shopName || ''
+}
+
+function normalizeEntityName(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[\s（）()【】\[\]<>《》“”"'‘’]/g, '')
+    .replace(/有限责任公司|股份有限公司|有限公司|个体工商户|普通合伙|个人独资企业|旗舰店|专营店|专卖店|企业店/g, '')
+    .trim()
+}
+
+function entityNameMatches(left = '', right = '') {
+  const normalizedLeft = normalizeEntityName(left)
+  const normalizedRight = normalizeEntityName(right)
+  if (!normalizedLeft || !normalizedRight) return false
+  return normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)
+}
+
+function buildCloudDisplayName(result = {}, originalFileName = '', fallbackLabel = '文件') {
+  const extension = getFileExtension(originalFileName)
+  if (result.isEnvelope || result.documentType === '信封' || result.trackingNumber) {
+    return `信封${extension}`
+  }
+  if (result.documentTitle) {
+    return `${String(result.documentTitle).trim()}${extension}`
+  }
+  if (result.documentType && !['普通图片', '其他文书'].includes(result.documentType)) {
+    return `${String(result.documentType).trim()}${extension}`
+  }
+  return `${fallbackLabel}${extension}`
+}
+
+async function analyzeDocumentImage(dataUrl) {
+  const base64Data = dataUrl.split(',')[1]
+  const [aiResult, barcodeResult] = await Promise.all([
+    extractFromImage(base64Data),
+    detectBarcodeFromDataUrl(dataUrl),
+  ])
+
+  const aiTracking = isBlockedTrackingCode(aiResult?.trackingNumber) ? '' : aiResult?.trackingNumber
+  const barcodeTracking = isBlockedTrackingCode(barcodeResult?.trackingNumber) ? '' : barcodeResult?.trackingNumber
+  const barcodeRawValue = isBlockedTrackingCode(barcodeResult?.rawValue) ? '' : barcodeResult?.rawValue
+  const trackingCandidates = extractTrackingCandidates(JSON.stringify(aiResult || {})).filter(value => !isBlockedTrackingCode(value))
+
+  const trackingNumber = pickBestTrackingNumber(
+    aiTracking,
+    barcodeTracking,
+    barcodeRawValue,
+    trackingCandidates
+  )
+
+  const merged = {
+    ...(aiResult || {}),
+    trackingNumber: isBlockedTrackingCode(trackingNumber) ? '' : trackingNumber,
+    licenseName: aiResult?.licenseName || aiResult?.shopName || '',
+    barcodeRawValue,
+    barcodeFormat: barcodeResult?.format || '',
+    isEnvelope: Boolean(aiResult?.isEnvelope || aiResult?.documentType === '信封' || trackingNumber),
+  }
+
+  if (!merged.documentType) {
+    merged.documentType = merged.isEnvelope ? '信封' : '普通图片'
+  }
+
+  return merged
 }
 
 async function handleOcrUpload(event) {
@@ -857,36 +1402,24 @@ async function handleOcrUpload(event) {
   ocrResult.value = null
 
   try {
-    // 将图片转换为 base64
-    const reader = new FileReader()
-    const imageBase64 = await new Promise((resolve, reject) => {
-      reader.onload = (e) => {
-        const base64 = e.target.result.split(',')[1]
-        resolve(base64)
-      }
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
-
-    // 使用豆包AI提取图片信息
-    const result = await extractFromImage(imageBase64)
+    const dataUrl = await readFileAsDataUrl(file)
+    const result = await analyzeDocumentImage(dataUrl)
 
     if (!result) {
       alert('AI识别失败，请重试或使用传统OCR')
       return
     }
 
-    // 匹配案件
     const matchedCases = store.cases.filter(c => {
-      const shopName = result.shopName || ''
-      if (!shopName) return false
-      return c.shopName.includes(shopName) || shopName.includes(c.shopName) ||
-             c.licenseName.includes(shopName) || shopName.includes(c.licenseName)
+      const licenseName = result.licenseName || ''
+      if (!licenseName) return false
+      return entityNameMatches(c.licenseName || c.shopName || '', licenseName)
     })
 
     ocrResult.value = {
+      licenseName: result.licenseName || '',
       shopName: result.shopName || '',
-      trackingNumber: result.trackingNumber || '',
+      trackingNumber: normalizeTrackingNumber(result.trackingNumber),
       matchedCases,
       rawText: result.raw || JSON.stringify(result, null, 2),
       aiResult: result
@@ -957,73 +1490,71 @@ function applyOcrToCaseWithSign(caseId, signTime) {
   alert('已成功关联到案件并记录签收时间！')
 }
 
-function findMatchedCase(shopName = '') {
-  if (!shopName) return null
+function findMatchedCase(licenseName = '') {
+  if (!licenseName) return null
   return store.cases.find(c =>
-    (c.shopName && c.shopName.includes(shopName)) ||
-    (shopName && c.shopName && shopName.includes(c.shopName)) ||
-    (c.licenseName && c.licenseName.includes(shopName)) ||
-    (shopName && c.licenseName && shopName.includes(c.licenseName))
+    entityNameMatches(c.licenseName || c.shopName || '', licenseName)
   )
 }
 
 async function processImageUpload(imageBase64, fileName, labelPrefix = '图片') {
-  processingStatus.value = '上传中...'
-  const base64Data = imageBase64.split(',')[1]
-  const url = await uploadBase64ToTos(imageBase64, fileName)
+  processingStatus.value = '原图上传并识别中...'
+  const [url, result] = await Promise.all([
+    uploadBase64ToTos(imageBase64, fileName),
+    analyzeDocumentImage(imageBase64),
+  ])
 
   if (!url) {
     throw new Error('上传失败，请重试')
   }
 
+  const displayName = buildCloudDisplayName(result, fileName, labelPrefix)
   const fileMeta = {
     url,
-    name: `${labelPrefix}_${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+    name: displayName,
     date: dayjs().format('YYYY-MM-DD'),
-    uploadedAt: dayjs().toISOString()
+    uploadedAt: dayjs().toISOString(),
+    trackingNumber: normalizeTrackingNumber(result?.trackingNumber),
+    documentType: result?.documentType || '',
   }
 
-  processingStatus.value = 'AI匹配中...'
-  const result = await extractFromImage(base64Data)
-  const matchedCase = result?.shopName ? findMatchedCase(result.shopName) : null
+  const matchedCase = result?.licenseName ? findMatchedCase(result.licenseName) : null
 
   if (matchedCase) {
-    await store.assignCloudFile(url, matchedCase.id, fileMeta)
+    const nextImages = Array.isArray(matchedCase.images) ? matchedCase.images : []
+    await store.assignCloudFile(url, matchedCase.id, fileMeta, (fileMeta.trackingNumber || nextImages.length === 0)
+      ? { trackingNumber: fileMeta.trackingNumber || matchedCase.trackingNumber || '' }
+      : null)
     totalCloudFiles.value += 1
-    return { matched: true, matchedCaseName: matchedCase.shopName }
+    return { matched: true, matchedCaseName: matchedCase.licenseName || matchedCase.shopName, analysis: result }
   }
 
   await store.addUnassignedImage(fileMeta)
   totalCloudFiles.value += 1
-  return { matched: false }
+  return { matched: false, analysis: result }
 }
 
-// 扫码上传 - 扫描后立即AI识别并上传
+// 拍照上传 - 拍照后立即优化、上传、AI识别并匹配
 async function handleScanUpload(event) {
   const file = event.target.files?.[0]
   if (!file) return
 
   uploadLoading.value = true
-  processingStatus.value = '识别中...'
+  processingStatus.value = '准备处理拍照文件...'
 
   try {
-    const imageBase64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = e => resolve(e.target.result)
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
-
-    const result = await processImageUpload(imageBase64, `scan_${Date.now()}.jpg`, '扫描')
+    const imageBase64 = await readFileAsDataUrl(file)
+    const fileName = file.name || `camera_${Date.now()}${getFileExtension(file.name) || '.jpg'}`
+    const result = await processImageUpload(imageBase64, fileName, '拍照')
     uploadResult.value = result.matched
-      ? { success: true, message: `✅ 上传成功！已识别并匹配到：「${result.matchedCaseName}」` }
-      : { success: false, message: '⚠️ 上传成功，但未识别到匹配的案件，请在云端文件手动分配' }
+      ? { success: true, message: `✅ 上传成功！已按执照名称匹配到：「${result.matchedCaseName}」` }
+      : { success: false, message: '⚠️ 上传成功，但未识别到执照名称匹配案件，请在云端文件手动分配' }
 
     if (showCloudFiles.value) {
       await loadCloudFiles()
     }
   } catch (err) {
-    console.error('Scan upload failed:', err)
+    console.error('Camera upload failed:', err)
     uploadResult.value = { success: false, message: '处理失败：' + err.message }
   }
 
@@ -1076,6 +1607,8 @@ const allCloudFiles = ref([])
 const cloudFilesLoading = ref(false)
 const showImagePreview = ref(false)
 const previewImageUrl = ref('')
+const previewFile = ref({ url: '', kind: '', name: '' })
+const previewTextContent = ref('')
 const totalCloudFiles = ref(0)
 const uploadLoading = ref(false)
 const processingStatus = ref('')
@@ -1134,14 +1667,14 @@ function isImageFile(file) {
 }
 
 function getFileName(file) {
-  if (file.name) return file.name
-  if (file.Key) {
+  if (file?.name) return file.name
+  if (file?.Key) {
     const parts = file.Key.split('/')
     return parts[parts.length - 1]
   }
-  if (file.url) {
+  if (file?.url) {
     try {
-      const urlObj = new URL(file.url)
+      const urlObj = new URL(file.url, window.location.origin)
       const pathParts = urlObj.pathname.split('/')
       return pathParts[pathParts.length - 1]
     } catch {
@@ -1149,6 +1682,22 @@ function getFileName(file) {
     }
   }
   return '未命名文件'
+}
+
+function getPreviewKind(file) {
+  const name = getFileName(file).toLowerCase()
+  if (/\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(name)) return 'image'
+  if (/\.pdf$/i.test(name)) return 'pdf'
+  if (/\.(txt|md|json|csv)$/i.test(name)) return 'text'
+  return 'other'
+}
+
+function getFileIcon(file) {
+  const kind = typeof file === 'string' ? file : getPreviewKind(file)
+  if (kind === 'image') return '🖼️'
+  if (kind === 'pdf') return '📕'
+  if (kind === 'text') return '📝'
+  return '📄'
 }
 
 function getFileCaseId(file) {
@@ -1163,11 +1712,13 @@ function getFileCaseId(file) {
 
 async function assignFileToCase(file, caseId) {
   const fileUrl = file.url || getCloudFileUrl(file.Key)
+  const trackingNumber = normalizeTrackingNumber(file.trackingNumber)
   await store.assignCloudFile(fileUrl, caseId, {
     name: getFileName(file),
     date: file.date || dayjs().format('YYYY-MM-DD'),
-    uploadedAt: file.uploadedAt || file.LastModified || dayjs().toISOString()
-  })
+    uploadedAt: file.uploadedAt || file.LastModified || dayjs().toISOString(),
+    trackingNumber,
+  }, caseId && trackingNumber ? { trackingNumber } : null)
 
   if (caseId) {
     alert('已关联到案件！')
@@ -1254,9 +1805,40 @@ async function batchDeleteCloudFiles() {
   alert(`批量删除完成：成功 ${successCount} 个${failCount > 0 ? '，失败 ' + failCount + ' 个' : ''}`)
 }
 
-function previewImage(url) {
+async function openFilePreview(file) {
+  const url = file?.url || getCloudFileUrl(file?.Key)
+  if (!url) return
+
+  const kind = getPreviewKind(file)
   previewImageUrl.value = url
+  previewFile.value = {
+    url,
+    kind,
+    name: getFileName(file),
+  }
+  previewTextContent.value = ''
+
+  if (kind === 'text') {
+    try {
+      previewTextContent.value = await fetch(url).then(res => res.text())
+    } catch (error) {
+      previewTextContent.value = '文本预览加载失败，请点击“新窗口打开”。'
+    }
+  }
+
   showImagePreview.value = true
+}
+
+function closeFilePreview() {
+  showImagePreview.value = false
+  previewImageUrl.value = ''
+  previewFile.value = { url: '', kind: '', name: '' }
+  previewTextContent.value = ''
+}
+
+function openPreviewInNewTab() {
+  if (!previewFile.value.url) return
+  window.open(previewFile.value.url, '_blank', 'noopener,noreferrer')
 }
 
 // 计算未关联文件数

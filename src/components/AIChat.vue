@@ -142,7 +142,7 @@ function buildContext() {
     总数: cases.length,
     未受理: cases.filter(c => c.status === 'pending_report').length,
     已受理: cases.filter(c => c.status === 'accepted').length,
-    已立案: cases.filter(c => c.status === 'reported').length,
+    不予受理: cases.filter(c => c.status === 'reported').length,
     已调解: cases.filter(c => c.status === 'decided').length,
     已处罚: cases.filter(c => c.status === 'closed').length,
     不予立案: cases.filter(c => c.status === 'rejected').length,

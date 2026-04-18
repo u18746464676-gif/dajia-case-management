@@ -16,15 +16,30 @@ function workingDaysDiff(startDate, endDate) {
   return count - 1
 }
 
+function addWorkingDays(startDate, days) {
+  let current = dayjs(startDate)
+  let added = 0
+
+  while (added < days) {
+    current = current.add(1, 'day')
+    const dayOfWeek = current.day()
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      added++
+    }
+  }
+
+  return current.format('YYYY-MM-DD')
+}
+
 // 检查案件是否超期
 export function checkOverdueCases(cases) {
   const now = dayjs()
   const overdueList = []
 
   for (const c of cases) {
-    // 未受理案件：签收日期超过7个工作日
+    // 未受理案件：签收日期起10个工作日内应受理
     if (c.status === 'pending_report' && c.signDate) {
-      const deadline = dayjs(c.signDate).add(7, 'day').format('YYYY-MM-DD')
+      const deadline = addWorkingDays(c.signDate, 10)
       const workingDaysLeft = workingDaysDiff(now, deadline)
       if (workingDaysLeft < 0) {
         const overdueDays = Math.abs(workingDaysLeft)
@@ -37,37 +52,48 @@ export function checkOverdueCases(cases) {
           deadline: deadline,
           urgency: overdueDays > 3 ? 'danger' : 'warning'
         })
-      }
-    }
-
-    // 已受理案件：调解期限60日
-    if ((c.status === 'accepted' || c.status === 'reported' || c.status === 'decided') && c.acceptanceDate) {
-      const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
-      const daysLeft = dayjs(mediationDeadline).diff(now, 'day')
-      if (daysLeft < 0) {
-        const overdueDays = Math.abs(daysLeft)
+      } else if (workingDaysLeft <= 3) {
         overdueList.push({
           id: c.id,
           shopName: c.shopName,
           productName: c.productName,
-          type: 'mediation',
-          message: `调解期限已超过${overdueDays}天`,
-          deadline: mediationDeadline,
-          urgency: 'danger'
-        })
-      } else if (daysLeft <= 7) {
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'mediation',
-          message: `调解期限还剩${daysLeft}天`,
-          deadline: mediationDeadline,
+          type: 'acceptance',
+          message: `受理到期日还剩${workingDaysLeft}个工作日`,
+          deadline: deadline,
           urgency: 'warning'
         })
       }
+    }
 
-      // 案件办结期限120日
+    // 受理相关案件时限，不予受理只保留办结期限
+    if ((c.status === 'accepted' || c.status === 'reported' || c.status === 'decided') && c.acceptanceDate) {
+      if (c.status !== 'reported') {
+        const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
+        const daysLeft = dayjs(mediationDeadline).diff(now, 'day')
+        if (daysLeft < 0) {
+          const overdueDays = Math.abs(daysLeft)
+          overdueList.push({
+            id: c.id,
+            shopName: c.shopName,
+            productName: c.productName,
+            type: 'mediation',
+            message: `调解期限已超过${overdueDays}天`,
+            deadline: mediationDeadline,
+            urgency: 'danger'
+          })
+        } else if (daysLeft <= 7) {
+          overdueList.push({
+            id: c.id,
+            shopName: c.shopName,
+            productName: c.productName,
+            type: 'mediation',
+            message: `调解期限还剩${daysLeft}天`,
+            deadline: mediationDeadline,
+            urgency: 'warning'
+          })
+        }
+      }
+
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
       if (completionDaysLeft < 0) {
