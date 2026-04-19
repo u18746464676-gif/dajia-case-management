@@ -1433,9 +1433,9 @@ async function handleOcrUpload(event) {
     }
 
     const matchedCases = store.cases.filter(c => {
-      const licenseName = result.licenseName || ''
-      if (!licenseName) return false
-      return entityNameMatches(c.licenseName || c.shopName || '', licenseName)
+      const ocrName = result.licenseName || result.shopName || ''
+      if (!ocrName) return false
+      return entityNameMatches(c.licenseName || c.shopName || '', ocrName)
     })
 
     // 提取所有候选单号（AI返回的 + 从原始文本重新提取的，取最多5个）
