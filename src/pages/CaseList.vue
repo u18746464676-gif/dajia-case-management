@@ -1439,11 +1439,17 @@ async function handleOcrUpload(event) {
     })
 
     // 提取所有候选单号（AI返回的 + 从原始文本重新提取的，取最多5个）
+    // 优先选 XA 开头的单号，其次选数字最多的
     const rawTextForTracking = result.raw || ''
-    const aiNumber = result.trackingNumber ? [result.trackingNumber] : []
+    const aiNumbers = Array.isArray(result.trackingNumbers)
+      ? result.trackingNumbers.filter(t => !isBlockedTrackingCode(t))
+      : (result.trackingNumber ? [result.trackingNumber] : [])
     const candidatesFromRaw = extractTrackingCandidates(rawTextForTracking)
-    const allCandidates = [...new Set([...aiNumber, ...candidatesFromRaw])].slice(0, 5)
-    const defaultTracking = normalizeTrackingNumber(result.trackingNumber || rawTextForTracking)
+    const allCandidates = [...new Set([...aiNumbers, ...candidatesFromRaw])].slice(0, 5)
+
+    // 自动选：XA 开头 > 纯数字 > 其他
+    const xaCandidate = allCandidates.find(t => t.toUpperCase().startsWith('XA'))
+    const defaultTracking = xaCandidate || normalizeTrackingNumber(result.trackingNumber || rawTextForTracking)
 
     ocrResult.value = {
       licenseName: result.licenseName || '',
