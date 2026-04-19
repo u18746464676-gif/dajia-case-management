@@ -1,5 +1,50 @@
 <template>
   <div class="space-y-4">
+    <!-- 背景上传进度条 -->
+    <div v-if="uploadQueueHasActive" class="card overflow-hidden">
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <div class="flex items-center gap-2">
+          <div class="h-2.5 w-2.5 animate-pulse rounded-full bg-blue-500"></div>
+          <span class="text-sm font-medium text-slate-700">
+            正在上传 {{ uploadQueueActive }} 个文件...
+          </span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-slate-500">{{ uploadQueueItems.length }} 个文件</span>
+          <span class="text-xs font-medium text-blue-600">{{ uploadQueueProgress }}%</span>
+          <button @click="clearUploadFinished" class="text-xs text-slate-400 hover:text-slate-600">清空</button>
+        </div>
+      </div>
+      <!-- 总进度条 -->
+      <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div
+          class="h-full rounded-full bg-blue-500 transition-all duration-500"
+          :style="{ width: uploadQueueProgress + '%' }"
+        ></div>
+      </div>
+      <!-- 各文件状态 -->
+      <div class="mt-2 space-y-1 max-h-40 overflow-y-auto">
+        <div
+          v-for="item in uploadQueueItems"
+          :key="item.id"
+          class="flex items-center gap-2 text-xs"
+        >
+          <!-- 状态图标 -->
+          <span v-if="item.status === 'done'" class="text-emerald-500">✅</span>
+          <span v-else-if="item.status === 'error'" class="text-red-400 cursor-pointer" @click="retryUploadItem(item.id, uploadQueueCallback)" title="点击重试">❌</span>
+          <span v-else-if="item.status === 'uploading'" class="animate-spin text-blue-400">⟳</span>
+          <span v-else class="text-slate-300">○</span>
+
+          <span class="flex-1 truncate text-slate-600" :class="{ 'text-emerald-600 font-medium': item.status === 'done' }">{{ item.name }}</span>
+
+          <span v-if="item.status === 'uploading'" class="text-slate-400">{{ item.progress }}%</span>
+          <span v-else-if="item.status === 'done'" class="text-emerald-500">完成</span>
+          <span v-else-if="item.status === 'error'" class="text-red-400" :title="item.error">{{ item.error || '失败' }}</span>
+          <span v-else class="text-slate-400">等待</span>
+        </div>
+      </div>
+    </div>
+
     <section class="card overflow-hidden">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div class="space-y-3">
@@ -588,6 +633,7 @@ import { detectBarcodeFromDataUrl } from '@/lib/barcode'
 import { extractTrackingCandidates, normalizeTrackingNumber, pickBestTrackingNumber, isBlockedTrackingCode } from '@/lib/tracking'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { formatAmount } from '@/lib/case-status'
+import { useBgUploadQueue } from '@/composables/useBgUploadQueue'
 
 const store = useCaseStore()
 const route = useRoute()
@@ -620,6 +666,52 @@ const albumInputRef = ref(null)
 const fileInputRef = ref(null)
 const excelInputRef = ref(null)
 const caseListSectionRef = ref(null)
+
+// ── 背景上传队列 ─────────────────────────────────────
+const {
+  items: uploadQueueItems,
+  totalProgress: uploadQueueProgress,
+  activeCount: uploadQueueActive,
+  hasActive: uploadQueueHasActive,
+  enqueueFiles,
+  clearFinished: clearUploadFinished,
+  retryItem: retryUploadItem,
+} = useBgUploadQueue()
+
+// 上传成功后自动关联到案件（仅 OCR 结果中已匹配到案件的情况）
+async function uploadQueueCallback(dataUrl, name) {
+  const url = await uploadBase64ToTos(dataUrl, name)
+  return url
+}
+
+// 监听队列完成项，自动关联到案件
+watch(uploadQueueItems, async (items) => {
+  const doneItems = items.filter(it => it.status === 'done' && !it._handled)
+  for (const item of doneItems) {
+    item._handled = true
+    // 如果该文件是 OCR 识别后入队的，且当时匹配到了案件，自动关联
+    const ocrInfo = item._ocrInfo
+    if (ocrInfo && ocrInfo.matchedCaseId) {
+      try {
+        const fileMeta = {
+          url: item.url,
+          name: item.name,
+          date: dayjs().format('YYYY-MM-DD'),
+          uploadedAt: dayjs().toISOString(),
+          trackingNumber: ocrInfo.trackingNumber || '',
+          documentType: ocrInfo.documentType || '普通图片',
+        }
+        await store.assignCloudFile(item.url, ocrInfo.matchedCaseId, fileMeta,
+          ocrInfo.trackingNumber ? { trackingNumber: ocrInfo.trackingNumber } : null)
+        if (ocrInfo.caseName) {
+          console.log(`[BgUpload] ${item.name} 已自动关联到「${ocrInfo.caseName}」`)
+        }
+      } catch (err) {
+        console.error('[BgUpload] 自动关联失败:', err)
+      }
+    }
+  }
+}, { deep: true })
 
 // ── 全选逻辑 ──────────────────────────────────────────
 const isAllPageSelected = computed(() => {
@@ -1590,40 +1682,30 @@ async function handleOcrUpload(event) {
   }
 }
 
-// 关联OCR结果到案件（同时上传文件到云端）
-async function applyOcrToCase(caseId) {
+// 关联OCR结果到案件（文件入背景上传队列，不阻塞页面）
+function applyOcrToCase(caseId) {
   if (!ocrResult.value) return
   const result = ocrResult.value
 
-  // 先上传文件到云端（如有源文件）
+  const matchedCase = store.cases.find(c => c.id === caseId)
+
+  // 把文件加入背景上传队列
   if (result.sourceFile) {
-    try {
-      const isImage = result.sourceFile.type.startsWith('image/')
-      let url = ''
-      if (isImage) {
-        const dataUrl = await readFileAsDataUrl(result.sourceFile)
-        url = await uploadBase64ToTos(dataUrl, result.sourceFile.name)
-      } else {
-        // 文档文件也转base64上传
-        const dataUrl = await readFileAsDataUrl(result.sourceFile)
-        url = await uploadBase64ToTos(dataUrl, result.sourceFile.name)
-      }
-      if (url) {
-        const fileMeta = {
-          url,
-          name: result.sourceFile.name || '文件',
-          date: dayjs().format('YYYY-MM-DD'),
-          uploadedAt: dayjs().toISOString(),
-          trackingNumber: result.trackingNumber || '',
-          documentType: result.aiResult?.documentType || (result.isDoc ? '其他文书' : '普通图片'),
-        }
-        await store.assignCloudFile(url, caseId, fileMeta,
-          result.trackingNumber ? { trackingNumber: result.trackingNumber } : null)
-      }
-    } catch (err) {
-      console.error('文件上传失败:', err)
-      alert('文件上传失败：' + err.message + '，但案件已关联')
+    const ocrInfo = {
+      matchedCaseId: caseId,
+      caseName: matchedCase ? (matchedCase.licenseName || matchedCase.shopName) : '',
+      trackingNumber: result.trackingNumber || '',
+      documentType: result.aiResult?.documentType || (result.isDoc ? '其他文书' : '普通图片'),
     }
+    enqueueFiles([result.sourceFile], uploadQueueCallback)
+    // 给刚入队的项附加 OCR 信息（hack: 利用 watch 异步写入）
+    setTimeout(() => {
+      const queue = uploadQueueItems.value
+      const lastItem = queue[queue.length - 1]
+      if (lastItem && lastItem.name === result.sourceFile.name && !lastItem._ocrInfo) {
+        lastItem._ocrInfo = ocrInfo
+      }
+    }, 100)
   }
 
   const updates = {}
@@ -1634,7 +1716,7 @@ async function applyOcrToCase(caseId) {
 
   ocrResult.value = null
   logisticsResult.value = null
-  alert('已成功关联到案件！')
+  alert('已成功关联到案件，文件正在后台上传！')
 }
 
 // 查询物流
@@ -1659,31 +1741,29 @@ async function queryLogistics(trackingNumber) {
   logisticsLoading.value = false
 }
 
-// OCR识别后一键关联并记录签收时间
-async function applyOcrToCaseWithSign(caseId, signTime) {
+// OCR识别后一键关联并记录签收时间（文件入背景上传队列）
+function applyOcrToCaseWithSign(caseId, signTime) {
   if (!ocrResult.value) return
   const result = ocrResult.value
 
-  // 先上传文件到云端（如有源文件）
+  const matchedCase = store.cases.find(c => c.id === caseId)
+
+  // 文件入背景上传队列
   if (result.sourceFile) {
-    try {
-      const dataUrl = await readFileAsDataUrl(result.sourceFile)
-      const url = await uploadBase64ToTos(dataUrl, result.sourceFile.name)
-      if (url) {
-        const fileMeta = {
-          url,
-          name: result.sourceFile.name || '文件',
-          date: dayjs().format('YYYY-MM-DD'),
-          uploadedAt: dayjs().toISOString(),
-          trackingNumber: result.trackingNumber || '',
-          documentType: result.aiResult?.documentType || (result.isDoc ? '其他文书' : '普通图片'),
-        }
-        await store.assignCloudFile(url, caseId, fileMeta,
-          result.trackingNumber ? { trackingNumber: result.trackingNumber } : null)
-      }
-    } catch (err) {
-      console.error('文件上传失败:', err)
+    const ocrInfo = {
+      matchedCaseId: caseId,
+      caseName: matchedCase ? (matchedCase.licenseName || matchedCase.shopName) : '',
+      trackingNumber: result.trackingNumber || '',
+      documentType: result.aiResult?.documentType || (result.isDoc ? '其他文书' : '普通图片'),
     }
+    enqueueFiles([result.sourceFile], uploadQueueCallback)
+    setTimeout(() => {
+      const queue = uploadQueueItems.value
+      const lastItem = queue[queue.length - 1]
+      if (lastItem && lastItem.name === result.sourceFile.name && !lastItem._ocrInfo) {
+        lastItem._ocrInfo = ocrInfo
+      }
+    }, 100)
   }
 
   const updates = {}
@@ -1698,7 +1778,7 @@ async function applyOcrToCaseWithSign(caseId, signTime) {
 
   ocrResult.value = null
   logisticsResult.value = null
-  alert('已成功关联到案件并记录签收时间！')
+  alert('已成功关联到案件并记录签收时间，文件正在后台上传！')
 }
 
 function findMatchedCase(licenseName = '') {
