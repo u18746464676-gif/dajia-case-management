@@ -1,5 +1,20 @@
 <template>
   <div class="space-y-4">
+    <!-- Toast 通知 -->
+    <transition-group name="toast" tag="div" class="fixed top-4 right-4 z-50 space-y-2 w-72">
+      <div
+        v-for="toast in toasts"
+        :key="toast.id"
+        class="card shadow-lg text-sm"
+        :class="{
+          'border-l-4 border-emerald-500': toast.type === 'success',
+          'border-l-4 border-red-400': toast.type === 'error',
+          'border-l-4 border-amber-400': toast.type === 'warn',
+          'border-l-4 border-blue-400': toast.type === 'info',
+        }"
+      >{{ toast.message }}</div>
+    </transition-group>
+
     <!-- 背景上传进度条 -->
     <div v-if="uploadQueueHasActive" class="card overflow-hidden">
       <div class="flex items-center justify-between gap-3 mb-2">
@@ -74,16 +89,10 @@
           </div>
 
           <div v-if="showMoreActions" class="grid grid-cols-1 gap-3 mt-3 sm:grid-cols-2">
-            <button type="button" @click="showMoreActions = false; triggerAlbumUpload()" class="action-tile">
-              <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">相册上传</span>
-                <span class="mt-1 block text-xs text-slate-500">批量挑图后再统一上传</span>
-              </span>
-            </button>
             <button type="button" @click="showMoreActions = false; triggerFileUpload()" class="action-tile">
               <span class="min-w-0">
                 <span class="block text-sm font-semibold text-slate-800">上传文件</span>
-                <span class="mt-1 block text-xs text-slate-500">支持文档类附件暂存</span>
+                <span class="mt-1 block text-xs text-slate-500">图片/证件/快递单/附件</span>
               </span>
             </button>
             <button type="button" @click="showMoreActions = false; triggerExcelUpload()" class="action-tile">
@@ -651,6 +660,8 @@ const batchReportDate = ref('')
 const uploadedFiles = ref([])
 const ocrLoading = ref(false)
 const ocrResult = ref(null)
+const toasts = ref([])
+let toastTimer = null
 const logisticsLoading = ref(false)
 const logisticsResult = ref(null)
 const batchLogisticsLoading = ref(false)
@@ -1450,69 +1461,104 @@ async function processNextFile() {
 }
 
 // 用户点"×"关闭 OCR 结果时，自动处理下一个文件
-watch(ocrResult, (val) => {
-  if (val === null && isProcessingFileQueue.value && pendingFileQueue.value.length > 0) {
-    processNextFile()
-  } else if (val === null && isProcessingFileQueue.value && pendingFileQueue.value.length === 0) {
-    isProcessingFileQueue.value = false
-  }
-})
-
-// 图片文件 → OCR识别
+// ── 图片文件 → OCR识别 ──────────────────────────────────
 async function handleOcrUploadForFile(file) {
   ocrLoading.value = true
-  ocrResult.value = null
   try {
     const dataUrl = await readFileAsDataUrl(file)
     const result = await analyzeDocumentImage(dataUrl)
     if (!result) {
-      alert('AI识别失败，请重试')
+      addToast('OCR识别失败：AI返回空结果', 'error')
       return
     }
     const matchedCases = findMatchedCases(result)
     const allCandidates = buildTrackingCandidates(result)
     const xaCandidate = allCandidates.find(t => t.toUpperCase().startsWith('XA'))
     const defaultTracking = xaCandidate || normalizeTrackingNumber(result.trackingNumber || '')
-    ocrResult.value = {
-      sourceFile: file,
-      licenseName: result.licenseName || '',
-      shopName: result.shopName || '',
-      trackingNumber: defaultTracking,
-      trackingCandidates: allCandidates,
-      matchedCases,
-      rawText: result.raw || JSON.stringify(result, null, 2),
-      aiResult: result,
-      isDoc: false,
+
+    // 直接上传文件
+    const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
+
+    // 找到最佳匹配（取第一个匹配到的）
+    const bestMatch = matchedCases.length > 0 ? matchedCases[0] : null
+    if (bestMatch) {
+      const fileMeta = {
+        url: uploadedUrl,
+        name: file.name,
+        date: dayjs().format('YYYY-MM-DD'),
+        uploadedAt: dayjs().toISOString(),
+        trackingNumber: defaultTracking || '',
+        documentType: '普通图片',
+      }
+      await store.assignCloudFile(uploadedUrl, bestMatch.id, fileMeta,
+        defaultTracking ? { trackingNumber: defaultTracking } : null)
+      addToast(`✅ ${file.name} → ${bestMatch.licenseName || bestMatch.shopName}`, 'success')
+    } else {
+      addToast(`📄 ${file.name}（未匹配到案件，已单独上传）`, 'warn')
     }
   } catch (err) {
     console.error('OCR错误:', err)
-    alert('识别失败：' + err.message)
+    addToast('识别失败：' + err.message, 'error')
   } finally {
     ocrLoading.value = false
+    // 不等待确认，直接处理下一个文件
+    if (pendingFileQueue.value.length > 0) {
+      processNextFile()
+    } else {
+      isProcessingFileQueue.value = false
+    }
   }
 }
 
 // 文档文件 → 从文件名解析
 async function handleDocUpload(file) {
   ocrLoading.value = true
-  ocrResult.value = null
   try {
     const parsed = parseDocFileName(file.name)
     const matchedCases = findMatchedCases(parsed)
-    ocrResult.value = {
-      sourceFile: file,
-      licenseName: parsed.licenseName || '',
-      shopName: parsed.shopName || '',
-      trackingNumber: parsed.trackingNumber || '',
-      trackingCandidates: parsed.trackingNumber ? [parsed.trackingNumber] : [],
-      matchedCases,
-      rawText: file.name,
-      aiResult: parsed,
-      isDoc: true,
+
+    // 直接上传文件
+    const dataUrl = await readFileAsDataUrl(file)
+    const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
+
+    // 找到最佳匹配
+    const bestMatch = matchedCases.length > 0 ? matchedCases[0] : null
+    if (bestMatch) {
+      const fileMeta = {
+        url: uploadedUrl,
+        name: file.name,
+        date: dayjs().format('YYYY-MM-DD'),
+        uploadedAt: dayjs().toISOString(),
+        trackingNumber: parsed.trackingNumber || '',
+        documentType: '其他文书',
+      }
+      await store.assignCloudFile(uploadedUrl, bestMatch.id, fileMeta,
+        parsed.trackingNumber ? { trackingNumber: parsed.trackingNumber } : null)
+      addToast(`✅ ${file.name} → ${bestMatch.licenseName || bestMatch.shopName}`, 'success')
+    } else {
+      addToast(`📄 ${file.name}（未匹配到案件，已单独上传）`, 'warn')
     }
+  } catch (err) {
+    console.error('文档处理错误:', err)
+    addToast('处理失败：' + err.message, 'error')
   } finally {
     ocrLoading.value = false
+    // 不等待确认，直接处理下一个文件
+    if (pendingFileQueue.value.length > 0) {
+      processNextFile()
+    } else {
+      isProcessingFileQueue.value = false
+    }
   }
+}
+
+// 轻量提示通知（3秒自动消失）
+function addToast(message, type = 'info') {
+  const id = Date.now()
+  toasts.value.push({ id, message, type })
+  setTimeout(() => {
+    toasts.value = toasts.value.filter(t => t.id !== id)
+  }, 3000)
 }
 
 // 从文件名解析执照/店铺/单号
@@ -1550,9 +1596,21 @@ function parseDocFileName(fileName = '') {
 
 // 复用handleOcrUpload中的匹配和候选构建逻辑
 function findMatchedCases(result) {
-  const ocrName = result.licenseName || result.shopName || ''
-  if (!ocrName) return []
-  return store.cases.filter(c => entityNameMatches(c.licenseName || c.shopName || '', ocrName))
+  const ocrLicense = result.licenseName || ''
+  const ocrShop = result.shopName || ''
+  if (!ocrLicense && !ocrShop) return []
+  return store.cases.filter(c => {
+    const caseLicense = c.licenseName || ''
+    const caseShop = c.shopName || ''
+    // 执照名或店铺名，任意一个匹配上即可
+    if (ocrLicense && ocrShop) {
+      return entityNameMatches(caseLicense, ocrLicense) || entityNameMatches(caseShop, ocrShop)
+    } else if (ocrLicense) {
+      return entityNameMatches(caseLicense, ocrLicense) || entityNameMatches(caseShop, ocrLicense)
+    } else {
+      return entityNameMatches(caseShop, ocrShop) || entityNameMatches(caseLicense, ocrShop)
+    }
+  })
 }
 
 function buildTrackingCandidates(result) {
