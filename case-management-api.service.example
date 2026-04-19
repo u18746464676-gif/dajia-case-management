@@ -1,0 +1,14 @@
+[Unit]
+Description=Case Management API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/case-management-api
+ExecStart=/usr/local/bin/node /var/www/case-management-api/server.js
+Restart=always
+RestartSec=5
+Environment=SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE
+
+[Install]
+WantedBy=multi-user.target

@@ -21,6 +21,11 @@ Thumbs.db
 # 日志
 *.log
 npm-debug.log*
+
 # PWA build artifacts
 sw.js
 workbox-*.js
+
+# 服务器配置文件（本地部署用，不提交）
+case-management-api.service
+case-management.conf

@@ -1,12 +1,12 @@
 // 豆包大模型服务
 const BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3'
 
-// 你的凭证
-const API_KEY = '0bf9d45d-7269-4236-814f-e07590d1d4cf'
-const ACCESS_KEY = 'AKLTOGFhY2RhYjM0MzliNDNkOGJmY2NiNTA3OTI5YmFmOWY'
-const SECRET_KEY = 'WlRVeE56QXlNbUZpTmpRME5ERTJZamc0TmpCa09HSXdNVFpoTmpreE5Uaw=='
-const REGION = 'cn-beijing'
-const PROJECT_ID = 'seed-general' // 可以不改,API Key已经验证
+// 凭证（从环境变量读取，请勿硬编码）
+const API_KEY    = import.meta.env.VITE_DOUBAO_API_KEY || ''
+const ACCESS_KEY = import.meta.env.VITE_TOS_ACCESS_KEY_ID || ''
+const SECRET_KEY = import.meta.env.VITE_TOS_SECRET_ACCESS_KEY || ''
+const REGION     = import.meta.env.VITE_TOS_REGION || 'cn-beijing'
+const PROJECT_ID = 'seed-general' // 可以不改
 
 // 生成签名(简化版,实际生产应使用完整的签名算法)
 async function generateAuthHeader(method, path, body = '') {
@@ -189,6 +189,8 @@ export async function extractFromImage(imageBase64) {
 - 无法识别的字段返回 null。`
 
   try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 120000)
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -208,8 +210,10 @@ export async function extractFromImage(imageBase64) {
           }
         ],
         max_tokens: 2000,
-      })
+      }),
+      signal: controller.signal,
     })
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       const error = await response.text()

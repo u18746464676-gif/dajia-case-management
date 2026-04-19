@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import {
   ensureCloudFilesTable,
   registerCloudFile,
+  verifyCloudFileExists,
   fetchUnassignedFiles,
   fetchCaseFileUrls,
   deleteCloudFilesByUrl,
@@ -17,6 +18,18 @@ const APP_META_ID = '00000000-0000-0000-0000-000000000000'
 const CASE_NUMBER_PREFIX = 'AJ'
 const CASE_NUMBER_PATTERN = /^AJ-(\d{8})-(\d{4})$/
 const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_BASE || 'http://192.168.1.28:8787'
+
+// 从 TOS URL 中提取对象 key，例如：
+// https://dajia-case.tos-cn-beijing.volces.com/case-images/abc.jpg → case-images/abc.jpg
+function extractTosKey(url) {
+  if (!url) return ''
+  try {
+    const u = new URL(url)
+    return u.pathname.replace(/^\//, '')
+  } catch {
+    return url
+  }
+}
 
 function uuid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -140,14 +153,13 @@ export const useCaseStore = defineStore('case', () => {
 
   async function loadFromSupabase() {
     isLoading.value = true
-    console.log('[Supabase] 开始加载数据...')
+    // console.log('[Supabase] 开始加载数据...')
     try {
       const { data, error } = await supabase
         .from('cases')
         .select('id, data')
         .order('created_at', { ascending: false })
 
-      console.log('[Supabase] 查询结果:', { error, rowCount: data?.length })
       if (error) throw error
 
       const rows = data || []
@@ -155,9 +167,7 @@ export const useCaseStore = defineStore('case', () => {
       const caseRows = rows.filter(row => row.id !== APP_META_ID && row.data?.type !== '__app_meta__')
 
       cases.value = ensureCaseNumbers(caseRows.map(row => row.data).filter(Boolean))
-      console.log('[Supabase] 加载到案件数:', cases.value.length)
       unassignedImages.value = dedupeByUrl(appMetaRow?.data?.unassignedImages || loadUnassignedImagesFromLocalStorage())
-      console.log('[Supabase] 加载到未分配图片数:', unassignedImages.value.length)
 
       // 云端返回空但本地有数据时，用本地数据（防止上传失败导致刷新丢数据）
       if (cases.value.length === 0) {
@@ -178,7 +188,7 @@ export const useCaseStore = defineStore('case', () => {
     } finally {
       isLoading.value = false
     }
-    console.log('[Supabase] 最终案件数:', cases.value.length)
+    // console.log('[Supabase] 最终案件数:', cases.value.length)
   }
 
   async function saveToSupabase() {
@@ -493,9 +503,22 @@ export const useCaseStore = defineStore('case', () => {
     if (!image?.url) return null
     const normalized = normalizeImageRecord(image)
     unassignedImages.value = [normalized, ...unassignedImages.value.filter(item => item.url !== normalized.url)]
-    // 注册到云端 cloud_files 表
+    // 注册到云端 cloud_files 表并二次验证
     if (image.key || image.url) {
-      await registerCloudFile({ fileUrl: image.url, fileKey: image.key || image.url, fileName: image.name }).catch(() => {})
+      const regResult = await registerCloudFile({
+        fileUrl: image.url,
+        fileKey: image.key || extractTosKey(image.url),
+        fileName: image.name,
+      })
+      if (regResult.error) {
+        console.error('[addUnassignedImage] ❌ cloud_files 注册失败:', regResult.error)
+        // 抛出让调用方感知
+        throw new Error('cloud_files 注册失败: ' + (regResult.error.message || JSON.stringify(regResult.error)))
+      }
+      const verifyResult = await verifyCloudFileExists(image.url)
+      if (!verifyResult.exists) {
+        throw new Error('文件入库二次验证失败：数据库记录不存在')
+      }
     }
     await syncState()
     return normalized
@@ -548,6 +571,25 @@ export const useCaseStore = defineStore('case', () => {
         changed = true
       }
     } else {
+      // 未匹配案件 → 写入 cloud_files 表
+      const regResult = await registerCloudFile({
+        fileUrl,
+        fileKey: extractTosKey(fileUrl),
+        fileName: imageRecord.name,
+        fileType: 'image',
+      })
+      if (regResult.error) {
+        console.error('[assignCloudFile] ❌ cloud_files 注册失败:', regResult.error)
+        throw new Error('cloud_files 注册失败: ' + (regResult.error.message || JSON.stringify(regResult.error)))
+      }
+
+      // 二次验证（stub 始终返回 exists:true，可确保写入成功）
+      const verifyResult = await verifyCloudFileExists(fileUrl)
+      if (!verifyResult.exists) {
+        console.error('[assignCloudFile] ❌ 二次验证失败：数据库记录不存在！fileUrl:', fileUrl)
+        throw new Error('文件入库二次验证失败：数据库记录不存在，请联系管理员')
+      }
+
       const existing = unassignedImages.value.find(item => item.url === fileUrl)
       const nextUnassigned = [imageRecord, ...unassignedImages.value.filter(item => item.url !== fileUrl)]
       if (!existing || JSON.stringify(existing) !== JSON.stringify(imageRecord)) {

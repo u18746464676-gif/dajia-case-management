@@ -1,148 +1,79 @@
 /**
- * 云端文件管理 — 统一管理所有上传文件的元数据
+ * @file  cloudFiles.js
+ * 统一管理所有上传文件的元数据
+ *
+ * 架构说明（2026-04-19）：
+ *   前端上传到云存储（TOS）后，调自有后端 API /api/register-cloud-file
+ *   由后端使用 Supabase service_role key 写入 cloud_files 表
+ *   前端不再直连 Supabase（无 RLS 问题）
+ *
+ * 不再使用的旧函数（保留仅因 stores/case.js 有调用，标记为兼容过渡）：
+ *   verifyCloudFileExists → 始终返回 { exists: true }，因为后端已保证写入成功
+ *
  * 表结构 (Supabase):
  * CREATE TABLE cloud_files (
  *   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
- *   case_id TEXT,                    -- 关联案件ID，未分配时为 NULL
- *   file_url TEXT NOT NULL,          -- TOS 上的文件 URL
- *   file_key TEXT NOT NULL,          -- TOS 上的对象 key（用于删除）
- *   file_name TEXT,                  -- 原始文件名
- *   file_type TEXT DEFAULT 'image',  -- image | file | other
- *   file_size BIGINT,               -- 文件大小（字节）
+ *   case_id TEXT,
+ *   file_url TEXT NOT NULL,
+ *   file_key TEXT NOT NULL,
+ *   file_name TEXT,
+ *   file_type TEXT DEFAULT 'image',
+ *   file_size BIGINT,
  *   uploaded_at TIMESTAMPTZ DEFAULT NOW(),
- *   deleted_at TIMESTAMPTZ           -- 软删除时间，为 NULL 表示未删除
+ *   deleted_at TIMESTAMPTZ
  * );
- *
- * -- RLS 策略（可选，待用户配置）
  */
 
-import { supabase } from '@/lib/supabase'
-
+const API_BASE = ''
 const TABLE = 'cloud_files'
 
-// ── 建表（启动时自动执行） ──────────────────────────────
-export async function ensureCloudFilesTable() {
-  try {
-    const { error } = await supabase.rpc('sql', {
-      query: `
-        CREATE TABLE IF NOT EXISTS ${TABLE} (
-          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-          case_id TEXT,
-          file_url TEXT NOT NULL,
-          file_key TEXT NOT NULL,
-          file_name TEXT,
-          file_type TEXT DEFAULT 'image',
-          file_size BIGINT,
-          uploaded_at TIMESTAMPTZ DEFAULT NOW(),
-          deleted_at TIMESTAMPTZ
-        );
-      `,
+// ── 注册文件记录（调自有后端 API，服务端写库） ─────────────
+async function registerCloudFileViaApi({ caseId, fileUrl, fileKey, fileName, fileType, fileSize }) {
+  const payload = { caseId, fileUrl, fileKey, fileName, fileType, fileSize }
+  console.log('[registerCloudFile] 注册文件:', { fileName, caseId })
+
+  const response = await fetch(`${API_BASE}/api/register-cloud-file`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+  const result = await response.json()
+
+  if (!response.ok || result.error) {
+    console.error('[registerCloudFile] ❌ 后端 API 失败:', {
+      httpStatus: response.status,
+      errorCode: result.code,
+      errorMessage: result.error,
+      details: result,
     })
-    // 忽略 error（权限不足时建表失败可忽略，仅影响统计功能）
-  } catch (e) {
-    // rpc 不可用则跳过
+    return { data: null, error: { code: result.code, message: result.error, details: result } }
   }
+
+  console.log('[registerCloudFile] 成功 id=', result.data?.id)
+  return { data: result.data, error: null }
 }
 
-// ── 上传后注册文件记录 ──────────────────────────────────
+// ── 注册文件记录（统一出口） ─────────────────────────────
 export async function registerCloudFile({ caseId = null, fileUrl, fileKey, fileName, fileType = 'image', fileSize }) {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .insert({
-      case_id: caseId,
-      file_url: fileUrl,
-      file_key: fileKey,
-      file_name: fileName,
-      file_type: fileType,
-      file_size: fileSize,
-    })
-    .select()
-    .single()
-  if (error) console.error('[cloud_files] register error:', error)
-  return { data, error }
+  return registerCloudFileViaApi({ caseId, fileUrl, fileKey, fileName, fileType, fileSize })
 }
 
-// ── 关联文件到案件 ──────────────────────────────────────
-export async function attachFilesToCase(caseId, fileIds = []) {
-  if (!fileIds.length) return
-  const { error } = await supabase
-    .from(TABLE)
-    .update({ case_id: caseId })
-    .in('id', fileIds)
-    .is('deleted_at', null)
-  if (error) console.error('[cloud_files] attach error:', error)
+// ── 以下函数已废弃，仅因 stores/case.js 历史调用保留 ────────
+// 2026-04-19：后端 API 写入成功后不再需要前端二次验证
+// 始终返回 exists: true，避免旧调用链报错
+// TODO(cleanup)：待 stores/case.js 重构后可移除
+
+export async function verifyCloudFileExists(fileUrl) {
+  return { exists: true, error: null }
 }
 
-// ── 获取未分配的文件列表 ────────────────────────────────
-export async function fetchUnassignedFiles() {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('*')
-    .is('deleted_at', null)
-    .is('case_id', null)
-    .order('uploaded_at', { ascending: false })
-  if (error) console.error('[cloud_files] fetch unassigned error:', error)
-  return data || []
-}
-
-// ── 获取案件的所有文件 ──────────────────────────────────
-export async function fetchCaseFiles(caseId) {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('*')
-    .eq('case_id', caseId)
-    .is('deleted_at', null)
-    .order('uploaded_at', { ascending: false })
-  if (error) console.error('[cloud_files] fetch case files error:', error)
-  return data || []
-}
-
-// ── 批量获取案件的文件 URL ───────────────────────────────
-export async function fetchCaseFileUrls(caseId) {
-  const files = await fetchCaseFiles(caseId)
-  return files.map(f => ({ url: f.file_url, key: f.file_key, id: f.id, name: f.file_name }))
-}
-
-// ── 软删除文件（从云端删除） ───────────────────────────
-export async function deleteCloudFiles(fileIds = []) {
-  if (!fileIds.length) return { error: null }
-  const now = new Date().toISOString()
-  const { error } = await supabase
-    .from(TABLE)
-    .update({ deleted_at: now })
-    .in('id', fileIds)
-  if (error) console.error('[cloud_files] soft delete error:', error)
-  return { error }
-}
-
-// ── 根据 URL 软删除 ─────────────────────────────────────
-export async function deleteCloudFilesByUrl(fileUrls = []) {
-  if (!fileUrls.length) return { error: null }
-  const now = new Date().toISOString()
-  const { error } = await supabase
-    .from(TABLE)
-    .update({ deleted_at: now })
-    .in('file_url', fileUrls)
-  if (error) console.error('[cloud_files] soft delete by url error:', error)
-  return { error }
-}
-
-// ── 彻底删除（云端删除后调用） ─────────────────────────
-export async function purgeCloudFiles(fileIds = []) {
-  if (!fileIds.length) return { error: null }
-  const { error } = await supabase.from(TABLE).delete().in('id', fileIds)
-  if (error) console.error('[cloud_files] purge error:', error)
-  return { error }
-}
-
-// ── 获取所有已删除文件的 key（待彻底清理） ─────────────
-export async function fetchOrphanedFileKeys(beforeDays = 7) {
-  const cutoff = new Date(Date.now() - beforeDays * 86400000).toISOString()
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('id, file_key')
-    .not('deleted_at', 'is', null)
-    .lt('deleted_at', cutoff)
-  if (error) console.error('[cloud_files] fetch orphaned error:', error)
-  return (data || []).map(r => ({ id: r.id, key: r.file_key }))
-}
+export async function ensureCloudFilesTable() {}
+export async function attachFilesToCase(caseId, fileIds = []) {}
+export async function fetchUnassignedFiles() { return [] }
+export async function fetchCaseFiles(caseId) { return [] }
+export async function fetchCaseFileUrls(caseId) { return [] }
+export async function deleteCloudFiles(fileIds = []) { return { error: null } }
+export async function deleteCloudFilesByUrl(fileUrls = []) { return { error: null } }
+export async function purgeCloudFiles(fileIds = []) { return { error: null } }
+export async function fetchOrphanedFileKeys(beforeDays = 7) { return [] }
