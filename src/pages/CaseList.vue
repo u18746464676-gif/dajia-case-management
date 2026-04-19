@@ -121,7 +121,25 @@
         <div class="mt-3 space-y-2 text-sm text-emerald-700">
           <div>识别到的执照名称：<strong>{{ ocrResult.licenseName || ocrResult.shopName || '-' }}</strong></div>
           <div>
-            识别到单号：<strong>{{ ocrResult.trackingNumber }}</strong>
+            识别到单号：
+            <div v-if="ocrResult.trackingCandidates.length > 1" class="mt-1 space-y-1">
+              <label
+                v-for="(tn, idx) in ocrResult.trackingCandidates"
+                :key="tn"
+                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-emerald-100"
+                :class="{ 'bg-emerald-100 font-bold': ocrResult.trackingNumber === tn }"
+              >
+                <input
+                  type="radio"
+                  :value="tn"
+                  v-model="ocrResult.trackingNumber"
+                  class="accent-emerald-600"
+                />
+                <span class="text-sm">{{ tn }}</span>
+                <span v-if="idx === 0" class="text-xs text-slate-400">(AI优选)</span>
+              </label>
+            </div>
+            <strong v-else>{{ ocrResult.trackingNumber || '-' }}</strong>
             <button
               v-if="ocrResult.trackingNumber && !logisticsResult"
               @click="queryLogistics(ocrResult.trackingNumber)"
@@ -1347,7 +1365,8 @@ function entityNameMatches(left = '', right = '') {
 
 function buildCloudDisplayName(result = {}, originalFileName = '', fallbackLabel = '文件') {
   const extension = getFileExtension(originalFileName)
-  if (result.isEnvelope || result.documentType === '信封' || result.trackingNumber) {
+  const hasTracking = result.trackingNumber || (Array.isArray(result.trackingNumbers) && result.trackingNumbers.length > 0)
+  if (result.isEnvelope || result.documentType === '信封' || hasTracking) {
     return `信封${extension}`
   }
   if (result.documentTitle) {
@@ -1366,13 +1385,15 @@ async function analyzeDocumentImage(dataUrl) {
     detectBarcodeFromDataUrl(dataUrl),
   ])
 
-  const aiTracking = isBlockedTrackingCode(aiResult?.trackingNumber) ? '' : aiResult?.trackingNumber
+  const aiNumbers = Array.isArray(aiResult?.trackingNumbers)
+    ? aiResult.trackingNumbers.filter(t => !isBlockedTrackingCode(t))
+    : [aiTracking].filter(Boolean)
   const barcodeTracking = isBlockedTrackingCode(barcodeResult?.trackingNumber) ? '' : barcodeResult?.trackingNumber
   const barcodeRawValue = isBlockedTrackingCode(barcodeResult?.rawValue) ? '' : barcodeResult?.rawValue
   const trackingCandidates = extractTrackingCandidates(JSON.stringify(aiResult || {})).filter(value => !isBlockedTrackingCode(value))
 
   const trackingNumber = pickBestTrackingNumber(
-    aiTracking,
+    ...aiNumbers,
     barcodeTracking,
     barcodeRawValue,
     trackingCandidates
@@ -1381,6 +1402,7 @@ async function analyzeDocumentImage(dataUrl) {
   const merged = {
     ...(aiResult || {}),
     trackingNumber: isBlockedTrackingCode(trackingNumber) ? '' : trackingNumber,
+    trackingNumbers: [...new Set([trackingNumber, ...aiNumbers, ...trackingCandidates])].filter(t => !isBlockedTrackingCode(t) && t),
     licenseName: aiResult?.licenseName || aiResult?.shopName || '',
     barcodeRawValue,
     barcodeFormat: barcodeResult?.format || '',
@@ -1416,10 +1438,18 @@ async function handleOcrUpload(event) {
       return entityNameMatches(c.licenseName || c.shopName || '', licenseName)
     })
 
+    // 提取所有候选单号（AI返回的 + 从原始文本重新提取的，取最多5个）
+    const rawTextForTracking = result.raw || ''
+    const aiNumber = result.trackingNumber ? [result.trackingNumber] : []
+    const candidatesFromRaw = extractTrackingCandidates(rawTextForTracking)
+    const allCandidates = [...new Set([...aiNumber, ...candidatesFromRaw])].slice(0, 5)
+    const defaultTracking = normalizeTrackingNumber(result.trackingNumber || rawTextForTracking)
+
     ocrResult.value = {
       licenseName: result.licenseName || '',
       shopName: result.shopName || '',
-      trackingNumber: normalizeTrackingNumber(result.trackingNumber),
+      trackingNumber: defaultTracking,
+      trackingCandidates: allCandidates,
       matchedCases,
       rawText: result.raw || JSON.stringify(result, null, 2),
       aiResult: result
