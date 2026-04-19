@@ -89,10 +89,28 @@
           </div>
 
           <div v-if="showMoreActions" class="grid grid-cols-1 gap-3 mt-3 sm:grid-cols-2">
+            <button type="button" @click="showMoreActions = false; triggerInput(envelopeInputRef)" class="action-tile">
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-800">📮 上传信封</span>
+                <span class="mt-1 block text-xs text-slate-500">OCR识别 → 信封分类</span>
+              </span>
+            </button>
+            <button type="button" @click="showMoreActions = false; triggerInput(documentInputRef)" class="action-tile">
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-800">📄 上传文书</span>
+                <span class="mt-1 block text-xs text-slate-500">OCR识别 → 文书分类</span>
+              </span>
+            </button>
+            <button type="button" @click="showMoreActions = false; triggerInput(wordInputRef)" class="action-tile">
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-800">📝 上传Word</span>
+                <span class="mt-1 block text-xs text-slate-500">文件名解析 → 文书分类</span>
+              </span>
+            </button>
             <button type="button" @click="showMoreActions = false; triggerFileUpload()" class="action-tile">
               <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">上传文件</span>
-                <span class="mt-1 block text-xs text-slate-500">图片/证件/快递单/附件</span>
+                <span class="block text-sm font-semibold text-slate-800">📎 混合上传</span>
+                <span class="mt-1 block text-xs text-slate-500">混合格式，系统自动分类</span>
               </span>
             </button>
             <button type="button" @click="showMoreActions = false; triggerExcelUpload()" class="action-tile">
@@ -117,6 +135,9 @@
 
           <input ref="photoInputRef" type="file" accept="image/*,.heic,.heif" capture="environment" @change="handleScanUpload" class="hidden" />
           <input ref="albumInputRef" type="file" accept="image/*,.heic,.heif" multiple @change="handleAlbumUpload" class="hidden" />
+          <input ref="envelopeInputRef" type="file" accept="image/*,.heic,.heif,.pdf" multiple @change="handleEnvelopeUpload" class="hidden" />
+          <input ref="documentInputRef" type="file" accept="image/*,.heic,.heif,.pdf" multiple @change="handleDocumentUpload" class="hidden" />
+          <input ref="wordInputRef" type="file" accept=".doc,.docx" multiple @change="handleWordUpload" class="hidden" />
           <input ref="fileInputRef" type="file" accept="image/*,.heic,.heif,.pdf,.doc,.docx,.txt" multiple @change="handleFileUpload" class="hidden" />
           <input ref="excelInputRef" type="file" accept=".xlsx,.xls,.csv" @change="importExcel" class="hidden" />
         </div>
@@ -674,6 +695,9 @@ const selectedImportRows = ref([])
 const excelImporting = ref(false)
 const photoInputRef = ref(null)
 const albumInputRef = ref(null)
+const envelopeInputRef = ref(null)
+const documentInputRef = ref(null)
+const wordInputRef = ref(null)
 const fileInputRef = ref(null)
 const excelInputRef = ref(null)
 const caseListSectionRef = ref(null)
@@ -1472,10 +1496,10 @@ async function handleOcrUploadForFile(file) {
   try {
     const dataUrl = await readFileAsDataUrl(file)
     const result = await analyzeDocumentImage(dataUrl)
+    console.log('[OCR] 识别结果:', JSON.stringify(result, null, 2))
     if (!result || result._ocrFailed) {
       // OCR完全失败（API报错），仍上传文件但不关联
-      const dataUrl = await readFileAsDataUrl(file)
-      const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
+      await uploadQueueCallback(dataUrl, file.name)
       addToast(`⚠️ ${file.name} OCR识别失败，文件已上传（未关联）`, 'warn')
       return
     }
@@ -1483,6 +1507,7 @@ async function handleOcrUploadForFile(file) {
     const allCandidates = buildTrackingCandidates(result)
     const xaCandidate = allCandidates.find(t => t.toUpperCase().startsWith('XA'))
     const defaultTracking = xaCandidate || normalizeTrackingNumber(result.trackingNumber || '')
+    console.log('[OCR] 匹配到案件:', matchedCases.map(c => c.licenseName || c.shopName))
 
     // 直接上传文件
     const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
@@ -1506,7 +1531,7 @@ async function handleOcrUploadForFile(file) {
     }
   } catch (err) {
     console.error('OCR错误:', err)
-    addToast('识别失败：' + err.message, 'error')
+    addToast('识别失败：' + (err.message || String(err)), 'error')
   } finally {
     ocrLoading.value = false
   }
@@ -1913,6 +1938,110 @@ async function processImageUpload(imageBase64, fileName, labelPrefix = '图片')
 }
 
 // 拍照上传 - 拍照后立即优化、上传、AI识别并匹配
+// ── 上传信封 → OCR → 信封分类 ──────────────────────────────
+async function handleEnvelopeUpload(event) {
+  const files = Array.from(event.target.files || [])
+  if (files.length === 0) return
+  ocrLoading.value = true
+  try {
+    await Promise.all(files.map(async (file) => {
+      const dataUrl = await readFileAsDataUrl(file)
+      const result = await analyzeDocumentImage(dataUrl)
+      console.log('[信封OCR]', file.name, result)
+      const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
+      const matchedCases = findMatchedCases(result)
+      const bestMatch = matchedCases[0] || null
+      if (bestMatch) {
+        await store.assignCloudFile(uploadedUrl, bestMatch.id, {
+          url: uploadedUrl, name: file.name,
+          date: dayjs().format('YYYY-MM-DD'),
+          uploadedAt: dayjs().toISOString(),
+          trackingNumber: result.trackingNumber || '',
+          documentType: '信封',
+        }, result.trackingNumber ? { trackingNumber: result.trackingNumber } : null)
+        addToast(`✅ ${file.name} → ${bestMatch.licenseName || bestMatch.shopName}（信封）`, 'success')
+      } else {
+        addToast(`📮 ${file.name}（未匹配到案件，已上传至信封）`, 'warn')
+      }
+    }))
+  } catch (err) {
+    console.error('信封上传错误:', err)
+    addToast('信封上传失败：' + (err.message || String(err)), 'error')
+  } finally {
+    ocrLoading.value = false
+    event.target.value = ''
+  }
+}
+
+// ── 上传文书 → OCR → 文书分类 ─────────────────────────────
+async function handleDocumentUpload(event) {
+  const files = Array.from(event.target.files || [])
+  if (files.length === 0) return
+  ocrLoading.value = true
+  try {
+    await Promise.all(files.map(async (file) => {
+      const dataUrl = await readFileAsDataUrl(file)
+      const result = await analyzeDocumentImage(dataUrl)
+      console.log('[文书OCR]', file.name, result)
+      const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
+      const matchedCases = findMatchedCases(result)
+      const bestMatch = matchedCases[0] || null
+      if (bestMatch) {
+        await store.assignCloudFile(uploadedUrl, bestMatch.id, {
+          url: uploadedUrl, name: file.name,
+          date: dayjs().format('YYYY-MM-DD'),
+          uploadedAt: dayjs().toISOString(),
+          trackingNumber: result.trackingNumber || '',
+          documentType: '其他文书',
+        }, result.trackingNumber ? { trackingNumber: result.trackingNumber } : null)
+        addToast(`✅ ${file.name} → ${bestMatch.licenseName || bestMatch.shopName}（文书）`, 'success')
+      } else {
+        addToast(`📄 ${file.name}（未匹配到案件，已上传至文书）`, 'warn')
+      }
+    }))
+  } catch (err) {
+    console.error('文书上传错误:', err)
+    addToast('文书上传失败：' + (err.message || String(err)), 'error')
+  } finally {
+    ocrLoading.value = false
+    event.target.value = ''
+  }
+}
+
+// ── 上传Word → 文件名解析 → 文书分类 ──────────────────────
+async function handleWordUpload(event) {
+  const files = Array.from(event.target.files || [])
+  if (files.length === 0) return
+  ocrLoading.value = true
+  try {
+    await Promise.all(files.map(async (file) => {
+      const parsed = parseDocFileName(file.name)
+      const dataUrl = await readFileAsDataUrl(file)
+      const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
+      const matchedCases = findMatchedCases(parsed)
+      const bestMatch = matchedCases[0] || null
+      if (bestMatch) {
+        await store.assignCloudFile(uploadedUrl, bestMatch.id, {
+          url: uploadedUrl, name: file.name,
+          date: dayjs().format('YYYY-MM-DD'),
+          uploadedAt: dayjs().toISOString(),
+          trackingNumber: parsed.trackingNumber || '',
+          documentType: '其他文书',
+        }, parsed.trackingNumber ? { trackingNumber: parsed.trackingNumber } : null)
+        addToast(`✅ ${file.name} → ${bestMatch.licenseName || bestMatch.shopName}（Word）`, 'success')
+      } else {
+        addToast(`📝 ${file.name}（未匹配到案件，已上传至文书）`, 'warn')
+      }
+    }))
+  } catch (err) {
+    console.error('Word上传错误:', err)
+    addToast('Word上传失败：' + (err.message || String(err)), 'error')
+  } finally {
+    ocrLoading.value = false
+    event.target.value = ''
+  }
+}
+
 async function handleScanUpload(event) {
   const file = event.target.files?.[0]
   if (!file) return
