@@ -89,24 +89,24 @@
           </div>
 
           <div v-if="showMoreActions" class="grid grid-cols-1 gap-3 mt-3 sm:grid-cols-2">
-            <button type="button" @click="showMoreActions = false; triggerInput(envelopeInputRef)" class="action-tile">
+            <label for="input-envelope" class="action-tile cursor-pointer">
               <span class="min-w-0">
                 <span class="block text-sm font-semibold text-slate-800">📮 上传信封</span>
                 <span class="mt-1 block text-xs text-slate-500">OCR识别 → 信封分类</span>
               </span>
-            </button>
-            <button type="button" @click="showMoreActions = false; triggerInput(documentInputRef)" class="action-tile">
+            </label>
+            <label for="input-document" class="action-tile cursor-pointer">
               <span class="min-w-0">
                 <span class="block text-sm font-semibold text-slate-800">📄 上传文书</span>
                 <span class="mt-1 block text-xs text-slate-500">OCR识别 → 文书分类</span>
               </span>
-            </button>
-            <button type="button" @click="showMoreActions = false; triggerInput(wordInputRef)" class="action-tile">
+            </label>
+            <label for="input-word" class="action-tile cursor-pointer">
               <span class="min-w-0">
                 <span class="block text-sm font-semibold text-slate-800">📝 上传Word</span>
                 <span class="mt-1 block text-xs text-slate-500">文件名解析 → 文书分类</span>
               </span>
-            </button>
+            </label>
             <button type="button" @click="showMoreActions = false; triggerFileUpload()" class="action-tile">
               <span class="min-w-0">
                 <span class="block text-sm font-semibold text-slate-800">📎 混合上传</span>
@@ -135,9 +135,9 @@
 
           <input ref="photoInputRef" type="file" accept="image/*,.heic,.heif" capture="environment" @change="handleScanUpload" class="hidden" />
           <input ref="albumInputRef" type="file" accept="image/*,.heic,.heif" multiple @change="handleAlbumUpload" class="hidden" />
-          <input ref="envelopeInputRef" type="file" accept="image/*,.heic,.heif,.pdf" multiple @change="handleEnvelopeUpload" class="hidden" />
-          <input ref="documentInputRef" type="file" accept="image/*,.heic,.heif,.pdf" multiple @change="handleDocumentUpload" class="hidden" />
-          <input ref="wordInputRef" type="file" accept=".doc,.docx" multiple @change="handleWordUpload" class="hidden" />
+          <input ref="envelopeInputRef" id="input-envelope" type="file" accept="image/*,.heic,.heif,.pdf" multiple @change="handleEnvelopeUpload" class="hidden" />
+          <input ref="documentInputRef" id="input-document" type="file" accept="image/*,.heic,.heif,.pdf" multiple @change="handleDocumentUpload" class="hidden" />
+          <input ref="wordInputRef" id="input-word" type="file" accept=".doc,.docx" multiple @change="handleWordUpload" class="hidden" />
           <input ref="fileInputRef" type="file" accept="image/*,.heic,.heif,.pdf,.doc,.docx,.txt" multiple @change="handleFileUpload" class="hidden" />
           <input ref="excelInputRef" type="file" accept=".xlsx,.xls,.csv" @change="importExcel" class="hidden" />
         </div>
