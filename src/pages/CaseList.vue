@@ -63,7 +63,7 @@
 
           <input ref="photoInputRef" type="file" accept="image/*,.heic,.heif" capture="environment" @change="handleScanUpload" class="hidden" />
           <input ref="albumInputRef" type="file" accept="image/*,.heic,.heif" multiple @change="handleAlbumUpload" class="hidden" />
-          <input ref="fileInputRef" type="file" accept=".doc,.docx,.pdf,.txt" multiple @change="handleFileUpload" class="hidden" />
+          <input ref="fileInputRef" type="file" accept="image/*,.heic,.heif,.pdf,.doc,.docx,.txt" multiple @change="handleFileUpload" class="hidden" />
           <input ref="excelInputRef" type="file" accept=".xlsx,.xls,.csv" @change="importExcel" class="hidden" />
         </div>
       </div>
@@ -115,7 +115,10 @@
 
       <div v-if="ocrResult" class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
         <div class="flex items-center justify-between gap-3">
-          <span class="text-sm font-semibold text-emerald-700">✅ OCR 识别结果</span>
+          <span class="text-sm font-semibold text-emerald-700">
+            ✅ {{ ocrResult.isDoc ? '文件名解析结果' : 'OCR 识别结果' }}
+            <span v-if="ocrResult.sourceFile" class="font-normal text-slate-500 text-xs"> · {{ ocrResult.sourceFile.name }}</span>
+          </span>
           <button @click="ocrResult = null; logisticsResult = null" class="btn-ghost p-0 text-emerald-600">×</button>
         </div>
         <div class="mt-3 space-y-2 text-sm text-emerald-700">
@@ -136,7 +139,7 @@
                   class="accent-emerald-600"
                 />
                 <span class="text-sm">{{ tn }}</span>
-                <span v-if="idx === 0" class="text-xs text-slate-400">(AI优选)</span>
+                <span class="text-xs text-slate-400">({{ ocrResult.isDoc ? '文件名' : 'AI优选' }})</span>
               </label>
             </div>
             <strong v-else>{{ ocrResult.trackingNumber || '-' }}</strong>
@@ -1318,11 +1321,128 @@ async function confirmImportRows() {
   }
 }
 
-function handleFileUpload(event) {
-  const files = event.target.files
+// 统一文件上传入口：图片走OCR识别，PDF/Word/文档走文件名解析
+async function handleFileUpload(event) {
+  const files = Array.from(event.target.files || [])
+  if (files.length === 0) return
+
+  // 每次只处理一个文件，显示OCR结果供确认后再处理下一个
   for (let i = 0; i < files.length; i++) {
-    uploadedFiles.value.push(files[i])
+    const file = files[i]
+    const isImage = file.type.startsWith('image/')
+
+    if (isImage) {
+      await handleOcrUploadForFile(file)
+    } else {
+      await handleDocUpload(file)
+    }
   }
+}
+
+// 图片文件 → OCR识别
+async function handleOcrUploadForFile(file) {
+  ocrLoading.value = true
+  ocrResult.value = null
+  try {
+    const dataUrl = await readFileAsDataUrl(file)
+    const result = await analyzeDocumentImage(dataUrl)
+    if (!result) {
+      alert('AI识别失败，请重试')
+      return
+    }
+    const matchedCases = findMatchedCases(result)
+    const allCandidates = buildTrackingCandidates(result)
+    const xaCandidate = allCandidates.find(t => t.toUpperCase().startsWith('XA'))
+    const defaultTracking = xaCandidate || normalizeTrackingNumber(result.trackingNumber || '')
+    ocrResult.value = {
+      sourceFile: file,
+      licenseName: result.licenseName || '',
+      shopName: result.shopName || '',
+      trackingNumber: defaultTracking,
+      trackingCandidates: allCandidates,
+      matchedCases,
+      rawText: result.raw || JSON.stringify(result, null, 2),
+      aiResult: result,
+      isDoc: false,
+    }
+  } catch (err) {
+    console.error('OCR错误:', err)
+    alert('识别失败：' + err.message)
+  } finally {
+    ocrLoading.value = false
+  }
+}
+
+// 文档文件 → 从文件名解析
+async function handleDocUpload(file) {
+  ocrLoading.value = true
+  ocrResult.value = null
+  try {
+    const parsed = parseDocFileName(file.name)
+    const matchedCases = findMatchedCases(parsed)
+    ocrResult.value = {
+      sourceFile: file,
+      licenseName: parsed.licenseName || '',
+      shopName: parsed.shopName || '',
+      trackingNumber: parsed.trackingNumber || '',
+      trackingCandidates: parsed.trackingNumber ? [parsed.trackingNumber] : [],
+      matchedCases,
+      rawText: file.name,
+      aiResult: parsed,
+      isDoc: true,
+    }
+  } finally {
+    ocrLoading.value = false
+  }
+}
+
+// 从文件名解析执照/店铺/单号
+function parseDocFileName(fileName = '') {
+  const name = String(fileName).replace(/\.[^.]+$/, '') // 去掉扩展名
+  const parts = name.split(/[_,\-–。、\s/\\]/).filter(p => p.length > 0)
+  let licenseName = ''
+  let shopName = ''
+  let trackingNumber = ''
+
+  for (const part of parts) {
+    // 单号候选
+    const normalized = part.replace(/[^A-Za-z0-9]/g, '')
+    if (/^[A-Z0-9]{10,20}$/i.test(normalized)) {
+      trackingNumber = normalized.toUpperCase()
+      continue
+    }
+    // 执照/店铺
+    if (/[公司企业店厂行社]$/.test(part) || /(?:有限公司|股份|集团|店铺|旗舰店)/.test(part)) {
+      if (!licenseName) licenseName = part
+      else if (!shopName) shopName = part
+    }
+  }
+
+  // 如果没找到执照名，取第一段作为店铺名
+  if (!shopName && parts.length > 0) {
+    const first = parts[0]
+    if (first.length >= 2 && !/^\d+$/.test(first)) {
+      shopName = first
+    }
+  }
+
+  return { licenseName, shopName, trackingNumber }
+}
+
+// 复用handleOcrUpload中的匹配和候选构建逻辑
+function findMatchedCases(result) {
+  const ocrName = result.licenseName || result.shopName || ''
+  if (!ocrName) return []
+  return store.cases.filter(c => entityNameMatches(c.licenseName || c.shopName || '', ocrName))
+}
+
+function buildTrackingCandidates(result) {
+  const raw = result.raw || ''
+  const aiNums = Array.isArray(result.trackingNumbers)
+    ? result.trackingNumbers.filter(t => !isBlockedTrackingCode(t))
+    : (result.trackingNumber ? [result.trackingNumber] : [])
+  const fromRaw = extractTrackingCandidates(raw)
+  return [...new Set([...aiNums, ...fromRaw])].slice(0, 5)
 }
 
 function removeFile(idx) {
@@ -1470,12 +1590,45 @@ async function handleOcrUpload(event) {
   }
 }
 
-function applyOcrToCase(caseId) {
+// 关联OCR结果到案件（同时上传文件到云端）
+async function applyOcrToCase(caseId) {
   if (!ocrResult.value) return
+  const result = ocrResult.value
+
+  // 先上传文件到云端（如有源文件）
+  if (result.sourceFile) {
+    try {
+      const isImage = result.sourceFile.type.startsWith('image/')
+      let url = ''
+      if (isImage) {
+        const dataUrl = await readFileAsDataUrl(result.sourceFile)
+        url = await uploadBase64ToTos(dataUrl, result.sourceFile.name)
+      } else {
+        // 文档文件也转base64上传
+        const dataUrl = await readFileAsDataUrl(result.sourceFile)
+        url = await uploadBase64ToTos(dataUrl, result.sourceFile.name)
+      }
+      if (url) {
+        const fileMeta = {
+          url,
+          name: result.sourceFile.name || '文件',
+          date: dayjs().format('YYYY-MM-DD'),
+          uploadedAt: dayjs().toISOString(),
+          trackingNumber: result.trackingNumber || '',
+          documentType: result.aiResult?.documentType || (result.isDoc ? '其他文书' : '普通图片'),
+        }
+        await store.assignCloudFile(url, caseId, fileMeta,
+          result.trackingNumber ? { trackingNumber: result.trackingNumber } : null)
+      }
+    } catch (err) {
+      console.error('文件上传失败:', err)
+      alert('文件上传失败：' + err.message + '，但案件已关联')
+    }
+  }
 
   const updates = {}
-  if (ocrResult.value.trackingNumber) {
-    updates.trackingNumber = ocrResult.value.trackingNumber
+  if (result.trackingNumber) {
+    updates.trackingNumber = result.trackingNumber
   }
   store.updateCase(caseId, updates)
 
@@ -1507,14 +1660,36 @@ async function queryLogistics(trackingNumber) {
 }
 
 // OCR识别后一键关联并记录签收时间
-function applyOcrToCaseWithSign(caseId, signTime) {
+async function applyOcrToCaseWithSign(caseId, signTime) {
   if (!ocrResult.value) return
+  const result = ocrResult.value
+
+  // 先上传文件到云端（如有源文件）
+  if (result.sourceFile) {
+    try {
+      const dataUrl = await readFileAsDataUrl(result.sourceFile)
+      const url = await uploadBase64ToTos(dataUrl, result.sourceFile.name)
+      if (url) {
+        const fileMeta = {
+          url,
+          name: result.sourceFile.name || '文件',
+          date: dayjs().format('YYYY-MM-DD'),
+          uploadedAt: dayjs().toISOString(),
+          trackingNumber: result.trackingNumber || '',
+          documentType: result.aiResult?.documentType || (result.isDoc ? '其他文书' : '普通图片'),
+        }
+        await store.assignCloudFile(url, caseId, fileMeta,
+          result.trackingNumber ? { trackingNumber: result.trackingNumber } : null)
+      }
+    } catch (err) {
+      console.error('文件上传失败:', err)
+    }
+  }
 
   const updates = {}
-  if (ocrResult.value.trackingNumber) {
-    updates.trackingNumber = ocrResult.value.trackingNumber
+  if (result.trackingNumber) {
+    updates.trackingNumber = result.trackingNumber
   }
-  // 格式化签收时间
   if (signTime) {
     updates.signDate = signTime.split(' ')[0]
   }
