@@ -1472,8 +1472,11 @@ async function handleOcrUploadForFile(file) {
   try {
     const dataUrl = await readFileAsDataUrl(file)
     const result = await analyzeDocumentImage(dataUrl)
-    if (!result) {
-      addToast('OCR识别失败：AI返回空结果', 'error')
+    if (!result || result._ocrFailed) {
+      // OCR完全失败（API报错），仍上传文件但不关联
+      const dataUrl = await readFileAsDataUrl(file)
+      const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
+      addToast(`⚠️ ${file.name} OCR识别失败，文件已上传（未关联）`, 'warn')
       return
     }
     const matchedCases = findMatchedCases(result)
@@ -1515,6 +1518,7 @@ async function handleDocUpload(file) {
   try {
     const parsed = parseDocFileName(file.name)
     const matchedCases = findMatchedCases(parsed)
+    addToast(`📄 解析「${file.name}」→ 执照:${parsed.licenseName || '-'} 店铺:${parsed.shopName || '-'} 单号:${parsed.trackingNumber || '-'}`, 'info')
 
     // 直接上传文件
     const dataUrl = await readFileAsDataUrl(file)
@@ -1539,7 +1543,7 @@ async function handleDocUpload(file) {
     }
   } catch (err) {
     console.error('文档处理错误:', err)
-    addToast('处理失败：' + err.message, 'error')
+    addToast('处理失败：' + (err.message || String(err)), 'error')
   } finally {
     ocrLoading.value = false
   }
@@ -1670,14 +1674,17 @@ function buildCloudDisplayName(result = {}, originalFileName = '', fallbackLabel
 
 async function analyzeDocumentImage(dataUrl) {
   const base64Data = dataUrl.split(',')[1]
-  const [aiResult, barcodeResult] = await Promise.all([
-    extractFromImage(base64Data),
-    detectBarcodeFromDataUrl(dataUrl),
-  ])
+  let aiResult = await extractFromImage(base64Data).catch(() => null)
+  // 第一次失败则重试一次
+  if (!aiResult) {
+    await new Promise(r => setTimeout(r, 1000))
+    aiResult = await extractFromImage(base64Data).catch(() => null)
+  }
+  const barcodeResult = await detectBarcodeFromDataUrl(dataUrl)
 
   const aiNumbers = Array.isArray(aiResult?.trackingNumbers)
     ? aiResult.trackingNumbers.filter(t => !isBlockedTrackingCode(t))
-    : [aiTracking].filter(Boolean)
+    : (aiResult?.trackingNumber ? [aiResult.trackingNumber] : [])
   const barcodeTracking = isBlockedTrackingCode(barcodeResult?.trackingNumber) ? '' : barcodeResult?.trackingNumber
   const barcodeRawValue = isBlockedTrackingCode(barcodeResult?.rawValue) ? '' : barcodeResult?.rawValue
   const trackingCandidates = extractTrackingCandidates(JSON.stringify(aiResult || {})).filter(value => !isBlockedTrackingCode(value))
@@ -1693,10 +1700,12 @@ async function analyzeDocumentImage(dataUrl) {
     ...(aiResult || {}),
     trackingNumber: isBlockedTrackingCode(trackingNumber) ? '' : trackingNumber,
     trackingNumbers: [...new Set([trackingNumber, ...aiNumbers, ...trackingCandidates])].filter(t => !isBlockedTrackingCode(t) && t),
-    licenseName: aiResult?.licenseName || aiResult?.shopName || '',
+    licenseName: (aiResult?.licenseName || aiResult?.shopName || ''),
+    shopName: (aiResult?.shopName || aiResult?.licenseName || ''),
     barcodeRawValue,
     barcodeFormat: barcodeResult?.format || '',
     isEnvelope: Boolean(aiResult?.isEnvelope || aiResult?.documentType === '信封' || trackingNumber),
+    _ocrFailed: !aiResult,  // 标记OCR是否完全失败
   }
 
   if (!merged.documentType) {
