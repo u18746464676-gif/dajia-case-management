@@ -1429,35 +1429,40 @@ async function confirmImportRows() {
 const pendingFileQueue = ref([])
 const isProcessingFileQueue = ref(false)
 
+const OCR_CONCURRENCY = 3  // 最多同时识别图片数量
+let ocrRunningCount = 0
+
 function handleFileUpload(event) {
   const files = Array.from(event.target.files || [])
   if (files.length === 0) return
-
-  // 全部加入队列
   pendingFileQueue.value.push(...files)
   if (!isProcessingFileQueue.value) {
-    processNextFile()
+    isProcessingFileQueue.value = true
+    processNextBatch()
   }
-  // 清空 input，让下次选择同一文件也能触发
   event.target.value = ''
 }
 
-// 逐一处理队列中的文件，用户确认（或 ocrResult 被清除）后处理下一个
-async function processNextFile() {
-  if (pendingFileQueue.value.length === 0) {
-    isProcessingFileQueue.value = false
-    return
+// 启动下一批，直到达到并发上限或队空
+function processNextBatch() {
+  while (ocrRunningCount < OCR_CONCURRENCY && pendingFileQueue.value.length > 0) {
+    ocrRunningCount++
+    const file = pendingFileQueue.value.shift()
+    const isImage = file.type.startsWith('image/')
+    if (isImage) {
+      handleOcrUploadForFile(file).finally(() => {
+        ocrRunningCount--
+        if (pendingFileQueue.value.length > 0) processNextBatch()
+        else if (ocrRunningCount === 0) isProcessingFileQueue.value = false
+      })
+    } else {
+      handleDocUpload(file).finally(() => {
+        ocrRunningCount--
+        if (pendingFileQueue.value.length > 0) processNextBatch()
+        else if (ocrRunningCount === 0) isProcessingFileQueue.value = false
+      })
+    }
   }
-  isProcessingFileQueue.value = true
-  const file = pendingFileQueue.value.shift()
-  const isImage = file.type.startsWith('image/')
-
-  if (isImage) {
-    await handleOcrUploadForFile(file)
-  } else {
-    await handleDocUpload(file)
-  }
-  // ocrResult 留着给用户确认，watch 监听 ocrResult 变化再处理下一个
 }
 
 // 用户点"×"关闭 OCR 结果时，自动处理下一个文件
@@ -1501,12 +1506,6 @@ async function handleOcrUploadForFile(file) {
     addToast('识别失败：' + err.message, 'error')
   } finally {
     ocrLoading.value = false
-    // 不等待确认，直接处理下一个文件
-    if (pendingFileQueue.value.length > 0) {
-      processNextFile()
-    } else {
-      isProcessingFileQueue.value = false
-    }
   }
 }
 
@@ -1543,12 +1542,6 @@ async function handleDocUpload(file) {
     addToast('处理失败：' + err.message, 'error')
   } finally {
     ocrLoading.value = false
-    // 不等待确认，直接处理下一个文件
-    if (pendingFileQueue.value.length > 0) {
-      processNextFile()
-    } else {
-      isProcessingFileQueue.value = false
-    }
   }
 }
 
