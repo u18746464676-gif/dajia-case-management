@@ -484,7 +484,7 @@
           <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-3">
             <div v-for="(img, idx) in caseImages" :key="idx" class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div class="bg-slate-50 p-3">
-                <img :src="img.url" class="h-40 w-full rounded-xl object-contain bg-white" />
+                <img :src="img.url" class="h-40 w-full rounded-xl object-contain bg-white cursor-pointer hover:opacity-90" @click="previewImage(img.url)" />
               </div>
               <div class="space-y-2 px-4 py-3">
                 <div class="min-w-0">
@@ -493,7 +493,7 @@
                   <div v-if="img.trackingNumber" class="mt-1 text-xs text-slate-500">快递单号 {{ img.trackingNumber }}</div>
                 </div>
                 <div class="flex items-center justify-between gap-3">
-                  <a v-if="img.url" :href="img.url" target="_blank" rel="noreferrer" class="text-sm text-blue-600 hover:text-blue-700">查看原图</a>
+                  <button @click="previewImage(img.url)" class="text-sm text-blue-600 hover:text-blue-700">预览</button>
                   <button @click="deleteImage(idx)" class="btn-ghost text-rose-500 hover:bg-rose-50 hover:text-rose-600">删除</button>
                 </div>
               </div>
@@ -613,6 +613,12 @@
     <p class="mt-4 mb-6 text-xl text-slate-400">案件不存在</p>
     <router-link to="/" class="btn-primary inline-flex items-center gap-2">返回列表</router-link>
   </div>
+
+  <!-- 图片预览弹窗 -->
+  <div v-if="showImagePreview" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" @click="showImagePreview = false">
+    <button @click="showImagePreview = false" class="absolute top-4 right-4 text-white text-3xl hover:text-gray-300">×</button>
+    <img :src="previewImageUrl" class="max-w-[90vw] max-h-[90vh] object-contain" @click.stop />
+  </div>
 </template>
 
 <script setup>
@@ -633,6 +639,8 @@ const showReplyModal = ref(false)
 const showDocModal = ref(false)
 const activeDetailTab = ref('info')
 const activeMaterialTab = ref('all')
+const showImagePreview = ref(false)
+const previewImageUrl = ref('')
 
 const replyForm = ref({ date: dayjs().format('YYYY-MM-DD'), content: '' })
 const docForm = ref({ name: '', url: '', type: 'other', category: 'other', note: '' })
@@ -861,6 +869,11 @@ function deleteImage(idx) {
   const images = [...(c.value.images || [])]
   images.splice(idx, 1)
   saveField('images', images)
+}
+
+function previewImage(url) {
+  previewImageUrl.value = url
+  showImagePreview.value = true
 }
 
 function statusLabel(s) {

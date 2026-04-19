@@ -33,7 +33,7 @@
         <textarea
           v-model="quickInput"
           class="input-field flex-1 min-h-20 resize-none"
-          placeholder="粘贴含有以下信息的文字，系统将自动识别：执照名称、店铺名称、商品名称、金额&#10;例如：xxx旗舰店购买的《美白祛斑面膜》，金额199元，执照名：xxx化妆品有限公司"
+          placeholder="粘贴信息，用空格分隔，系统按顺序识别：\n执照名称 店铺名称 商品名称 商品价格\n例：xxx化妆品有限公司 xxx旗舰店 美白祛斑面膜 199"
         ></textarea>
         <div class="flex flex-col gap-2">
           <button type="button" @click="doQuickParse" class="btn-primary whitespace-nowrap">
@@ -75,7 +75,33 @@
           </div>
           <div>
             <label class="label">🏛️ 管辖局 *</label>
-            <input v-model="form.jurisdiction" type="text" class="input-field" required placeholder="例：市场监督管理局" />
+            <div class="relative">
+              <input
+                v-model="form.jurisdiction"
+                type="text"
+                class="input-field w-full"
+                required
+                placeholder="输入区县名称，下方会匹配历史记录"
+                autocomplete="off"
+                @focus="showJurisdictionSuggestions = true"
+                @blur="onJurisdictionBlur"
+                @keydown.escape="showJurisdictionSuggestions = false"
+              />
+              <!-- 补全下拉 -->
+              <ul
+                v-if="showJurisdictionSuggestions && filteredJurisdictionSuggestions.length > 0"
+                class="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+              >
+                <li
+                  v-for="item in filteredJurisdictionSuggestions"
+                  :key="item"
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 text-slate-700"
+                  @mousedown.prevent="selectJurisdiction(item)"
+                >
+                  {{ item }}
+                </li>
+              </ul>
+            </div>
           </div>
           <div>
             <label class="label">📦 快递单号</label>
@@ -249,128 +275,63 @@ onMounted(() => {
   }
 })
 
+// ── 管辖局：历史补全 + 自动后缀 ──────────────────────────
+const showJurisdictionSuggestions = ref(false)
+
+// 从所有案件中提取去重后的管辖局历史
+const jurisdictionHistory = computed(() => {
+  const list = store.cases
+    .map(c => c.jurisdiction)
+    .filter(j => j && typeof j === 'string' && j.includes('市场监督管理局'))
+  return [...new Set(list)]
+})
+
+// 根据当前输入过滤补全列表
+const filteredJurisdictionSuggestions = computed(() => {
+  const val = form.value.jurisdiction || ''
+  if (!val) return jurisdictionHistory.value
+  const lower = val.toLowerCase()
+  return jurisdictionHistory.value.filter(j => j.toLowerCase().includes(lower))
+})
+
+// 选中某条历史记录
+function selectJurisdiction(item) {
+  form.value.jurisdiction = item
+  showJurisdictionSuggestions.value = false
+}
+
+// 失焦时：如果字段不以"市场监督管理局"结尾，自动补上
+function onJurisdictionBlur() {
+  setTimeout(() => {
+    const val = form.value.jurisdiction.trim()
+    if (val && !val.includes('市场监督管理局')) {
+      form.value.jurisdiction = val + '市场监督管理局'
+    }
+    showJurisdictionSuggestions.value = false
+  }, 150)
+}
+
 // 快速录入解析
 function doQuickParse() {
-  const text = quickInput.value.trim()
-  if (!text) return
+  const raw = quickInput.value
+  if (!raw || !raw.trim()) return
 
+  // 支持各种空白字符：普通空格、全角空格、制表符、换行、&nbsp;等 HTML 实体
+  const cleanText = raw
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // 按空格拆分，取前4段
+  const parts = cleanText.split(' ').filter(p => p.length > 0)
   const result = { licenseName: '', shopName: '', productName: '', productPrice: '' }
 
-  // ── 执照名称 ──────────────────────────────────────
-  // 1) 带标头的写法：执照名称/营业执照/公司名  某某有限公司
-  let m = text.match(/(?:执照名称|营业执照(?![状])|公司名|企业名)[：: ]*([\u4e00-\u9fa5]{2,30})(?:有限公司|股份有限公司)?/)
-  if (m) result.licenseName = m[1].trim()
-  // 2) 直接以"有限公司"结尾的公司名（取前面 5-30 个中文）
-  if (!result.licenseName) {
-    m = text.match(/([\u4e00-\u9fa5]{4,30})(?:有限公司|股份有限公司|有限合伙|集团)$/)
-    if (m) result.licenseName = m[1].trim()
-  }
-
-  // ── 店铺名称 ──────────────────────────────────────
-  // 1) 带标头
-  m = text.match(/(?:店铺(?:名称|名)?|店铺)[：: ]*([\u4e00-\u9fa5a-zA-Z0-9]{2,20})/)
-  if (m) result.shopName = m[1].trim()
-  // 2) 以"旗舰店/专卖店/专营店/官方店/商城"结尾
-  if (!result.shopName) {
-    m = text.match(/([\u4e00-\u9fa5a-zA-Z0-9]{1,20})(?:旗舰店|专卖店|专营店|官方店|商城)$/)
-    if (m) result.shopName = m[1].trim()
-  }
-  // 3) 括号内或引号内的店名
-  if (!result.shopName) {
-    m = text.match(/[(（"『]([\u4e00-\u9fa5a-zA-Z0-9]{2,20})旗舰店/)
-    if (m) result.shopName = m[1].trim()
-  }
-
-  // ── 商品名称 ──────────────────────────────────────
-  // 1) 带标头
-  m = text.match(/(?:商品(?:名称|名)?|产品(?:名称|名)?|品名)[：: ]*([\u4e00-\u9fa5a-zA-Z0-9\s]{2,50})/)
-  if (m) result.productName = m[1].trim()
-  // 2) 《》或「」包裹的书名号产品
-  if (!result.productName) {
-    m = text.match(/[《「『]([\u4e00-\u9fa5a-zA-Z0-9\s]{2,40})[》」』]/)
-    if (m) result.productName = m[1].trim()
-  }
-  // 3) 常见商品标题特征：品牌词 + 产品名（前面有"买/下单/购买/在"等）
-  if (!result.productName) {
-    m = text.match(/(?:买|购买|下单|入手|在|购)[^\n]{0,8}([\u4e00-\u9fa5a-zA-Z0-9\s]{3,40})(?:¥|￥|元|价格|包邮|片|盒|瓶|支|装)/)
-    if (m) result.productName = m[1].trim()
-  }
-
-  // ── 金额 ─────────────────────────────────────────
-  // 1) 带标头：价格/金额/实付/合计/付款  ¥123 或 123元
-  m = text.match(/(?:价格|金额|售价|实付|合计|付款|成交价)[：: ]*(?:RMB\s*)?[¥￥]?\s*([\d.]+)(?:元|块)?/)
-  if (m) { const p = parseFloat(m[1]); if (p > 0 && p < 1000000) result.productPrice = p.toFixed(2) }
-  // 2) 纯金额符号 ¥123 或 ￥123
-  if (!result.productPrice) {
-    m = text.match(/(?:RMB\s*)?[¥￥]\s*([\d.]+)/)
-    if (m) { const p = parseFloat(m[1]); if (p > 0 && p < 1000000) result.productPrice = p.toFixed(2) }
-  }
-  // 3) "XXX元" 纯文字
-  if (!result.productPrice) {
-    m = text.match(/([\d.]+)(?:元|块)(?:人民币)?/)
-    if (m) { const p = parseFloat(m[1]); if (p > 0 && p < 1000000) result.productPrice = p.toFixed(2) }
-  }
-  // 4) 单独的数字（金额最可能出现在商品价格附近，排除日期/数量）
-  if (!result.productPrice) {
-    const prices = text.match(/\b(\d+\.?\d{0,2})\b/g) || []
-    const valid = prices.map(v => parseFloat(v)).filter(v => v >= 10 && v <= 99999 && !Number.isInteger(v / 1))
-    if (valid.length > 0) {
-      result.productPrice = Math.max(...valid).toFixed(2)
-    }
-  }
-
-  // ── 基于长度的智能推断（当标头式匹配未命中时启用）──
-  // 逻辑：最长的肯定是执照名称（公司名），短一点的是店铺名称
-  if (!result.licenseName || !result.shopName) {
-    const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length > 0)
-
-    // 收集所有「XXX有限公司」类型的公司全称候选
-    const companyCandidates = []
-    for (const line of lines) {
-      const cm = line.match(/^([\u4e00-\u9fa5]{4,30})(?:有限公司|股份有限公司|有限合伙|集团)$/)
-      if (cm) companyCandidates.push({ raw: cm[0], name: cm[1], len: cm[1].length })
-    }
-
-    // 收集所有「XXX旗舰店/专卖店/官方店」类型的店铺全称候选
-    const shopCandidates = []
-    for (const line of lines) {
-      const sm = line.match(/^([\u4e00-\u9fa5a-zA-Z0-9]{2,20})(?:旗舰店|专卖店|专营店|官方店|商城)$/)
-      if (sm) shopCandidates.push({ raw: sm[0], name: sm[1], len: sm[1].length })
-    }
-
-    // 按长度降序排列，取最长的作为执照名称
-    if (!result.licenseName && companyCandidates.length > 0) {
-      companyCandidates.sort((a, b) => b.len - a.len)
-      result.licenseName = companyCandidates[0].name
-    }
-
-    // 店铺候选取最短的（店名通常比公司名短）
-    if (!result.shopName && shopCandidates.length > 0) {
-      shopCandidates.sort((a, b) => a.len - b.len)
-      result.shopName = shopCandidates[0].name
-    }
-
-    // 备选：只有一个公司候选且无店铺候选时，从公司名推断店铺
-    if (!result.shopName && companyCandidates.length === 1 && shopCandidates.length === 0) {
-      const cName = companyCandidates[0].name
-      const shortMatch = cName.match(/([\u4e00-\u9fa5]{2,10})(?:化妆品|服饰|食品|家居|电器|珠宝|母婴|医疗|教育)?$/)
-      if (shortMatch) {
-        result.shopName = shortMatch[1] + '旗舰店'
-      }
-    }
-  }
-
-  // ── 商品名称兜底 ─────────────────────────────────
-  // 如果商品名称还是没识别到，尝试从书名号《》或「」中提取，取最短的
-  if (!result.productName) {
-    const bookMatches = text.match(/[\u300a\u300b\u300c\u300d]([^\u300a\u300b\u300c\u300d]{2,40})[\u300a\u300b\u300c\u300d]/g)
-    if (bookMatches && bookMatches.length > 0) {
-      const candidates = bookMatches.map(b => b.slice(1, -1)).filter(s => s.length >= 2 && s.length <= 40)
-      if (candidates.length > 0) {
-        candidates.sort((a, b) => a.length - b.length)
-        result.productName = candidates[0]
-      }
-    }
+  if (parts[0]) result.licenseName = parts[0]
+  if (parts[1]) result.shopName = parts[1]
+  if (parts[2]) result.productName = parts[2]
+  if (parts[3]) {
+    const num = parseFloat(parts[3].replace(/[^\d.]/g, ''))
+    result.productPrice = (!isNaN(num) && num > 0) ? num.toFixed(2) : parts[3]
   }
 
   quickParseResult.value = result
