@@ -1414,22 +1414,49 @@ async function confirmImportRows() {
 }
 
 // 统一文件上传入口：图片走OCR识别，PDF/Word/文档走文件名解析
-async function handleFileUpload(event) {
+// 文件排队列逐一处理，用户确认后再处理下一个
+const pendingFileQueue = ref([])
+const isProcessingFileQueue = ref(false)
+
+function handleFileUpload(event) {
   const files = Array.from(event.target.files || [])
   if (files.length === 0) return
 
-  // 每次只处理一个文件，显示OCR结果供确认后再处理下一个
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]
-    const isImage = file.type.startsWith('image/')
-
-    if (isImage) {
-      await handleOcrUploadForFile(file)
-    } else {
-      await handleDocUpload(file)
-    }
+  // 全部加入队列
+  pendingFileQueue.value.push(...files)
+  if (!isProcessingFileQueue.value) {
+    processNextFile()
   }
+  // 清空 input，让下次选择同一文件也能触发
+  event.target.value = ''
 }
+
+// 逐一处理队列中的文件，用户确认（或 ocrResult 被清除）后处理下一个
+async function processNextFile() {
+  if (pendingFileQueue.value.length === 0) {
+    isProcessingFileQueue.value = false
+    return
+  }
+  isProcessingFileQueue.value = true
+  const file = pendingFileQueue.value.shift()
+  const isImage = file.type.startsWith('image/')
+
+  if (isImage) {
+    await handleOcrUploadForFile(file)
+  } else {
+    await handleDocUpload(file)
+  }
+  // ocrResult 留着给用户确认，watch 监听 ocrResult 变化再处理下一个
+}
+
+// 用户点"×"关闭 OCR 结果时，自动处理下一个文件
+watch(ocrResult, (val) => {
+  if (val === null && isProcessingFileQueue.value && pendingFileQueue.value.length > 0) {
+    processNextFile()
+  } else if (val === null && isProcessingFileQueue.value && pendingFileQueue.value.length === 0) {
+    isProcessingFileQueue.value = false
+  }
+})
 
 // 图片文件 → OCR识别
 async function handleOcrUploadForFile(file) {
