@@ -227,7 +227,7 @@
             <option value="decided">已调解</option>
             <option value="closed">已处罚</option>
             <option value="rejected">不予立案</option>
-            <option value="not_punished">不予处罚</option>
+            <option value="not_punished">责令改正</option>
           </select>
           <div class="min-w-0 flex-1 xl:max-w-md">
             <input
@@ -682,7 +682,7 @@ function getStatusLabel(status = '') {
     decided: '已调解',
     closed: '已处罚',
     rejected: '不予立案',
-    not_punished: '不予处罚',
+    not_punished: '责令改正',
   }
   return labels[status] || status || '-'
 }
@@ -1006,7 +1006,7 @@ function normalizeStatus(value) {
     '已调解': 'decided',
     '已处罚': 'closed',
     '不予立案': 'rejected',
-    '不予处罚': 'not_punished',
+    '责令改正': 'not_punished',
   }
   return map[text] || 'pending_report'
 }

@@ -146,7 +146,7 @@ function buildContext() {
     已调解: cases.filter(c => c.status === 'decided').length,
     已处罚: cases.filter(c => c.status === 'closed').length,
     不予立案: cases.filter(c => c.status === 'rejected').length,
-    不予处罚: cases.filter(c => c.status === 'not_punished').length,
+    责令改正: cases.filter(c => c.status === 'not_punished').length,
   }
 
   const caseList = cases.slice(0, 10).map(c =>

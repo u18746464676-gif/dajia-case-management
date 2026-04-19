@@ -8,6 +8,22 @@
     <div class="card">
       <h2 class="text-lg font-bold text-gray-900 mb-6">⚙️ 设置</h2>
 
+      <!-- 外观模式 -->
+      <div class="mb-8">
+        <h3 class="font-medium text-gray-800 mb-3">🎨 外观模式</h3>
+        <div class="flex gap-2">
+          <button
+            v-for="opt in [{v:'light',l:'浅色'},{v:'dark',l:'深色'},{v:'system',l:'跟随系统'}]"
+            :key="opt.v"
+            @click="changeTheme(opt.v)"
+            class="flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all"
+            :class="currentTheme===opt.v
+              ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'"
+          >{{ opt.l }}</button>
+        </div>
+      </div>
+
       <!-- AI 助手 -->
       <div class="mb-8">
         <h3 class="font-medium text-gray-800 mb-3">🤖 AI 智能助手</h3>
@@ -152,6 +168,12 @@ const aliToken = ref(null)
 
 // AI 功能
 const searchQuery = ref('')
+const currentTheme = ref(getTheme())
+
+function changeTheme(t) {
+  currentTheme.value = t
+  setTheme(t)
+}
 const searchResult = ref('')
 const searchLoading = ref(false)
 const docType = ref('投诉信')

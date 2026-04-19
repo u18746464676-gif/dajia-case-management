@@ -677,7 +677,7 @@ const statusOptions = [
   { value: 'decided', label: '已调解', icon: '🤝' },
   { value: 'closed', label: '已处罚', icon: '⚖️' },
   { value: 'rejected', label: '不予立案', icon: '❌' },
-  { value: 'not_punished', label: '不予处罚', icon: '🚫' },
+  { value: 'not_punished', label: '责令改正', icon: '🚫' },
 ]
 
 const statusLabels = {
@@ -687,7 +687,7 @@ const statusLabels = {
   decided: '已调解',
   closed: '已处罚',
   rejected: '不予立案',
-  not_punished: '不予处罚',
+  not_punished: '责令改正',
 }
 
 const timelineItems = computed(() => {

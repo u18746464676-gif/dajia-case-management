@@ -319,6 +319,60 @@ function doQuickParse() {
     }
   }
 
+  // ── 基于长度的智能推断（当标头式匹配未命中时启用）──
+  // 逻辑：最长的肯定是执照名称（公司名），短一点的是店铺名称
+  if (!result.licenseName || !result.shopName) {
+    const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length > 0)
+
+    // 收集所有「XXX有限公司」类型的公司全称候选
+    const companyCandidates = []
+    for (const line of lines) {
+      const cm = line.match(/^([\u4e00-\u9fa5]{4,30})(?:有限公司|股份有限公司|有限合伙|集团)$/)
+      if (cm) companyCandidates.push({ raw: cm[0], name: cm[1], len: cm[1].length })
+    }
+
+    // 收集所有「XXX旗舰店/专卖店/官方店」类型的店铺全称候选
+    const shopCandidates = []
+    for (const line of lines) {
+      const sm = line.match(/^([\u4e00-\u9fa5a-zA-Z0-9]{2,20})(?:旗舰店|专卖店|专营店|官方店|商城)$/)
+      if (sm) shopCandidates.push({ raw: sm[0], name: sm[1], len: sm[1].length })
+    }
+
+    // 按长度降序排列，取最长的作为执照名称
+    if (!result.licenseName && companyCandidates.length > 0) {
+      companyCandidates.sort((a, b) => b.len - a.len)
+      result.licenseName = companyCandidates[0].name
+    }
+
+    // 店铺候选取最短的（店名通常比公司名短）
+    if (!result.shopName && shopCandidates.length > 0) {
+      shopCandidates.sort((a, b) => a.len - b.len)
+      result.shopName = shopCandidates[0].name
+    }
+
+    // 备选：只有一个公司候选且无店铺候选时，从公司名推断店铺
+    if (!result.shopName && companyCandidates.length === 1 && shopCandidates.length === 0) {
+      const cName = companyCandidates[0].name
+      const shortMatch = cName.match(/([\u4e00-\u9fa5]{2,10})(?:化妆品|服饰|食品|家居|电器|珠宝|母婴|医疗|教育)?$/)
+      if (shortMatch) {
+        result.shopName = shortMatch[1] + '旗舰店'
+      }
+    }
+  }
+
+  // ── 商品名称兜底 ─────────────────────────────────
+  // 如果商品名称还是没识别到，尝试从书名号《》或「」中提取，取最短的
+  if (!result.productName) {
+    const bookMatches = text.match(/[\u300a\u300b\u300c\u300d]([^\u300a\u300b\u300c\u300d]{2,40})[\u300a\u300b\u300c\u300d]/g)
+    if (bookMatches && bookMatches.length > 0) {
+      const candidates = bookMatches.map(b => b.slice(1, -1)).filter(s => s.length >= 2 && s.length <= 40)
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => a.length - b.length)
+        result.productName = candidates[0]
+      }
+    }
+  }
+
   quickParseResult.value = result
   if (result.licenseName) form.value.licenseName = result.licenseName
   if (result.shopName) form.value.shopName = result.shopName

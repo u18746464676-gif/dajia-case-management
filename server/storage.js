@@ -55,7 +55,6 @@ function createClient() {
   if (!BUCKET || !REGION || !ENDPOINT || !ACCESS_KEY_ID || !SECRET_ACCESS_KEY) {
     throw new Error('TOS server env missing')
   }
-
   return new TosClient({
     accessKeyId: ACCESS_KEY_ID,
     accessKeySecret: SECRET_ACCESS_KEY,
@@ -114,6 +113,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const client = createClient()
 
+    // 列出云端文件
     if (req.method === 'GET' && url.pathname === '/api/storage/files') {
       const prefix = url.searchParams.get('prefix') || 'case-images/'
       const result = await client.listObjects({ bucket: BUCKET, prefix })
@@ -124,9 +124,10 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { files })
     }
 
+    // 上传文件到 TOS
     if (req.method === 'POST' && url.pathname === '/api/storage/upload') {
       const body = await parseBody(req)
-      const fileName = body.fileName || `image_${Date.now()}.jpg`
+      const fileName = body.fileName || `file_${Date.now()}.jpg`
       const { contentType, buffer } = parseDataUrl(body.base64Data || '')
       const key = `case-images/${Date.now()}_${fileName}`
 
@@ -137,15 +138,32 @@ const server = http.createServer(async (req, res) => {
         contentType: contentType || 'image/jpeg',
       })
 
-      await client.headObject({ bucket: BUCKET, key })
       return json(res, 200, { url: getTosFileUrl(key), key })
     }
 
+    // 删除单个云端文件
     if (req.method === 'DELETE' && url.pathname === '/api/storage/file') {
       const urlOrKey = url.searchParams.get('urlOrKey') || ''
       const key = getTosKeyFromUrl(urlOrKey)
+      if (!key) return json(res, 400, { error: 'missing urlOrKey' })
       await client.deleteObject({ bucket: BUCKET, key })
-      return json(res, 200, { ok: true })
+      return json(res, 200, { ok: true, deletedKey: key })
+    }
+
+    // 批量删除云端文件
+    if (req.method === 'POST' && url.pathname === '/api/storage/batch-delete') {
+      const body = await parseBody(req)
+      const urls = Array.isArray(body.urls) ? body.urls : []
+      const errors = []
+      for (const urlOrKey of urls) {
+        try {
+          const key = getTosKeyFromUrl(urlOrKey)
+          if (key) await client.deleteObject({ bucket: BUCKET, key })
+        } catch (e) {
+          errors.push({ url: urlOrKey, error: e.message })
+        }
+      }
+      return json(res, 200, { ok: errors.length === 0, deleted: urls.length, errors })
     }
 
     return json(res, 404, { error: 'not found' })

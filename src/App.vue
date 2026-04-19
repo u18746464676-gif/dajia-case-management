@@ -181,7 +181,7 @@
           >
             <span class="w-1.5 h-1.5 rounded-full" :class="$route.query.status === 'not_punished' ? 'bg-white' : 'bg-slate-400'"></span>
             <span class="font-bold">{{ store.stats.notPunished }}</span>
-            <span>不予处罚</span>
+            <span>责令改正</span>
           </router-link>
         </div>
       </div>

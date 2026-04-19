@@ -2,12 +2,21 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import dayjs from 'dayjs'
 import { supabase } from '@/lib/supabase'
+import {
+  ensureCloudFilesTable,
+  registerCloudFile,
+  fetchUnassignedFiles,
+  fetchCaseFileUrls,
+  deleteCloudFilesByUrl,
+  deleteCloudFiles,
+} from '@/lib/cloudFiles'
 
 const STORAGE_KEY = 'pdd_case_list_v1'
 const UNASSIGNED_IMAGES_KEY = 'unassigned_images'
 const APP_META_ID = '00000000-0000-0000-0000-000000000000'
 const CASE_NUMBER_PREFIX = 'AJ'
 const CASE_NUMBER_PATTERN = /^AJ-(\d{8})-(\d{4})$/
+const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_BASE || 'http://192.168.1.28:8787'
 
 function uuid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -131,12 +140,14 @@ export const useCaseStore = defineStore('case', () => {
 
   async function loadFromSupabase() {
     isLoading.value = true
+    console.log('[Supabase] 开始加载数据...')
     try {
       const { data, error } = await supabase
         .from('cases')
         .select('id, data')
         .order('created_at', { ascending: false })
 
+      console.log('[Supabase] 查询结果:', { error, rowCount: data?.length })
       if (error) throw error
 
       const rows = data || []
@@ -144,17 +155,30 @@ export const useCaseStore = defineStore('case', () => {
       const caseRows = rows.filter(row => row.id !== APP_META_ID && row.data?.type !== '__app_meta__')
 
       cases.value = ensureCaseNumbers(caseRows.map(row => row.data).filter(Boolean))
+      console.log('[Supabase] 加载到案件数:', cases.value.length)
       unassignedImages.value = dedupeByUrl(appMetaRow?.data?.unassignedImages || loadUnassignedImagesFromLocalStorage())
+      console.log('[Supabase] 加载到未分配图片数:', unassignedImages.value.length)
+
+      // 云端返回空但本地有数据时，用本地数据（防止上传失败导致刷新丢数据）
+      if (cases.value.length === 0) {
+        const localData = loadFromLocalStorage()
+        if (localData.length > 0) {
+          cases.value = ensureCaseNumbers(localData)
+        }
+      }
+
       persistToLocal()
       isSynced.value = true
     } catch (err) {
-      console.error('加载失败，尝试本地数据:', err)
+      console.error('[Supabase] 加载失败:', err)
+      console.error('[Supabase] 尝试使用本地数据...')
       cases.value = ensureCaseNumbers(loadFromLocalStorage())
       unassignedImages.value = loadUnassignedImagesFromLocalStorage()
       isSynced.value = false
     } finally {
       isLoading.value = false
     }
+    console.log('[Supabase] 最终案件数:', cases.value.length)
   }
 
   async function saveToSupabase() {
@@ -201,8 +225,42 @@ export const useCaseStore = defineStore('case', () => {
     await saveToSupabase()
   }
 
+  // ── 云端文件操作 ────────────────────────────────────
+  async function deleteFilesFromCloud(urls) {
+    if (!urls || urls.length === 0) return
+    // 1. 从 TOS 云存储删除
+    try {
+      const body = JSON.stringify({ urls })
+      await fetch(`${STORAGE_API_BASE}/api/storage/batch-delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      })
+    } catch (e) {
+      console.warn('[cloud] TOS delete failed:', e)
+    }
+    // 2. 从 Supabase cloud_files 软删除
+    await deleteCloudFilesByUrl(urls)
+  }
+
   async function init() {
+    // 确保 cloud_files 表存在
+    await ensureCloudFilesTable()
     await loadFromSupabase()
+    // 尝试从 cloud_files 加载未分配图片（云端优先）
+    try {
+      const cloudFiles = await fetchUnassignedFiles()
+      if (cloudFiles && cloudFiles.length > 0) {
+        const cloudUrls = new Set(unassignedImages.value.map(i => i.url))
+        const merged = [
+          ...unassignedImages.value,
+          ...cloudFiles.map(f => ({ url: f.file_url, key: f.file_key, name: f.file_name, id: f.id, uploadedAt: f.uploaded_at })),
+        ]
+        unassignedImages.value = dedupeByUrl(merged)
+      }
+    } catch (e) {
+      console.warn('[cloud] fetchUnassignedFiles failed:', e)
+    }
 
     if (cases.value.length === 0) {
       const localData = loadFromLocalStorage()
@@ -369,6 +427,16 @@ export const useCaseStore = defineStore('case', () => {
   }
 
   async function deleteCase(id) {
+    const caseToDelete = cases.value.find(c => c.id === id)
+    if (caseToDelete) {
+      // 收集所有图片 URL 并从云端删除
+      const imageUrls = []
+        .concat(Array.isArray(caseToDelete.images) ? caseToDelete.images : [])
+        .concat(Array.isArray(caseToDelete.attachmentUrls) ? caseToDelete.attachmentUrls : [])
+        .map(img => typeof img === 'string' ? img : img?.url)
+        .filter(Boolean)
+      if (imageUrls.length > 0) await deleteFilesFromCloud(imageUrls)
+    }
     cases.value = cases.value.filter(c => c.id !== id)
     await syncState()
   }
@@ -399,10 +467,19 @@ export const useCaseStore = defineStore('case', () => {
     const idSet = new Set((ids || []).filter(Boolean))
     if (idSet.size === 0) return
 
-    const nextCases = cases.value.filter(c => !idSet.has(c.id))
-    if (nextCases.length === cases.value.length) return
+    // 批量收集所有待删案件的图片并从云端删除
+    const toDelete = cases.value.filter(c => idSet.has(c.id))
+    const imageUrls = []
+    for (const c of toDelete) {
+      ;[].concat(Array.isArray(c.images) ? c.images : [])
+        .concat(Array.isArray(c.attachmentUrls) ? c.attachmentUrls : [])
+        .map(img => typeof img === 'string' ? img : img?.url)
+        .filter(Boolean)
+        .forEach(url => imageUrls.push(url))
+    }
+    if (imageUrls.length > 0) await deleteFilesFromCloud(imageUrls)
 
-    cases.value = nextCases
+    cases.value = cases.value.filter(c => !idSet.has(c.id))
     await syncState()
   }
 
@@ -416,6 +493,10 @@ export const useCaseStore = defineStore('case', () => {
     if (!image?.url) return null
     const normalized = normalizeImageRecord(image)
     unassignedImages.value = [normalized, ...unassignedImages.value.filter(item => item.url !== normalized.url)]
+    // 注册到云端 cloud_files 表
+    if (image.key || image.url) {
+      await registerCloudFile({ fileUrl: image.url, fileKey: image.key || image.url, fileName: image.name }).catch(() => {})
+    }
     await syncState()
     return normalized
   }
@@ -425,6 +506,7 @@ export const useCaseStore = defineStore('case', () => {
     const next = unassignedImages.value.filter(item => item.url !== url)
     if (next.length === unassignedImages.value.length) return
     unassignedImages.value = next
+    await deleteFilesFromCloud([url])
     await syncState()
   }
 
