@@ -14,13 +14,18 @@ let tosClient = null
 function normalizeTosError(error) {
   const statusCode = error?.statusCode || error?.data?.StatusCode || error?.status || 0
   const code = error?.data?.Code || error?.code || error?.error || ''
+  const msg = error?.message || ''
+
+  if (statusCode === 0 || msg.includes('Failed to fetch') || msg.includes('fetch') || msg.includes('NetworkError')) {
+    return new Error('网络请求失败，请关闭 VPN 后重试')
+  }
 
   if (statusCode === 403 || code === 'SignatureDoesNotMatch') {
     return new Error('云存储鉴权失败（403）。当前 TOS 密钥或签名配置不正确，请更新后再试。')
   }
 
-  if (error?.message) {
-    return new Error(`云存储异常：${error.message}`)
+  if (msg) {
+    return new Error(`云存储异常：${msg}`)
   }
 
   return new Error('云存储异常，请稍后重试')
@@ -184,6 +189,43 @@ export async function uploadBase64ToTos(base64Data, fileName = 'image.jpg') {
     return finalUrl
   } catch (error) {
     const msg = `error=${error.message}`
+    throw normalizeTosError(error)
+  }
+}
+
+// Word 专用上传：固定走 case-docs/ 路径，与图片分离
+export async function uploadWordToTos(base64Data, fileName = 'document.docx') {
+  if (!isBrowser) return null
+
+  const timestamp = Date.now()
+  const fileKey = `case-docs/${timestamp}_${fileName}`
+
+  try {
+    if (useStorageApi()) {
+      const data = await requestStorageApi('/api/storage/upload', {
+        method: 'POST',
+        body: JSON.stringify({ base64Data, fileName, fileKey }),
+      })
+      return data.url
+    }
+
+    const base64Response = await fetch(base64Data)
+    const blob = await base64Response.blob()
+    const client = getTosClient()
+
+    const result = await client.putObject({
+      bucket: BUCKET,
+      key: fileKey,
+      body: blob,
+      contentType: 'application/octet-stream',
+    })
+
+    if (!result || (result.statusCode && result.statusCode >= 400)) {
+      throw new Error('Word 上传失败')
+    }
+
+    return getTosFileUrl(fileKey)
+  } catch (error) {
     throw normalizeTosError(error)
   }
 }
