@@ -144,28 +144,17 @@ export async function listTosObjects(prefix = 'case-images/') {
   }
 }
 
-// Mobile debug: expose toasts globally so CaseList.vue addToast can pick them up
-// No circular call - just set a flag that addToast reads
-window.__mobileUploadDebug = (msg) => {
-  window.__lastUploadDebug = msg
-  window.__lastUploadDebugTs = Date.now()
-  console.debug('[MOBILE-UPLOAD]', msg)
-}
-
 export async function uploadBase64ToTos(base64Data, fileName = 'image.jpg') {
   if (!isBrowser) return null
 
   const bLen = base64Data ? base64Data.length : 0
-  window.__mobileUploadDebug(`start file=${fileName} base64Len=${bLen}`)
 
   try {
     if (useStorageApi()) {
-      window.__mobileUploadDebug(`request /api/storage/upload`)
       const data = await requestStorageApi('/api/storage/upload', {
         method: 'POST',
         body: JSON.stringify({ base64Data, fileName }),
       })
-      window.__mobileUploadDebug(`response OK url=${data.url}`)
       return data.url
     }
 
@@ -192,11 +181,9 @@ export async function uploadBase64ToTos(base64Data, fileName = 'image.jpg') {
     })
 
     const finalUrl = getTosFileUrl(key)
-    window.__mobileUploadDebug(`response OK url=${finalUrl}`)
     return finalUrl
   } catch (error) {
     const msg = `error=${error.message}`
-    window.__mobileUploadDebug(`response ERROR ${msg}`)
     throw normalizeTosError(error)
   }
 }

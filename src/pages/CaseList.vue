@@ -1604,13 +1604,6 @@ async function handleDocUpload(file) {
 
 // 轻量提示通知（3秒自动消失）
 function addToast(message, type = 'info') {
-  // Mobile upload debug: surface internal debug messages as toasts
-  const debugMsg = window.__lastUploadDebug
-  const debugTs = window.__lastUploadDebugTs || 0
-  if (debugMsg && (Date.now() - debugTs) < 5000) {
-    message = '[UPLOAD] ' + debugMsg
-    window.__lastUploadDebug = null  // consume
-  }
   const id = Date.now()
   toasts.value.push({ id, message, type })
   setTimeout(() => {
@@ -1725,14 +1718,12 @@ function extractDocumentTitle(aiResult) {
     const lines = rawText.split(/[\n\r]+/).slice(0, 15)
     // 调试：打出前10行供排查
     const candidates = lines.map((l, i) => `${i + 1}. ${l.trim().substring(0, 50)}`).join(' | ')
-    window.__docUploadDebug = `TITLE-CANDIDATES: ${candidates}`
     // 先尝试"关于"开头的标题（不过 isMeaningfulTitle 的日期过滤）
     for (const line of lines) {
       const trimmed = line.trim()
       if (trimmed.startsWith('关于') && trimmed.length >= 6 && trimmed.length <= 50) {
         const cleaned = sanitizeFileName(trimmed)
         console.log('[PATH] extractDocumentTitle 关于 match:', cleaned)
-        window.__docUploadDebug = `TITLE-ABOUT: ${cleaned}`
         return cleaned
       }
     }
@@ -2250,11 +2241,6 @@ async function handleDocumentUpload(event) {
         const dataUrl = await readFileAsDataUrl(file)
         addToast('🔍 AI识别中...', 'info')
         const result = await analyzeDocumentImage(dataUrl)
-        // 调试：把 OCR 原始结果打出来
-        const raw = window.__docUploadDebug || ''
-        if (raw) {
-          addToast('🔍 ' + raw.substring(0, 100), 'info')
-        }
         console.log('[PATH] analyzeDocumentImage result:', JSON.stringify({
           _documentTitle: result?._documentTitle,
           documentTitle: result?.documentTitle,
