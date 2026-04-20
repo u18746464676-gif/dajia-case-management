@@ -52,6 +52,7 @@ function normalizeImageRecord(image = {}) {
   return {
     url: image.url || '',
     name: image.name || '未命名文件',
+    ocrTitle: image.ocrTitle || '',   // OCR 提取的标题（独立展示，不改文件名）
     date: image.date || dayjs().format('YYYY-MM-DD'),
     uploadedAt: image.uploadedAt || now,
   }
@@ -577,6 +578,7 @@ export const useCaseStore = defineStore('case', () => {
         fileKey: extractTosKey(fileUrl),
         fileName: imageRecord.name,
         fileType: 'image',
+        ocrTitle: imageRecord.ocrTitle || '',
       })
       if (regResult.error) {
         console.error('[assignCloudFile] ❌ cloud_files 注册失败:', regResult.error)

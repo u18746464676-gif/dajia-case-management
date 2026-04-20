@@ -28,8 +28,8 @@ const API_BASE = ''
 const TABLE = 'cloud_files'
 
 // ── 注册文件记录（调自有后端 API，服务端写库） ─────────────
-async function registerCloudFileViaApi({ caseId, fileUrl, fileKey, fileName, fileType, fileSize }) {
-  const payload = { caseId, fileUrl, fileKey, fileName, fileType, fileSize }
+async function registerCloudFileViaApi({ caseId, fileUrl, fileKey, fileName, fileType, fileSize, ocrTitle }) {
+  const payload = { caseId, fileUrl, fileKey, fileName, fileType, fileSize, ocrTitle: ocrTitle || '' }
   console.log('[registerCloudFile] 注册文件:', { fileName, caseId })
 
   const response = await fetch(`${API_BASE}/api/register-cloud-file`, {
@@ -55,8 +55,8 @@ async function registerCloudFileViaApi({ caseId, fileUrl, fileKey, fileName, fil
 }
 
 // ── 注册文件记录（统一出口） ─────────────────────────────
-export async function registerCloudFile({ caseId = null, fileUrl, fileKey, fileName, fileType = 'image', fileSize }) {
-  return registerCloudFileViaApi({ caseId, fileUrl, fileKey, fileName, fileType, fileSize })
+export async function registerCloudFile({ caseId = null, fileUrl, fileKey, fileName, fileType = 'image', fileSize, ocrTitle = '' }) {
+  return registerCloudFileViaApi({ caseId, fileUrl, fileKey, fileName, fileType, fileSize, ocrTitle })
 }
 
 // ── 以下函数已废弃，仅因 stores/case.js 历史调用保留 ────────

@@ -27,21 +27,47 @@ function normalizeTosError(error) {
 }
 
 async function requestStorageApi(path, options = {}) {
-  const response = await fetch(`${STORAGE_API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    ...options,
-  })
+  const url = `${STORAGE_API_BASE}${path}`
+  let data = {}
+  let bodyText = ''
+  let status = 0
 
-  const data = await response.json().catch(() => ({}))
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+      ...options,
+    })
 
-  if (!response.ok) {
-    throw normalizeTosError({ status: response.status, ...data })
+    status = response.status
+    bodyText = await response.text()
+
+    try {
+      data = bodyText ? JSON.parse(bodyText) : {}
+    } catch {
+      data = { _raw: bodyText }
+    }
+
+    if (!response.ok) {
+      const msg = data?.error || data?.message || data?.msg || bodyText || 'unknown'
+      const err = new Error(`UPLOAD FAILED status=${status} body=${typeof msg === 'string' ? msg : JSON.stringify(msg)}`)
+      err._status = status
+      err._body = bodyText
+      err._data = data
+      throw err
+    }
+
+    return data
+  } catch (e) {
+    if (e._status !== undefined) throw e
+    const err = new Error(`UPLOAD FAILED status=${status} body=${bodyText || e.message}`)
+    err._status = status
+    err._body = bodyText
+    err._data = data
+    throw err
   }
-
-  return data
 }
 
 function useStorageApi() {
@@ -118,15 +144,28 @@ export async function listTosObjects(prefix = 'case-images/') {
   }
 }
 
+// Mobile debug: expose toasts globally so CaseList.vue addToast can pick them up
+// No circular call - just set a flag that addToast reads
+window.__mobileUploadDebug = (msg) => {
+  window.__lastUploadDebug = msg
+  window.__lastUploadDebugTs = Date.now()
+  console.debug('[MOBILE-UPLOAD]', msg)
+}
+
 export async function uploadBase64ToTos(base64Data, fileName = 'image.jpg') {
   if (!isBrowser) return null
 
+  const bLen = base64Data ? base64Data.length : 0
+  window.__mobileUploadDebug(`start file=${fileName} base64Len=${bLen}`)
+
   try {
     if (useStorageApi()) {
+      window.__mobileUploadDebug(`request /api/storage/upload`)
       const data = await requestStorageApi('/api/storage/upload', {
         method: 'POST',
         body: JSON.stringify({ base64Data, fileName }),
       })
+      window.__mobileUploadDebug(`response OK url=${data.url}`)
       return data.url
     }
 
@@ -152,8 +191,12 @@ export async function uploadBase64ToTos(base64Data, fileName = 'image.jpg') {
       key,
     })
 
-    return getTosFileUrl(key)
+    const finalUrl = getTosFileUrl(key)
+    window.__mobileUploadDebug(`response OK url=${finalUrl}`)
+    return finalUrl
   } catch (error) {
+    const msg = `error=${error.message}`
+    window.__mobileUploadDebug(`response ERROR ${msg}`)
     throw normalizeTosError(error)
   }
 }

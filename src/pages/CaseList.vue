@@ -498,7 +498,10 @@
                     <span v-else class="text-2xl">{{ getFileIcon(file) }}</span>
                   </button>
                 </td>
-                <td class="max-w-xs truncate py-2 px-3">{{ getFileName(file) }}</td>
+                <td class="max-w-xs truncate py-2 px-3">
+                  <div class="truncate text-sm text-slate-800">{{ getFileName(file) }}</div>
+                  <div v-if="file.ocrTitle" class="truncate text-xs text-blue-500">{{ file.ocrTitle }}</div>
+                </td>
                 <td class="py-2 px-3">{{ file.LastModified ? new Date(file.LastModified).toLocaleString('zh-CN') : (file.uploadedAt ? new Date(file.uploadedAt).toLocaleString('zh-CN') : '-') }}</td>
                 <td class="py-2 px-3">
                   <select :value="getFileCaseId(file)" @change="assignFileToCase(file, $event.target.value)" class="input-field py-2 text-xs sm:w-44">
@@ -1503,6 +1506,13 @@ async function handleOcrUploadForFile(file) {
   try {
     const dataUrl = await readFileAsDataUrl(file)
     const result = await analyzeDocumentImage(dataUrl)
+    console.log('[PATH] handleOcrUploadForFile analyzeDocumentImage:', JSON.stringify({
+      _documentTitle: result?._documentTitle,
+      documentTitle: result?.documentTitle,
+      documentType: result?.documentType,
+      isEnvelope: result?.isEnvelope,
+      trackingNumber: result?.trackingNumber,
+    }))
     console.log('[OCR] 识别结果:', JSON.stringify(result, null, 2))
     if (!result || result._ocrFailed) {
       // OCR完全失败（API报错），仍上传文件但不关联
@@ -1521,10 +1531,21 @@ async function handleOcrUploadForFile(file) {
 
     // 找到最佳匹配（取第一个匹配到的）
     const bestMatch = matchedCases.length > 0 ? matchedCases[0] : null
+    const title2 = extractDocumentTitle(result)
+    const ext2 = getFileExtension(file.name)
+    let finalName2 = title2
+      ? `${title2}${ext2}`
+      : (file.name || `图片${ext2}`)
+    let nameSource2 = title2 ? 'title' : 'fallback'
+    if (/^信封([_.]|\.|$)/.test(finalName2)) {
+      finalName2 = title2 ? `${sanitizeFileName(title2)}${ext2}` : (file.name || `图片${ext2}`)
+      nameSource2 = 'hard-guard:' + (title2 ? 'title' : 'fallback')
+      addToast('🛡️ [OCR通道] HARD-GUARD: "' + title2 + ext2 + '"', 'info')
+    }
     if (bestMatch) {
       const fileMeta = {
         url: uploadedUrl,
-        name: file.name,
+        name: finalName,
         date: dayjs().format('YYYY-MM-DD'),
         uploadedAt: dayjs().toISOString(),
         trackingNumber: defaultTracking || '',
@@ -1532,9 +1553,9 @@ async function handleOcrUploadForFile(file) {
       }
       await store.assignCloudFile(uploadedUrl, bestMatch.id, fileMeta,
         defaultTracking ? { trackingNumber: defaultTracking } : null)
-      addToast(`✅ 【${result._documentTitle || file.name}】→ ${bestMatch.licenseName || bestMatch.shopName}`, 'success')
+      addToast('✅ [OCR通道] FINAL=' + finalName2 + ' TITLE=' + (title2 || '-') + ' SOURCE=' + nameSource2 + ' → ' + (bestMatch.licenseName || bestMatch.shopName), 'success')
     } else {
-      addToast(`📄 【${result._documentTitle || file.name}】（未匹配到案件，已存入云端文件）`, 'warn')
+      addToast('📄 [OCR通道] FINAL=' + finalName2 + ' TITLE=' + (title2 || '-') + ' SOURCE=' + nameSource2 + '（未匹配，已存云端）', 'warn')
     }
   } catch (err) {
     console.error('OCR错误:', err)
@@ -1583,11 +1604,18 @@ async function handleDocUpload(file) {
 
 // 轻量提示通知（3秒自动消失）
 function addToast(message, type = 'info') {
+  // Mobile upload debug: surface internal debug messages as toasts
+  const debugMsg = window.__lastUploadDebug
+  const debugTs = window.__lastUploadDebugTs || 0
+  if (debugMsg && (Date.now() - debugTs) < 5000) {
+    message = '[UPLOAD] ' + debugMsg
+    window.__lastUploadDebug = null  // consume
+  }
   const id = Date.now()
   toasts.value.push({ id, message, type })
   setTimeout(() => {
     toasts.value = toasts.value.filter(t => t.id !== id)
-  }, 3000)
+  }, 4000)
 }
 
 // 从文件名解析执照/店铺/单号
@@ -1627,33 +1655,100 @@ function parseDocFileName(fileName = '') {
 // ── 从 OCR 结果中提取文书标题 ──────────────────────────────
 // 优先级：documentTitle 字段 > raw 文本前几行匹配标题规则
 const DOCUMENT_TITLE_PATTERNS = [
-  /投诉受理/, /不予立案/, /行政处罚决定书/, /调解书/, /终止调解/,
-  /立案告知/, /举报答复/, /案件移送/, /处罚决定/, /结案报告/,
-  /行政处理/, /责令改正/, /行政处罚/, /查封扣押/, /听证告知/,
-  /复议决定/, /撤销决定/, /赔偿决定/, /补偿决定/,
-  /答复函/, /投诉函/, /举报函/, /情况说明/, /授权委托/,
-  /身份证/, /营业执照/, /公证文书/,
+  // 核心行政文书
+  /关于.{4,30}/,                              // 关于xxx的调查回复/答复函/处理意见等（通用标题格式）
+  /投诉举报处理告知书/, /投诉受理回执/, /投诉举报答复/, /投诉举报函/,
+  /不予立案告知书/, /不予立案通知书/, /不予立案决定书/,
+  /行政处罚决定书/, /行政处罚告知书/, /行政处罚听证告知书/,
+  /举报答复书/, /举报答复函/, /举报处理告知书/,
+  /立案告知书/, /立案审批表/, /立案通知书/,
+  /终止调解书/, /终止调解告知书/, /终止行政调解书/,
+  /案件移送函/, /案件移送通知书/, /案件处理告知书/,
+  /责令改正通知书/, /责令限期改正通知书/, /责令整改通知书/,
+  /查封扣押决定书/, /查封（扣押）物品清单/,
+  /听证告知书/, /听证通知书/,
+  /复议决定书/, /行政复议决定书/,
+  /撤销决定书/, /撤销行政处罚决定书/,
+  /赔偿决定书/, /补偿决定书/, /行政赔偿决定书/,
+  // 通用文书
+  /调解书/, /调解协议书/, /和解协议书/,
+  /处罚决定/, /处罚告知/, /处罚审批表/,
+  /结案报告/, /结案审批表/, /案件终结报告/,
+  /行政处理/, /行政处理决定书/,
+  /答复函/, /投诉函/, /举报函/, /情况说明/, /授权委托书/,
+  /身份证/, /营业执照/, /公证文书/, /法定代表人/,
+  /先行登记保存/, /先行登记保存物品清单/,
+  /地址确认书/, /送达回证/, /送达地址确认书/,
 ]
 
+// 清洗非法字符，返回干净的文件名
+function sanitizeFileName(name = '') {
+  return String(name)
+    .replace(/[\\/:*?"<>|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s+|\s+$/g, '')
+    .replace(/^\.+/, '')
+    .substring(0, 120)
+}
+
+// 判断一行是否"有意义"（不是页码/日期/编号等脏行）
+function isMeaningfulTitle(line) {
+  const trimmed = line.trim()
+  if (!trimmed || trimmed.length < 4 || trimmed.length > 60) return false
+  // 纯页码行
+  if (/^第\s*[0-9]+\s*页$/.test(trimmed)) return false
+  if (/^\d+\s*\/\s*\d+$/.test(trimmed)) return false          // "1 / 2"
+  if (/^共\s*\d+\s*页/.test(trimmed)) return false
+  // 纯日期/编号前缀开头的行（常见OCR误识别格式，如"2024-01-01 投诉举报..."）
+  if (/^[0-9年日月时分秒\-\:\.\s]{8,20}[\u4e00-\u9fa5]/.test(trimmed)) return false
+  // 全是符号或单字符
+  if (/^[\W_]+$/.test(trimmed)) return false
+  if (trimmed.length <= 2) return false
+  // 页眉/页脚关键词
+  if (/^(此页|空白|签字|签章|盖章|扫描|复印|仅供)/.test(trimmed)) return false
+  return true
+}
+
 function extractDocumentTitle(aiResult) {
-  // 优先用 AI 直接返回的 documentTitle 字段
-  if (aiResult?.documentTitle && String(aiResult.documentTitle).trim().length > 1) {
-    return String(aiResult.documentTitle).trim()
+  // 优先用 OCR 层已提取的 _documentTitle
+  if (aiResult?._documentTitle && String(aiResult._documentTitle).trim().length > 1) {
+    const cleaned = sanitizeFileName(String(aiResult._documentTitle).trim())
+    if (isMeaningfulTitle(cleaned)) return cleaned
   }
-  // 从 raw 文本中按标题规则匹配
-  const rawText = aiResult?.raw || ''
+  if (aiResult?.documentTitle && String(aiResult.documentTitle).trim().length > 1) {
+    const cleaned = sanitizeFileName(String(aiResult.documentTitle).trim())
+    if (isMeaningfulTitle(cleaned)) return cleaned
+  }
+  // 从 OCR 原文 raw 文本中按标题规则匹配（取第一条有意义匹配）
+  const rawText = aiResult?._rawOcrText || aiResult?.raw || ''
   if (rawText) {
-    const lines = rawText.split(/[\n\r]+/).slice(0, 10)  // 只看前10行
+    const lines = rawText.split(/[\n\r]+/).slice(0, 15)
+    // 调试：打出前10行供排查
+    const candidates = lines.map((l, i) => `${i + 1}. ${l.trim().substring(0, 50)}`).join(' | ')
+    window.__docUploadDebug = `TITLE-CANDIDATES: ${candidates}`
+    // 先尝试"关于"开头的标题（不过 isMeaningfulTitle 的日期过滤）
     for (const line of lines) {
       const trimmed = line.trim()
-      if (trimmed.length >= 4 && trimmed.length <= 50) {
+      if (trimmed.startsWith('关于') && trimmed.length >= 6 && trimmed.length <= 50) {
+        const cleaned = sanitizeFileName(trimmed)
+        console.log('[PATH] extractDocumentTitle 关于 match:', cleaned)
+        window.__docUploadDebug = `TITLE-ABOUT: ${cleaned}`
+        return cleaned
+      }
+    }
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (trimmed.length >= 4 && trimmed.length <= 60) {
         for (const pattern of DOCUMENT_TITLE_PATTERNS) {
-          if (pattern.test(trimmed)) {
-            return trimmed
+          if (pattern.test(trimmed) && isMeaningfulTitle(trimmed)) {
+            const r = sanitizeFileName(trimmed)
+            console.log('[PATH] extractDocumentTitle raw match:', r)
+            return r
           }
         }
       }
     }
+    console.log('[PATH] extractDocumentTitle: no title, scanned lines:', lines.slice(0, 5).map(l => l.trim().substring(0, 40)))
   }
   return ''
 }
@@ -1745,19 +1840,55 @@ function entityNameMatches(left = '', right = '') {
   return normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)
 }
 
-function buildCloudDisplayName(result = {}, originalFileName = '', fallbackLabel = '文件') {
+// 根据 OCR 结果构建最终展示文件名
+// 优先级：OCR标题 > 文书类型 > 原始文件名
+// ===== 信封专用：提取单号 =====
+function extractTrackingNumber(result = {}) {
+  const sources = [
+    result?.trackingNumber,
+    ...(Array.isArray(result?.trackingNumbers) ? result.trackingNumbers : []),
+    result?._rawOcrText,
+    result?.raw,
+  ].filter(Boolean).map(v => String(v))
+  const merged = sources.join('\n').toUpperCase()
+
+  // 优先抓 XA 开头单号
+  const xaMatch = merged.match(/\bXA[A-Z0-9]{6,30}\b/)
+  if (xaMatch) {
+    return xaMatch[0].replace(/[^A-Z0-9]/g, '')
+  }
+  // 其他有效单号（纯大写字母数字，10位以上）
+  const genericMatches = merged.match(/\b[A-Z0-9]{10,30}\b/g) || []
+  return genericMatches.map(s => s.replace(/[^A-Z0-9]/g, '')).filter(s => s.length >= 10)[0] || ''
+}
+
+// ===== 三条链路各自命名 =====
+
+function buildEnvelopeDisplayName(result = {}, originalFileName = '') {
   const extension = getFileExtension(originalFileName)
-  const hasTracking = result.trackingNumber || (Array.isArray(result.trackingNumbers) && result.trackingNumbers.length > 0)
-  if (result.isEnvelope || result.documentType === '信封' || hasTracking) {
-    return `信封${extension}`
+  const tracking = extractTrackingNumber(result)
+  if (tracking && /^XA[A-Z0-9]{6,30}$/.test(tracking)) {
+    return `信封_${tracking}${extension}`
   }
-  if (result.documentTitle) {
-    return `${String(result.documentTitle).trim()}${extension}`
+  if (tracking) {
+    return `信封_${tracking}${extension}`
   }
-  if (result.documentType && !['普通图片', '其他文书'].includes(result.documentType)) {
-    return `${String(result.documentType).trim()}${extension}`
-  }
-  return `${fallbackLabel}${extension}`
+  return `信封${extension}`
+}
+
+function buildDocumentDisplayName(result = {}, originalFileName = '', fallbackLabel = '文书') {
+  const extension = getFileExtension(originalFileName)
+  // 文书通道：标题优先，绝不返回"信封"
+  const title = extractDocumentTitle(result)
+  const source = title ? 'document-title' : (originalFileName ? 'original-file' : 'fallback')
+  const finalName = title ? `${title}${extension}` : (originalFileName || `${fallbackLabel}${extension}`)
+  console.log('[PATH] buildDocumentDisplayName', { originalFileName, title, extension, source, finalName, documentType: result?.documentType, isEnvelope: result?.isEnvelope })
+  return finalName
+}
+
+function buildWordDisplayName(originalFileName = '', fallbackLabel = '文书') {
+  const extension = getFileExtension(originalFileName)
+  return originalFileName || `${fallbackLabel}${extension}`
 }
 
 async function analyzeDocumentImage(dataUrl) {
@@ -2013,7 +2144,7 @@ async function processImageUpload(imageBase64, fileName, labelPrefix = '图片')
     throw new Error('上传失败，请重试')
   }
 
-  const displayName = buildCloudDisplayName(result, fileName, labelPrefix)
+  const displayName = buildDocumentDisplayName(result, fileName, labelPrefix)
   const fileMeta = {
     url,
     name: displayName,
@@ -2067,27 +2198,27 @@ async function handleEnvelopeUpload(event) {
         const bestMatch = matchedCases[0] || null
         if (bestMatch) {
           await store.assignCloudFile(uploadedUrl, bestMatch.id, {
-            url: uploadedUrl, name: file.name,
+            url: uploadedUrl, name: buildEnvelopeDisplayName(result, file.name),
             date: dayjs().format('YYYY-MM-DD'),
             uploadedAt: dayjs().toISOString(),
             trackingNumber: result.trackingNumber || '',
             documentType: '信封',
           }, result.trackingNumber ? { trackingNumber: result.trackingNumber } : null)
-          addToast(`✅ 【${result._documentTitle || file.name}】→ ${bestMatch.licenseName || bestMatch.shopName}（信封）`, 'success')
+          addToast(`✅ 【${extractDocumentTitle(result) || file.name}】→ ${bestMatch.licenseName || bestMatch.shopName}（信封）`, 'success')
         } else {
           // 未匹配到案件 → 必须写入 cloud_files 表才算成功
           try {
             await store.assignCloudFile(uploadedUrl, null, {
-              url: uploadedUrl, name: file.name,
+              url: uploadedUrl, name: buildEnvelopeDisplayName(result, file.name),
               date: dayjs().format('YYYY-MM-DD'),
               uploadedAt: dayjs().toISOString(),
               trackingNumber: result.trackingNumber || '',
               documentType: '信封',
             })
-            addToast(`📮 ${file.name}（未匹配到案件，已存入云端文件）`, 'warn')
+            addToast(`📮 ${buildEnvelopeDisplayName(result, file.name)}（未匹配到案件，已存入云端文件）`, 'warn')
           } catch (err) {
             console.error('[信封上传] ❌ 未匹配文件写入 cloud_files 失败:', err)
-            addToast('❌ ' + file.name + ' 已上传云端但未入库，请联系管理员', 'error')
+            addToast('❌ ' + buildEnvelopeDisplayName(result, file.name) + ' 已上传云端但未入库，请联系管理员', 'error')
           }
         }
       } catch (innerErr) {
@@ -2106,6 +2237,7 @@ async function handleEnvelopeUpload(event) {
 
 // ── 上传文书 → OCR → 文书分类 ─────────────────────────────
 async function handleDocumentUpload(event) {
+  console.log('[PATH] handleDocumentUpload called')
   addToast('📄 开始处理文书上传...', 'info')
   const files = Array.from(event.target.files || [])
   if (files.length === 0) { addToast('未选择文件', 'warn'); ocrLoading.value = false; return }
@@ -2113,10 +2245,24 @@ async function handleDocumentUpload(event) {
   try {
     await Promise.all(files.map(async (file) => {
       try {
+        console.log('[PATH] handleDocumentUpload file:', file.name)
         addToast('🔄 读取文件: ' + file.name, 'info')
         const dataUrl = await readFileAsDataUrl(file)
         addToast('🔍 AI识别中...', 'info')
         const result = await analyzeDocumentImage(dataUrl)
+        // 调试：把 OCR 原始结果打出来
+        const raw = window.__docUploadDebug || ''
+        if (raw) {
+          addToast('🔍 ' + raw.substring(0, 100), 'info')
+        }
+        console.log('[PATH] analyzeDocumentImage result:', JSON.stringify({
+          _documentTitle: result?._documentTitle,
+          documentTitle: result?.documentTitle,
+          documentType: result?.documentType,
+          isEnvelope: result?.isEnvelope,
+          trackingNumber: result?.trackingNumber,
+          raw: (result?._rawOcrText || result?.raw || '').substring(0, 100)
+        }))
         addToast('☁️ 上传到云端...', 'info')
         const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
         if (!uploadedUrl) {
@@ -2126,28 +2272,35 @@ async function handleDocumentUpload(event) {
         addToast('🔗 匹配案件中...', 'info')
         const matchedCases = findMatchedCases(result)
         const bestMatch = matchedCases[0] || null
+        // 文书通道：先统一提取标题，再生成名字，来源透明
+        const title = extractDocumentTitle(result)  // OCR title stored separately, NOT used for rename
+        const ext = getFileExtension(file.name)
+        const finalName = file.name || `文书${ext}`   // 稳定方案：保留原文件名，不自动改名
+        const nameSource = 'original'
         if (bestMatch) {
           await store.assignCloudFile(uploadedUrl, bestMatch.id, {
-            url: uploadedUrl, name: file.name,
+            url: uploadedUrl, name: finalName,
+            ocrTitle: title || '',   // OCR标题独立存储，不改文件名
             date: dayjs().format('YYYY-MM-DD'),
             uploadedAt: dayjs().toISOString(),
             trackingNumber: result.trackingNumber || '',
             documentType: '其他文书',
           }, result.trackingNumber ? { trackingNumber: result.trackingNumber } : null)
-          addToast(`✅ 【${result._documentTitle || file.name}】→ ${bestMatch.licenseName || bestMatch.shopName}（文书）`, 'success')
+          addToast('✅ ' + finalName + (title ? ' [' + title + ']' : '') + ' → ' + (bestMatch.licenseName || bestMatch.shopName), 'success')
         } else {
           try {
             await store.assignCloudFile(uploadedUrl, null, {
-              url: uploadedUrl, name: file.name,
+              url: uploadedUrl, name: finalName,
+              ocrTitle: title || '',
               date: dayjs().format('YYYY-MM-DD'),
               uploadedAt: dayjs().toISOString(),
               trackingNumber: result.trackingNumber || '',
               documentType: '其他文书',
             })
-            addToast(`📄 ${file.name}（未匹配到案件，已存入云端文件）`, 'warn')
+            addToast('📄 ' + finalName + (title ? ' [' + title + ']' : '') + '（未匹配，已存云端）', 'warn')
           } catch (err) {
             console.error('[文书上传] ❌ 未匹配文件写入 cloud_files 失败:', err)
-            addToast('❌ ' + file.name + ' 已上传云端但未入库，请联系管理员', 'error')
+            addToast('❌ ' + finalName + ' 上传失败', 'error')
           }
         }
       } catch (innerErr) {
@@ -2187,26 +2340,26 @@ async function handleWordUpload(event) {
         const bestMatch = matchedCases[0] || null
         if (bestMatch) {
           await store.assignCloudFile(uploadedUrl, bestMatch.id, {
-            url: uploadedUrl, name: file.name,
+            url: uploadedUrl, name: buildWordDisplayName(file.name),
             date: dayjs().format('YYYY-MM-DD'),
             uploadedAt: dayjs().toISOString(),
             trackingNumber: parsed.trackingNumber || '',
             documentType: '其他文书',
           }, parsed.trackingNumber ? { trackingNumber: parsed.trackingNumber } : null)
-          addToast(`✅ 【${parsed.trackingNumber ? '单号:'+parsed.trackingNumber : (file.name)}】→ ${bestMatch.licenseName || bestMatch.shopName}（Word）`, 'success')
+          addToast(`✅ 【${buildWordDisplayName(file.name)}】→ ${bestMatch.licenseName || bestMatch.shopName}（Word）`, 'success')
         } else {
           try {
             await store.assignCloudFile(uploadedUrl, null, {
-              url: uploadedUrl, name: file.name,
+              url: uploadedUrl, name: buildWordDisplayName(file.name),
               date: dayjs().format('YYYY-MM-DD'),
               uploadedAt: dayjs().toISOString(),
               trackingNumber: parsed.trackingNumber || '',
               documentType: '其他文书',
             })
-            addToast(`📝 ${file.name}（未匹配到案件，已存入云端文件）`, 'warn')
+            addToast(`📝 ${buildWordDisplayName(file.name)}（未匹配到案件，已存入云端文件）`, 'warn')
           } catch (err) {
             console.error('[Word上传] ❌ 未匹配文件写入 cloud_files 失败:', err)
-            addToast('❌ ' + file.name + ' 已上传云端但未入库，请联系管理员', 'error')
+            addToast('❌ ' + buildWordDisplayName(file.name) + ' 已上传云端但未入库，请联系管理员', 'error')
           }
         }
       } catch (innerErr) {
