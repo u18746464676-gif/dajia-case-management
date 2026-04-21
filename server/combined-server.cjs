@@ -75,12 +75,29 @@ function validatePayload(body) {
   if (!fileUrl || typeof fileUrl !== 'string') return { ok: false, code: 'MISSING_FILE_URL', message: '缺少 fileUrl' }
   if (!fileKey || typeof fileKey !== 'string') return { ok: false, code: 'MISSING_FILE_KEY', message: '缺少 fileKey' }
   if (!fileName || typeof fileName !== 'string') return { ok: false, code: 'MISSING_FILE_NAME', message: '缺少 fileName' }
-  let url
-  try { url = new URL(fileUrl) } catch { return { ok: false, code: 'INVALID_URL', message: 'fileUrl 格式错误' } }
-  if (!ALLOWED_HOSTS.includes(url.hostname)) return { ok: false, code: 'INVALID_HOST', message: `fileUrl hostname 不在白名单: ${url.hostname}` }
-  const pathname = url.pathname.replace(/^\//, '')
-  if (!ALLOWED_PREFIXES.some(p => pathname.startsWith(p))) return { ok: false, code: 'INVALID_PATH', message: `fileUrl path 不合规: /${pathname}` }
-  if (!ALLOWED_PREFIXES.some(p => fileKey.startsWith(p))) return { ok: false, code: 'INVALID_KEY', message: `fileKey 不合规: ${fileKey}` }
+
+  const isLocalUploadPath = value => typeof value === 'string' && value.startsWith('/uploads/')
+  const isAllowedRemoteUrl = value => {
+    let url
+    try {
+      url = new URL(value)
+    } catch {
+      return { ok: false, code: 'INVALID_URL', message: 'fileUrl 格式错误' }
+    }
+    if (!ALLOWED_HOSTS.includes(url.hostname)) return { ok: false, code: 'INVALID_HOST', message: `fileUrl hostname 不在白名单: ${url.hostname}` }
+    const pathname = url.pathname.replace(/^\//, '')
+    if (!ALLOWED_PREFIXES.some(p => pathname.startsWith(p))) return { ok: false, code: 'INVALID_PATH', message: `fileUrl path 不合规: /${pathname}` }
+    return { ok: true }
+  }
+
+  if (isLocalUploadPath(fileUrl)) {
+    if (!isLocalUploadPath(fileKey)) return { ok: false, code: 'INVALID_KEY', message: `fileKey 不合规: ${fileKey}` }
+  } else {
+    const remoteCheck = isAllowedRemoteUrl(fileUrl)
+    if (!remoteCheck.ok) return remoteCheck
+    if (!ALLOWED_PREFIXES.some(p => fileKey.startsWith(p))) return { ok: false, code: 'INVALID_KEY', message: `fileKey 不合规: ${fileKey}` }
+  }
+
   return { ok: true, data: { caseId: typeof caseId === 'string' ? caseId : null, fileUrl, fileKey, fileName, fileType: typeof fileType === 'string' ? fileType : 'image', fileSize: typeof fileSize === 'number' ? fileSize : null } }
 }
 
