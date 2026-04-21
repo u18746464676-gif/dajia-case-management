@@ -95,6 +95,12 @@
                 <span class="mt-1 block text-xs text-slate-500">OCR识别 → 信封分类</span>
               </span>
             </label>
+            <label for="input-envelope-batch" class="action-tile cursor-pointer">
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-800">🖼️ 批量上传信封</span>
+                <span class="mt-1 block text-xs text-slate-500">仅选图片，先预览再批量上传</span>
+              </span>
+            </label>
             <label for="input-document" class="action-tile cursor-pointer">
               <span class="min-w-0">
                 <span class="block text-sm font-semibold text-slate-800">📄 上传文书</span>
@@ -136,6 +142,7 @@
           <input ref="photoInputRef" type="file" accept="image/*,.heic,.heif" capture="environment" @change="handleScanUpload" class="hidden" />
           <input ref="albumInputRef" type="file" accept="image/*,.heic,.heif" multiple @change="handleAlbumUpload" class="hidden" />
           <input ref="envelopeInputRef" id="input-envelope" type="file" accept="image/*,.heic,.heif,.pdf" multiple @change="handleEnvelopeUpload" class="hidden" />
+          <input id="input-envelope-batch" type="file" accept="image/*,.heic,.heif" multiple @change="handleAlbumUpload" class="hidden" />
           <input ref="documentInputRef" id="input-document" type="file" accept="image/*,.heic,.heif,.pdf" multiple @change="handleDocumentUpload" class="hidden" />
           <input ref="wordInputRef" id="input-word" type="file" accept=".doc,.docx" multiple @change="handleWordUpload" class="hidden" />
           <input ref="fileInputRef" type="file" accept="image/*,.heic,.heif,.pdf,.doc,.docx,.txt" multiple @change="handleFileUpload" class="hidden" />
