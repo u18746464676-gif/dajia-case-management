@@ -593,8 +593,8 @@
           </div>
           <div>
             <label class="label">本地上传文件</label>
-            <input ref="docFileInputRef" type="file" accept="image/*,.pdf,.doc,.docx" class="input-field" @change="handleDocFileChange" />
-            <div class="mt-1 text-xs text-slate-500">{{ selectedDocFile ? `已选择：${selectedDocFile.name}` : '支持图片、信封图片、Word、PDF' }}</div>
+            <input ref="docFileInputRef" type="file" accept="image/*,.pdf,.doc,.docx" multiple class="input-field" @change="handleDocFileChange" />
+            <div class="mt-1 text-xs text-slate-500">{{ selectedDocFiles.length ? (selectedDocFiles.length === 1 ? `已选择：${selectedDocFiles[0].name}` : `已选择 ${selectedDocFiles.length} 个文件`) : '支持图片、信封图片、Word、PDF' }}</div>
           </div>
           <div>
             <label class="label">材料备注</label>
@@ -665,7 +665,7 @@ const previewFileName = ref('')
 
 const replyForm = ref({ date: dayjs().format('YYYY-MM-DD'), content: '' })
 const docFileInputRef = ref(null)
-const selectedDocFile = ref(null)
+const selectedDocFiles = ref([])
 const docUploading = ref(false)
 const docForm = ref({ name: '', url: '', type: 'other', category: 'other', note: '' })
 const compensationPresets = [100, 150, 200, 300, 500]
@@ -1146,50 +1146,69 @@ function inferDocTypeByName(name = '') {
 }
 
 function handleDocFileChange(event) {
-  const file = event.target.files?.[0] || null
-  selectedDocFile.value = file
-  if (!file) return
+  const files = Array.from(event.target.files || [])
+  selectedDocFiles.value = files
+  if (files.length === 0) return
 
-  if (!docForm.value.name.trim()) {
-    docForm.value.name = file.name || ''
+  if (files.length === 1 && !docForm.value.name.trim()) {
+    docForm.value.name = files[0].name || ''
   }
   if (!docForm.value.category) {
     docForm.value.category = 'other'
   }
-  docForm.value.type = inferDocTypeByName(docForm.value.name || file.name || '')
+  const sampleName = files.length === 1 ? (docForm.value.name || files[0].name || '') : (files[0].name || '')
+  docForm.value.type = inferDocTypeByName(sampleName)
 }
 
 async function submitDoc() {
-  if (!selectedDocFile.value) return
-
-  const file = selectedDocFile.value
-  if (!docForm.value.name.trim()) {
-    docForm.value.name = file.name || '未命名材料'
-  }
+  if (selectedDocFiles.value.length === 0) return
   if (!docForm.value.category) {
     docForm.value.category = 'other'
   }
 
-  const lowerName = docForm.value.name.toLowerCase()
-  const originalLower = (file.name || '').toLowerCase()
-  const isWord = /\.(doc|docx)$/i.test(originalLower)
-  const type = inferDocTypeByName(lowerName)
-
   docUploading.value = true
+  let successCount = 0
+  let failCount = 0
+
   try {
-    const dataUrl = await readFileAsDataUrl(file)
-    const uploadedUrl = isWord
-      ? await uploadWordToTos(dataUrl, file.name)
-      : await uploadBase64ToTos(dataUrl, file.name)
+    for (const file of selectedDocFiles.value) {
+      try {
+        const isSingleFile = selectedDocFiles.value.length === 1
+        const finalName = isSingleFile
+          ? (docForm.value.name.trim() || file.name || '未命名材料')
+          : (file.name || '未命名材料')
+        const lowerName = finalName.toLowerCase()
+        const originalLower = (file.name || '').toLowerCase()
+        const isWord = /\.(doc|docx)$/i.test(originalLower)
+        const type = inferDocTypeByName(lowerName)
+        const dataUrl = await readFileAsDataUrl(file)
+        const uploadedUrl = isWord
+          ? await uploadWordToTos(dataUrl, file.name)
+          : await uploadBase64ToTos(dataUrl, file.name)
 
-    if (!uploadedUrl) throw new Error('上传失败，请重试')
+        if (!uploadedUrl) throw new Error('上传失败，请重试')
 
-    await store.addDocument(c.value.id, { ...docForm.value, url: uploadedUrl, type })
-    docForm.value = { name: '', url: '', type: 'other', category: 'other', note: '' }
-    selectedDocFile.value = null
-    if (docFileInputRef.value) docFileInputRef.value.value = ''
-    showDocModal.value = false
-    loadCase()
+        await store.addDocument(c.value.id, {
+          ...docForm.value,
+          name: finalName,
+          url: uploadedUrl,
+          type,
+        })
+        successCount += 1
+      } catch (error) {
+        console.error('[submitDoc] 上传失败:', file?.name, error)
+        failCount += 1
+      }
+    }
+
+    alert(`上传完成：成功 ${successCount} 个，失败 ${failCount} 个`)
+    if (successCount > 0) {
+      docForm.value = { name: '', url: '', type: 'other', category: 'other', note: '' }
+      selectedDocFiles.value = []
+      if (docFileInputRef.value) docFileInputRef.value.value = ''
+      showDocModal.value = false
+      loadCase()
+    }
   } finally {
     docUploading.value = false
   }
