@@ -592,8 +592,9 @@
             </select>
           </div>
           <div>
-            <label class="label">文件链接（阿里云盘分享链接）</label>
-            <input v-model="docForm.url" type="text" class="input-field" placeholder="https://alipan.com/..." />
+            <label class="label">本地上传文件</label>
+            <input ref="docFileInputRef" type="file" accept="image/*,.pdf,.doc,.docx" class="input-field" @change="handleDocFileChange" />
+            <div class="mt-1 text-xs text-slate-500">{{ selectedDocFile ? `已选择：${selectedDocFile.name}` : '支持图片、信封图片、Word、PDF' }}</div>
           </div>
           <div>
             <label class="label">材料备注</label>
@@ -602,7 +603,7 @@
         </div>
         <div class="mt-6 flex flex-col-reverse gap-3 md:flex-row">
           <button @click="showDocModal = false" class="btn-secondary flex-1">取消</button>
-          <button @click="submitDoc" class="btn-primary flex-1">保存</button>
+          <button @click="submitDoc" :disabled="docUploading" class="btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed">{{ docUploading ? '上传中...' : '保存' }}</button>
         </div>
       </div>
     </div>
@@ -617,7 +618,14 @@
   <!-- 图片预览弹窗 -->
   <div v-if="showImagePreview" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" @click="showImagePreview = false">
     <button @click="showImagePreview = false" class="absolute top-4 right-4 text-white text-3xl hover:text-gray-300">×</button>
-    <img :src="previewImageUrl" class="max-w-[90vw] max-h-[90vh] object-contain" @click.stop />
+    <div v-if="previewImageUrl" class="flex items-center justify-center">
+      <img :src="previewImageUrl" class="max-w-[90vw] max-h-[90vh] object-contain" @click.stop />
+    </div>
+    <div v-else class="flex flex-col items-center justify-center gap-4 text-white text-center p-8">
+      <div class="text-7xl">{{ getFileIconByUrl(previewNonImageUrl) }}</div>
+      <div class="text-lg">当前格式不支持弹窗内预览</div>
+      <a :href="previewNonImageUrl" target="_blank" class="underline text-blue-300 hover:text-blue-200">点击新窗口打开 / 下载</a>
+    </div>
   </div>
 </template>
 
@@ -629,6 +637,8 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import DeadlinePanel from '@/components/DeadlinePanel.vue'
 import dayjs from 'dayjs'
 import { formatAmount } from '@/lib/case-status'
+import { uploadBase64ToTos, uploadWordToTos } from '@/lib/tos'
+import { readFileAsDataUrl } from '@/lib/document-processing'
 
 const route = useRoute()
 const router = useRouter()
@@ -641,8 +651,12 @@ const activeDetailTab = ref('info')
 const activeMaterialTab = ref('all')
 const showImagePreview = ref(false)
 const previewImageUrl = ref('')
+const previewNonImageUrl = ref('')
 
 const replyForm = ref({ date: dayjs().format('YYYY-MM-DD'), content: '' })
+const docFileInputRef = ref(null)
+const selectedDocFile = ref(null)
+const docUploading = ref(false)
 const docForm = ref({ name: '', url: '', type: 'other', category: 'other', note: '' })
 const compensationPresets = [100, 150, 200, 300, 500]
 const documentCategoryOptions = [
@@ -872,8 +886,20 @@ function deleteImage(idx) {
 }
 
 function previewImage(url) {
-  previewImageUrl.value = url
+  const isImage = /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(url)
+  previewImageUrl.value = isImage ? url : ''
+  previewNonImageUrl.value = isImage ? '' : url
   showImagePreview.value = true
+}
+
+function getFileIconByUrl(url) {
+  if (!url) return '📄'
+  const lower = url.toLowerCase()
+  if (lower.endsWith('.pdf')) return '📕'
+  if (lower.endsWith('.doc') || lower.endsWith('.docx')) return '📄'
+  if (lower.endsWith('.txt') || lower.endsWith('.md')) return '📝'
+  if (lower.endsWith('.xls') || lower.endsWith('.xlsx')) return '📊'
+  return '📎'
 }
 
 function statusLabel(s) {
@@ -1095,14 +1121,38 @@ function deleteReply(replyId) {
   loadCase()
 }
 
-function submitDoc() {
+function handleDocFileChange(event) {
+  selectedDocFile.value = event.target.files?.[0] || null
+}
+
+async function submitDoc() {
   if (!docForm.value.name.trim()) return
+  if (!selectedDocFile.value) return
+
+  const file = selectedDocFile.value
   const lowerName = docForm.value.name.toLowerCase()
-  const type = lowerName.endsWith('.pdf') ? 'pdf' : (lowerName.match(/\.(png|jpe?g|webp|gif)$/) ? 'image' : 'other')
-  store.addDocument(c.value.id, { ...docForm.value, type })
-  docForm.value = { name: '', url: '', type: 'other', category: 'other', note: '' }
-  showDocModal.value = false
-  loadCase()
+  const originalLower = (file.name || '').toLowerCase()
+  const isWord = /\.(doc|docx)$/i.test(originalLower)
+  const type = lowerName.endsWith('.pdf') ? 'pdf' : (lowerName.match(/\.(png|jpe?g|webp|gif|bmp|heic|heif)$/) ? 'image' : 'other')
+
+  docUploading.value = true
+  try {
+    const dataUrl = await readFileAsDataUrl(file)
+    const uploadedUrl = isWord
+      ? await uploadWordToTos(dataUrl, file.name)
+      : await uploadBase64ToTos(dataUrl, file.name)
+
+    if (!uploadedUrl) throw new Error('上传失败，请重试')
+
+    await store.addDocument(c.value.id, { ...docForm.value, url: uploadedUrl, type })
+    docForm.value = { name: '', url: '', type: 'other', category: 'other', note: '' }
+    selectedDocFile.value = null
+    if (docFileInputRef.value) docFileInputRef.value.value = ''
+    showDocModal.value = false
+    loadCase()
+  } finally {
+    docUploading.value = false
+  }
 }
 
 function deleteDoc(docId) {
