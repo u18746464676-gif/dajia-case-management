@@ -5,6 +5,8 @@ const { TosClient } = require('@volcengine/tos-sdk')
 const fs = require('fs')
 const path = require('path')
 
+const LOCAL_UPLOAD_ROOT = process.env.LOCAL_UPLOAD_ROOT || '/uploads'
+
 const app = express()
 const PORT = 3001
 
@@ -86,7 +88,7 @@ function validatePayload(body) {
 app.post('/api/storage/upload', async (req, res) => {
   const t0 = Date.now()
   try {
-    const { base64Data, fileName } = req.body
+    const { base64Data, fileName, fileKey } = req.body
     if (!base64Data) return res.status(400).json({ error: '缺少 base64Data', code: 'MISSING_BASE64' })
     if (!fileName) return res.status(400).json({ error: '缺少 fileName', code: 'MISSING_FILENAME' })
 
@@ -95,7 +97,8 @@ app.post('/api/storage/upload', async (req, res) => {
     const contentType = match[1]
     const buffer = Buffer.from(match[2], 'base64')
 
-    const key = `case-images/${Date.now()}_${fileName}`
+    // fileKey 可选：传了则直接用（Word 专用链路），不传则走默认 case-images/
+    const key = fileKey || `case-images/${Date.now()}_${fileName}`
     const client = getTosClient()
 
     await client.putObject({
@@ -138,6 +141,114 @@ app.post('/api/register-cloud-file', async (req, res) => {
 // ── 健康检查 ─────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, ts: Date.now(), mode: 'combined-storage' })
+})
+
+// ── GET /api/storage/files ────────────────────────────────
+app.get('/api/storage/files', async (req, res) => {
+  try {
+    const { prefix = '', limit = '200' } = req.query
+    const supabase = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    let query = supabase
+      .from('cloud_files')
+      .select('id,file_url,file_key,file_name,file_type,file_size,uploaded_at,deleted_at,case_id,ocr_title')
+      .is('deleted_at', null)
+      .order('uploaded_at', { ascending: false })
+      .limit(Math.min(Number(limit) || 200, 500))
+
+    if (prefix) {
+      query = query.like('file_key', `${prefix}%`)
+    }
+
+    const { data, error } = await query
+    if (error) {
+      console.error('[storage/files] db error:', error.message)
+      return res.status(500).json({ error: '列表获取失败', detail: error.message })
+    }
+
+    const files = (data || []).map(item => ({
+      id: item.id,
+      url: item.file_url,
+      key: item.file_key,
+      name: item.file_name,
+      fileType: item.file_type,
+      size: item.file_size,
+      uploadedAt: item.uploaded_at,
+      deletedAt: item.deleted_at,
+      caseId: item.case_id,
+      ocrTitle: item.ocr_title,
+    }))
+
+    return res.json({ files })
+  } catch (err) {
+    console.error('[storage/files] list error:', err?.message)
+    return res.status(500).json({ error: '列表获取失败', detail: err?.message })
+  }
+})
+
+// ── DELETE /api/storage/file ─────────────────────────────
+app.delete('/api/storage/file', async (req, res) => {
+  const { urlOrKey } = req.query
+  if (!urlOrKey) return res.status(400).json({ error: '缺少 urlOrKey 参数' })
+
+  let lookup = String(urlOrKey)
+  if (lookup.startsWith('http')) {
+    try {
+      const u = new URL(lookup)
+      lookup = u.pathname
+    } catch {
+      return res.status(400).json({ error: 'urlOrKey 格式错误' })
+    }
+  }
+
+  const normalizedPath = lookup.startsWith('/uploads/') ? lookup : `/${lookup.replace(/^\/+/, '')}`
+  if (!normalizedPath.startsWith('/uploads/')) {
+    return res.status(400).json({ error: '仅允许删除 /uploads/ 下文件' })
+  }
+
+  try {
+    const supabase = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    const { data: record, error: findError } = await supabase
+      .from('cloud_files')
+      .select('id,file_url,file_key,deleted_at')
+      .or(`file_url.eq.${normalizedPath},file_key.eq.${normalizedPath}`)
+      .is('deleted_at', null)
+      .order('uploaded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (findError) {
+      console.error('[storage/file] db find error:', findError.message)
+      return res.status(500).json({ error: '删除失败', detail: findError.message })
+    }
+    if (!record) {
+      return res.status(404).json({ error: '未找到对应文件记录' })
+    }
+
+    const localFilePath = path.resolve(LOCAL_UPLOAD_ROOT, normalizedPath.replace(/^\/uploads\//, ''))
+    let fileDeleted = false
+    if (fs.existsSync(localFilePath)) {
+      fs.unlinkSync(localFilePath)
+      fileDeleted = true
+    }
+
+    const deletedAt = new Date().toISOString()
+    const { data: updated, error: updateError } = await supabase
+      .from('cloud_files')
+      .update({ deleted_at: deletedAt })
+      .eq('id', record.id)
+      .select('id,file_url,file_key,deleted_at')
+      .single()
+
+    if (updateError) {
+      console.error('[storage/file] db update error:', updateError.message)
+      return res.status(500).json({ error: '删除失败', detail: updateError.message })
+    }
+
+    return res.json({ success: true, fileDeleted, localFilePath, data: updated })
+  } catch (err) {
+    console.error('[storage/file] delete error:', err?.message)
+    return res.status(500).json({ error: '删除失败', detail: err?.message })
+  }
 })
 
 // ── 临时管理接口：添加 ocr_title 列 ─────────────────────────
