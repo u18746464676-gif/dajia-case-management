@@ -293,17 +293,25 @@ export const useCaseStore = defineStore('case', () => {
     }
   }
 
+  // 终态综合状态：已调解最优先，其次举报结果，其次终止调解，最后受理状态
+  function getEffectiveStatus(c) {
+    if (c.mediationStatus === 'decided') return 'decided'
+    if (c.reportResultStatus) return c.reportResultStatus
+    if (c.mediationStatus) return c.mediationStatus
+    if (c.acceptanceStatus) return c.acceptanceStatus
+    return 'pending_report'
+  }
+
   const stats = computed(() => {
-    const list = cases.value
     return {
-      total: list.filter(c => !(c.status === 'decided' && Number(c.profit) > 0)).length,
-      pending: list.filter(c => c.status === 'pending_report').length,
-      reported: list.filter(c => c.status === 'reported').length,
-      accepted: list.filter(c => c.status === 'accepted').length,
-      decided: list.filter(c => c.status === 'decided').length,
-      closed: list.filter(c => c.status === 'closed').length,
-      rejected: list.filter(c => c.status === 'rejected').length,
-      notPunished: list.filter(c => c.status === 'not_punished').length,
+      total: cases.value.filter(c => getEffectiveStatus(c) !== 'decided').length,
+      pending: cases.value.filter(c => getEffectiveStatus(c) === 'pending_report').length,
+      reported: cases.value.filter(c => getEffectiveStatus(c) === 'reported').length,
+      accepted: cases.value.filter(c => getEffectiveStatus(c) === 'accepted').length,
+      decided: cases.value.filter(c => getEffectiveStatus(c) === 'decided').length,
+      closed: cases.value.filter(c => getEffectiveStatus(c) === 'closed').length,
+      rejected: cases.value.filter(c => getEffectiveStatus(c) === 'rejected').length,
+      notPunished: cases.value.filter(c => getEffectiveStatus(c) === 'not_punished').length,
     }
   })
 

@@ -1,11 +1,13 @@
 # CHANGE_GUARD.md - 主链路封板规则
 
-> 生效时间：2026-04-21
-> 目标：冻结当前已跑通主链路，后续新增功能不得破坏现有运转。
+> 生效时间：2026-04-21，第一阶段确立
+> 更新：2026-04-22，第二阶段新增（三段独立状态 + effectiveStatus 规范）
 
-## 一、冻结区（默认禁止改）
+---
 
-以下模块列为**冻结区**，默认禁止改动：
+## 第一阶段：冻结区（2026-04-21 确立）
+
+### 冻结区模块（默认禁止改）
 
 - 上传主链路
 - `/api/storage/upload`
@@ -18,11 +20,7 @@
 - 预览主分支逻辑
 - nginx 关键路由
 
----
-
-## 二、触碰冻结区的强制规则
-
-只要未来改动触碰冻结区，必须先提供以下 5 项，未经确认不得直接改：
+### 触碰冻结区的强制规则
 
 1. 改动范围
 2. 风险点
@@ -30,11 +28,7 @@
 4. 全链路回归清单
 5. 上线后验证项
 
----
-
-## 三、固定冒烟测试清单
-
-每次改动前后都必须验证以下项目：
+### 固定冒烟测试清单
 
 1. 上传信封
 2. 上传文书
@@ -45,11 +39,7 @@
 7. 云端批量删除
 8. 材料中心预览
 
----
-
-## 四、新功能开发原则
-
-以后新增功能必须遵守：
+### 新功能开发原则
 
 - 默认不侵入主链路
 - 优先新组件 / 新接口 / 新字段
@@ -57,9 +47,7 @@
 - 能加开关就加开关
 - 能旁路实现就不要侵入实现
 
----
-
-## 五、部署规则
+### 部署规则
 
 - 不允许同名 bundle 覆盖作为长期方案
 - 每次 build 生成新 bundle 文件名
@@ -69,66 +57,68 @@
 
 ---
 
-## 六、当前冻结基线（2026-04-21）
+## 第二阶段：三段独立状态联动规范（2026-04-22 新增）
 
-### 1. 上传主链路基线
+### 背景
 
-- 前端上传入口统一走：`/api/storage/upload`
-- nginx：`location /api/storage/` → `127.0.0.1:8787`
-- 本地文件落盘：`/var/www/case-management/uploads/...`
-- 上传后由 `/api/register-cloud-file` 写入 `cloud_files`
+详情页"变更状态"由原来的单一 `c.status` 字段，改为三个独立子状态字段：
+- `acceptanceStatus` — 受理状态（已受理 / 不予受理）
+- `mediationStatus` — 调解状态（已调解 / 终止调解）
+- `reportResultStatus` — 举报结果（已处罚 / 不予立案 / 责令改正 / 不予处罚）
 
-### 2. 云端文件管理基线
+### effectiveStatus 计算规则（统一，所有读取处必须遵循）
 
-- 列表数据源：`cloud_files` 数据库记录
-- 列表接口：`GET /api/storage/files` → `127.0.0.1:3001`
-- 删除接口：`DELETE /api/storage/file` → `127.0.0.1:3001`
-- 列表默认只显示：`deleted_at IS NULL`
-- 不再依赖 TOS 直列对象作为云端管理数据源
+优先级从高到低：
+1. `mediationStatus === 'decided'` → `"decided"`（已调解，最优先，忽略举报结果）
+2. `reportResultStatus` 有值（非 null/undefined）→ 显示对应胶囊
+3. `mediationStatus` 有值（非 null/undefined，非 decided）→ `"mediation_terminated"`（终止调解）
+4. `acceptanceStatus` 有值 → 显示"已受理"或"不予受理"
+5. 所有子状态为空 → `"pending_report"`（强制返回"未受理"，不 fallback 到 c.status）
 
-### 3. 关键 nginx 路由基线
+### 涉及文件及规范
 
-```nginx
-location = /api/storage/files {
-    proxy_pass http://127.0.0.1:3001;
-}
+| 文件 | 规范 |
+|------|------|
+| `CaseDetail.vue` | 读取 `caseData`（store.getCase）触发响应式，直接用 caseData.value 计算 |
+| `CaseList.vue` | 列表 StatusBadge / 筛选过滤均用 `getEffectiveStatus(caseItem)` |
+| `case.js`（store stats） | stats 统计用 `getEffectiveStatus(c)` 计算 |
+| `AIChat.vue` | AI 统计摘要用 `getEffectiveStatus(c)` 计算 |
+| `DeadlinePanel.vue` | 法定时限倒计时联动，用 acceptanceStatus / mediationStatus / reportResultStatus 分支判断 |
+| `DeadlineAlert.vue` | 逾期铃铛，用 acceptanceStatus 判断是否显示受理超期 |
+| `notification.js`（铃铛提醒） | 与 DeadlinePanel 联动逻辑保持一致 |
+| `case-status.js` | StatusBadge 样式表须包含所有状态：exempted / mediation_terminated |
 
-location = /api/storage/file {
-    proxy_pass http://127.0.0.1:3001;
-}
+### effectiveStatus 的 Vue 响应式说明
 
-location /api/storage/ {
-    proxy_pass http://127.0.0.1:8787;
-}
-```
+- `CaseDetail.vue` 中的 `effectiveStatus` 直接读取 `caseData.value`（computed），不读 `c.value` 的缓存
+- 这样在 `changeAcceptanceStatus` 等函数通过 `store.updateCase` 修改数据后，响应式会自动更新
+- 不需要额外 `loadCase()` 或手动刷新
 
----
+### 禁止事项
 
-## 七、当前回滚点清单
+- ❌ 禁止用 `c.status` 作为 StatusBadge 的值（所有 StatusBadge 必须用 effectiveStatus）
+- ❌ 禁止在所有子状态为空时 fallback 到 `c.status`
+- ❌ 禁止在 `mediationStatus === 'decided'` 时还被举报结果覆盖
 
-### 源码回滚点
+### 变更状态函数规范
 
-- Git commit: `4ea7c0b`
-  - 含义：云端文件列表统一到 DB 数据源，移除 TOS 直列兜底
-
-### 前端静态资源回滚点
-
-- 当前线上 JS：`index-3kbFiamx.js`
-- 当前线上 CSS：`index-_zZAD9Z_.css`
-- 上一可回滚 JS：`index-CP0fHGGy.js`
-
-### nginx 回滚点
-
-- 当前配置：`/etc/nginx/conf.d/case-management-ssl.conf`
-- 备份文件：
-  - `/etc/nginx/conf.d/case-management-ssl.conf.bak`
-  - `/etc/nginx/conf.d/case-management-ssl.conf.bak-20260421-*`
+- `changeAcceptanceStatus(newStatus)` — 切换 acceptanceStatus，点击已选中的选项则清除（置 null）
+- `changeMediationStatus(newStatus)` — 切换 mediationStatus，点击已选中则清除
+- `changeReportResultStatus(newStatus)` — 切换 reportResultStatus，点击已选中则清除
+- 不允许用旧的 `changeStatus()` 一次性修改 `c.status` 字段来"变更状态"
 
 ---
 
-## 八、执行要求
+## 回滚点清单
 
-以后所有需求默认按以下顺序处理：
+| 类型 | 标识 | 说明 |
+|------|------|------|
+| Git 回滚点 | `53ef8e8` | feat: add batch envelope image picker entry（三段联动前） |
+| 当前稳定 bundle | `index-DPLhptBW.js` | 2026-04-22 00:44，三段联动 |
+| 上一稳定 bundle | `index-BC0ZOJVL.js` | 多选上传稳定版 |
+| nginx 备份 | `/etc/nginx/conf.d/case-management-ssl.conf.bak` | 始终保留 |
+
+## 执行要求
 
 1. 先判断是否触碰冻结区
 2. 若触碰，先提交变更说明与回滚方案
@@ -136,4 +126,4 @@ location /api/storage/ {
 4. 必须跑固定冒烟清单
 5. 验证通过后才允许继续扩展功能
 
-未经明确确认，不允许再随意改主链路。
+**三段独立状态相关改动，先确认 effectiveStatus 计算规则不被破坏。**

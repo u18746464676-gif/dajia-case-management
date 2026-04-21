@@ -9,13 +9,13 @@
       <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div class="space-y-4">
           <div>
-            <div class="text-xs uppercase tracking-[0.24em] text-slate-400">案件卷宗</div>
-            <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ primaryTitle }}</h2>
-            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{{ secondaryTitle }}</p>
+            <div class="text-xs uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">案件卷宗</div>
+            <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{{ primaryTitle }}</h2>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ secondaryTitle }}</p>
           </div>
 
           <div class="flex flex-wrap gap-2">
-            <StatusBadge :status="c.status" :profit="c.profit" />
+            <StatusBadge :status="effectiveStatus" :profit="c.profit" />
             <span class="soft-tag">编号 {{ c.caseNumber || '待生成' }}</span>
             <span class="soft-tag">管辖局 {{ c.jurisdiction || '未填写' }}</span>
             <span class="soft-tag">快递单号 {{ c.trackingNumber || '暂无' }}</span>
@@ -24,28 +24,28 @@
 
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="metric-card">
-              <div class="text-xs text-slate-500">当前状态</div>
-              <div class="mt-2"><StatusBadge :status="c.status" :profit="c.profit" /></div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前状态</div>
+              <div class="mt-2"><StatusBadge :status="effectiveStatus" :profit="c.profit" /></div>
             </div>
             <div class="metric-card">
-              <div class="text-xs text-slate-500">商品价格</div>
-              <div class="mt-2 text-2xl font-semibold text-slate-800">¥{{ formatCurrency(c.productPrice) }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">商品价格</div>
+              <div class="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">¥{{ formatCurrency(c.productPrice) }}</div>
             </div>
             <div class="metric-card">
-              <div class="text-xs text-slate-500">花费总额</div>
-              <div class="mt-2 text-2xl font-semibold text-slate-800">¥{{ formatCurrency(c.expense) }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">花费总额</div>
+              <div class="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">¥{{ formatCurrency(c.expense) }}</div>
             </div>
             <div class="metric-card">
-              <div class="text-xs text-slate-500">赔偿金额</div>
-              <div class="mt-2 text-2xl font-semibold text-slate-800">¥{{ formatCurrency(c.profit) }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">赔偿金额</div>
+              <div class="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">¥{{ formatCurrency(c.profit) }}</div>
             </div>
           </div>
         </div>
 
         <div class="w-full xl:max-w-sm">
-          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-            <div class="text-sm font-semibold text-slate-800">处置操作</div>
-            <p class="mt-1 text-xs leading-5 text-slate-500">围绕状态流转、答复补录与材料补充集中操作，基础字段在下方卷宗中直接维护。</p>
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4 shadow-sm">
+            <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">处置操作</div>
+            <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">围绕状态流转、答复补录与材料补充集中操作，基础字段在下方卷宗中直接维护。</p>
 
             <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
               <button @click="showStatusModal = true" class="btn-primary w-full">变更状态</button>
@@ -56,7 +56,7 @@
               <button @click="confirmDelete" class="btn-danger w-full">删除案件</button>
             </div>
 
-            <div class="mt-4 border-t border-slate-200 pt-3 text-xs leading-5 text-slate-400">
+            <div class="mt-4 border-t border-slate-200 dark:border-slate-700 pt-3 text-xs leading-5 text-slate-400 dark:text-slate-500">
               创建于 {{ formatDate(c.createdAt) }}<br />
               更新于 {{ formatDate(c.updatedAt) }}
             </div>
@@ -73,7 +73,7 @@
           type="button"
           @click="activeDetailTab = tab.value"
           class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition"
-          :class="activeDetailTab === tab.value ? 'bg-slate-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+          :class="activeDetailTab === tab.value ? 'bg-slate-700 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:bg-slate-700'"
         >
           {{ tab.label }}
         </button>
@@ -91,7 +91,7 @@
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label class="label">案件编号</label>
-              <input :value="c.caseNumber || '待生成'" type="text" class="input-field bg-slate-50 text-slate-500" readonly />
+              <input :value="c.caseNumber || '待生成'" type="text" class="input-field bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 dark:text-slate-500" readonly />
             </div>
             <div>
               <label class="label">📋 执照名称</label>
@@ -139,12 +139,12 @@
 
             <div class="space-y-3">
               <div class="panel-card">
-                <div class="text-xs text-slate-500">当前状态</div>
-                <div class="mt-2"><StatusBadge :status="c.status" :profit="c.profit" /></div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前状态</div>
+                <div class="mt-2"><StatusBadge :status="effectiveStatus" :profit="c.profit" /></div>
               </div>
 
               <div class="panel-card">
-                <div class="text-xs text-slate-500">受理跟进</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">受理跟进</div>
                 <div class="mt-3 grid grid-cols-1 gap-3">
                   <div>
                     <label class="label">✅ 受理日期</label>
@@ -166,13 +166,13 @@
           <section class="card">
             <h3 class="section-title">填写提醒</h3>
             <div class="space-y-2 text-sm leading-6">
-              <div :class="c.jurisdiction ? 'text-slate-700' : 'text-slate-500'">
+              <div :class="c.jurisdiction ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 dark:text-slate-500'">
                 {{ c.jurisdiction ? '已填写管辖局，后续生成材料会更顺。' : '建议优先补齐管辖局，后续流程会更稳。' }}
               </div>
-              <div :class="c.trackingNumber ? 'text-slate-700' : 'text-slate-500'">
+              <div :class="c.trackingNumber ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 dark:text-slate-500'">
                 {{ c.trackingNumber ? '快递单号已补齐，方便后续核验签收。' : '快递单号还空着，后续查签收会少一个抓手。' }}
               </div>
-              <div :class="c.notes ? 'text-slate-700' : 'text-slate-500'">
+              <div :class="c.notes ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 dark:text-slate-500'">
                 {{ c.notes ? '备注已记录，复盘时更容易回看细节。' : '有特殊情况时，建议顺手写在备注里。' }}
               </div>
             </div>
@@ -206,7 +206,7 @@
                     type="button"
                     @click="selectCompensation(amount)"
                     class="rounded-full border px-3 py-1.5 text-sm transition"
-                    :class="Number(c.profit || 0) === amount ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-700'"
+                    :class="Number(c.profit || 0) === amount ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-slate-400 hover:text-slate-700 dark:text-slate-200'"
                   >
                     {{ amount }}
                   </button>
@@ -269,7 +269,7 @@
               </div>
             </template>
 
-            <div v-else class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
+            <div v-else class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 px-4 py-6 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
               未申请复议时，无需填写后续字段。
             </div>
           </div>
@@ -285,7 +285,7 @@
           <div class="mb-4 flex items-center justify-between gap-3">
             <div>
               <h3 class="section-title mb-1">流程时间轴</h3>
-              <p class="text-sm text-slate-500">把建档、寄件、签收、受理、答复、结果、复议串成一条卷宗主线。</p>
+              <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">把建档、寄件、签收、受理、答复、结果、复议串成一条卷宗主线。</p>
             </div>
             <span class="soft-tag">已完成 {{ timelineSummary.doneCount }}/{{ timelineSummary.total }}</span>
           </div>
@@ -296,10 +296,10 @@
               :key="item.key"
               class="flex gap-4 rounded-2xl border p-4"
               :class="item.state === 'done'
-                ? 'border-slate-200 bg-white'
+                ? 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
                 : item.state === 'current'
                   ? 'border-blue-200 bg-blue-50/70'
-                  : 'border-dashed border-slate-200 bg-slate-50/70'"
+                  : 'border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70'"
             >
               <div class="flex flex-col items-center">
                 <div
@@ -308,19 +308,19 @@
                     ? 'bg-slate-800 text-white'
                     : item.state === 'current'
                       ? 'bg-blue-600 text-white'
-                      : 'bg-slate-200 text-slate-500'"
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 dark:text-slate-500'"
                 >
                   {{ item.state === 'done' ? '✓' : item.state === 'current' ? '•' : '…' }}
                 </div>
-                <div v-if="item.key !== timelineItems[timelineItems.length - 1]?.key" class="mt-2 h-full w-px bg-slate-200"></div>
+                <div v-if="item.key !== timelineItems[timelineItems.length - 1]?.key" class="mt-2 h-full w-px bg-slate-200 dark:bg-slate-700"></div>
               </div>
 
               <div class="min-w-0 flex-1">
                 <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div class="text-sm font-semibold text-slate-800">{{ item.title }}</div>
-                  <div class="text-sm" :class="item.date ? 'text-slate-700' : 'text-slate-400'">{{ formatTimelineDate(item.date) }}</div>
+                  <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ item.title }}</div>
+                  <div class="text-sm" :class="item.date ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'">{{ formatTimelineDate(item.date) }}</div>
                 </div>
-                <div class="mt-2 text-sm leading-6 text-slate-500">{{ item.description }}</div>
+                <div class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ item.description }}</div>
               </div>
             </div>
           </div>
@@ -331,47 +331,16 @@
             <h3 class="section-title">流程摘要</h3>
             <div class="space-y-3">
               <div class="panel-card">
-                <div class="text-xs text-slate-500">当前推进到</div>
-                <div class="mt-2 text-lg font-semibold text-slate-800">{{ timelineSummary.currentTitle }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前推进到</div>
+                <div class="mt-2 text-lg font-semibold text-slate-800 dark:text-slate-100">{{ timelineSummary.currentTitle }}</div>
               </div>
               <div class="panel-card">
-                <div class="text-xs text-slate-500">下一步建议补齐</div>
-                <div class="mt-2 text-sm leading-6 text-slate-600">{{ timelineSummary.pendingText }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">下一步建议补齐</div>
+                <div class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ timelineSummary.pendingText }}</div>
               </div>
               <div class="panel-card">
-                <div class="text-xs text-slate-500">当前状态</div>
-                <div class="mt-2"><StatusBadge :status="c.status" :profit="c.profit" /></div>
-              </div>
-            </div>
-          </section>
-
-          <section class="card">
-            <div class="flex items-center justify-between gap-3 mb-4">
-              <h3 class="section-title mb-0">
-                <span>📊</span>
-                <span>状态流转记录</span>
-              </h3>
-              <span class="soft-tag">共 {{ c.statusHistory?.length || 0 }} 条</span>
-            </div>
-            <div v-if="!c.statusHistory?.length" class="text-sm text-slate-400">暂无状态记录</div>
-            <div v-else class="space-y-3">
-              <div
-                v-for="(h, idx) in c.statusHistory"
-                :key="h.changedAt + idx"
-                class="rounded-2xl border p-4"
-                :class="idx === 0 ? 'border-blue-200 bg-blue-50/70' : 'border-slate-200 bg-slate-50/80'"
-              >
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div class="text-xs text-slate-400">{{ formatDate(h.changedAt) }}</div>
-                    <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                      <span class="soft-tag">{{ statusLabel(h.from) || '初始' }}</span>
-                      <span class="text-slate-400">→</span>
-                      <span class="soft-tag">{{ statusLabel(h.to) }}</span>
-                    </div>
-                  </div>
-                  <button v-if="idx > 0" @click="undoStatus(idx)" class="btn-secondary">撤销此步</button>
-                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前状态</div>
+                <div class="mt-2"><StatusBadge :status="effectiveStatus" :profit="c.profit" /></div>
               </div>
             </div>
           </section>
@@ -384,15 +353,15 @@
               </h3>
               <button @click="showReplyModal = true" class="btn-secondary">新增答复</button>
             </div>
-            <div v-if="!(c.replies || []).length" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-400">
+            <div v-if="!(c.replies || []).length" class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 px-4 py-8 text-center text-sm text-slate-400 dark:text-slate-500">
               还没有答复记录
             </div>
             <div v-else class="space-y-3">
-              <div v-for="reply in c.replies" :key="reply.id" class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <div v-for="reply in c.replies" :key="reply.id" class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/80 dark:bg-slate-900/80 p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div>
-                    <div class="text-sm font-semibold text-slate-800">{{ reply.date || '未填写日期' }}</div>
-                    <div class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{{ reply.content }}</div>
+                    <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ reply.date || '未填写日期' }}</div>
+                    <div class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{{ reply.content }}</div>
                   </div>
                   <button @click="deleteReply(reply.id)" class="btn-ghost text-rose-500 hover:bg-rose-50 hover:text-rose-600">删除</button>
                 </div>
@@ -411,7 +380,7 @@
               <span>📁</span>
               <span>材料中心</span>
             </h3>
-            <p class="text-sm text-slate-500">把信封图片、官方答复、处罚决定、复议材料分开管理，卷宗会更清晰。</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">把信封图片、官方答复、处罚决定、复议材料分开管理，卷宗会更清晰。</p>
           </div>
           <div class="flex flex-wrap gap-2">
             <button @click="showDocModal = true" class="btn-primary">新增文书</button>
@@ -420,20 +389,20 @@
 
         <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div class="metric-card">
-            <div class="text-xs text-slate-500">材料总数</div>
-            <div class="mt-2 text-2xl font-semibold text-slate-800">{{ materialSummary.total }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">材料总数</div>
+            <div class="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{{ materialSummary.total }}</div>
           </div>
           <div class="metric-card">
-            <div class="text-xs text-slate-500">信封图片</div>
-            <div class="mt-2 text-2xl font-semibold text-slate-800">{{ materialSummary.images }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">信封图片</div>
+            <div class="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{{ materialSummary.images }}</div>
           </div>
           <div class="metric-card">
-            <div class="text-xs text-slate-500">文书材料</div>
-            <div class="mt-2 text-2xl font-semibold text-slate-800">{{ materialSummary.documents }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">文书材料</div>
+            <div class="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{{ materialSummary.documents }}</div>
           </div>
           <div class="metric-card">
-            <div class="text-xs text-slate-500">最近更新</div>
-            <div class="mt-2 text-sm font-semibold text-slate-800">{{ materialSummary.latestAt ? formatDate(materialSummary.latestAt) : '暂未上传' }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">最近更新</div>
+            <div class="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-100">{{ materialSummary.latestAt ? formatDate(materialSummary.latestAt) : '暂未上传' }}</div>
           </div>
         </div>
 
@@ -443,14 +412,14 @@
             :key="tab.value"
             @click="activeMaterialTab = tab.value"
             class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition"
-            :class="activeMaterialTab === tab.value ? 'bg-slate-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+            :class="activeMaterialTab === tab.value ? 'bg-slate-700 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:bg-slate-700'"
           >
             {{ tab.label }} ({{ tab.count }})
           </button>
         </div>
 
         <div v-if="activeMaterialTab === 'all'" class="mt-4">
-          <div v-if="materialItems.length === 0" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-10 text-center text-slate-400">
+          <div v-if="materialItems.length === 0" class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 px-4 py-10 text-center text-slate-400 dark:text-slate-500">
             暂无案件材料
           </div>
           <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -458,17 +427,17 @@
               v-for="(item, idx) in materialItems"
               :key="item.id || idx"
               class="rounded-2xl border p-4"
-              :class="item.type === 'image' ? 'border-purple-200 bg-purple-50/60' : 'border-slate-200 bg-slate-50/80'"
+              :class="item.type === 'image' ? 'border-purple-200 bg-purple-50/60' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/80 dark:bg-slate-900/80'"
             >
               <div class="flex items-start gap-3">
                 <span class="text-2xl">{{ getMaterialIcon(item.type, item.category) }}</span>
                 <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-semibold text-slate-800">{{ item.name }}</div>
-                  <div class="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
+                  <div class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{{ item.name }}</div>
+                  <div class="mt-1 flex flex-wrap gap-2 text-xs text-slate-400 dark:text-slate-500">
                     <span>{{ item.date ? formatDate(item.date) : '未记录时间' }}</span>
                     <span v-if="item.type === 'document'" class="soft-tag">{{ getDocumentCategoryLabel(item.category) }}</span>
                   </div>
-                  <div v-if="item.note" class="mt-2 text-xs leading-5 text-slate-500">{{ item.note }}</div>
+                  <div v-if="item.note" class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ item.note }}</div>
                   <a v-if="item.url && item.type === 'document'" :href="item.url" target="_blank" rel="noreferrer" class="mt-2 inline-flex text-sm text-blue-600 hover:text-blue-700">打开链接</a>
                 </div>
                 <button @click="deleteMaterial(item)" class="btn-ghost text-rose-500 hover:bg-rose-50 hover:text-rose-600">删除</button>
@@ -478,19 +447,19 @@
         </div>
 
         <div v-if="activeMaterialTab === 'images'" class="mt-4">
-          <div v-if="caseImages.length === 0" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-10 text-center text-slate-400">
+          <div v-if="caseImages.length === 0" class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 px-4 py-10 text-center text-slate-400 dark:text-slate-500">
             暂无上传图片
           </div>
           <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            <div v-for="(img, idx) in caseImages" :key="idx" class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div class="bg-slate-50 p-3">
-                <img :src="img.url" class="h-40 w-full rounded-xl object-contain bg-white cursor-pointer hover:opacity-90" @click="previewImage(img.url)" />
+            <div v-for="(img, idx) in caseImages" :key="idx" class="group overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+              <div class="bg-slate-50 dark:bg-slate-900 p-3">
+                <img :src="img.url" class="h-40 w-full rounded-xl object-contain bg-white dark:bg-slate-900 cursor-pointer hover:opacity-90" @click="previewImage(img.url)" />
               </div>
               <div class="space-y-2 px-4 py-3">
                 <div class="min-w-0">
-                  <div class="truncate text-sm font-medium text-slate-700">{{ img.name || '信封图片' }}</div>
-                  <div class="text-xs text-slate-400">{{ img.uploadedAt ? formatDate(img.uploadedAt) : (img.date || '未记录时间') }}</div>
-                  <div v-if="img.trackingNumber" class="mt-1 text-xs text-slate-500">快递单号 {{ img.trackingNumber }}</div>
+                  <div class="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{{ img.name || '信封图片' }}</div>
+                  <div class="text-xs text-slate-400 dark:text-slate-500">{{ img.uploadedAt ? formatDate(img.uploadedAt) : (img.date || '未记录时间') }}</div>
+                  <div v-if="img.trackingNumber" class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">快递单号 {{ img.trackingNumber }}</div>
                 </div>
                 <div class="flex items-center justify-between gap-3">
                   <button @click="previewImage(img.url)" class="text-sm text-blue-600 hover:text-blue-700">预览</button>
@@ -502,13 +471,13 @@
         </div>
 
         <div v-if="activeMaterialTab === 'documents'" class="mt-4">
-          <div v-if="!caseDocuments.length" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-10 text-center text-slate-400">
+          <div v-if="!caseDocuments.length" class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 px-4 py-10 text-center text-slate-400 dark:text-slate-500">
             暂无上传文书
           </div>
           <div v-else class="space-y-4">
-            <section v-for="group in documentGroups" :key="group.value" class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <section v-for="group in documentGroups" :key="group.value" class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 p-4">
               <div class="mb-3 flex items-center justify-between gap-3">
-                <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <div class="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
                   <span>{{ group.icon }}</span>
                   <span>{{ group.label }}</span>
                 </div>
@@ -518,14 +487,14 @@
                 <div
                   v-for="d in group.items"
                   :key="d.id"
-                  class="rounded-2xl border border-slate-200 bg-white p-4"
+                  class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4"
                 >
                   <div class="flex items-start gap-3">
                     <span class="text-2xl">{{ getMaterialIcon('document', d.category || 'other') }}</span>
                     <div class="min-w-0 flex-1">
-                      <div class="truncate text-sm font-semibold text-slate-800">{{ d.name }}</div>
-                      <div class="mt-1 text-xs text-slate-400">{{ formatDate(d.uploadedAt) }}</div>
-                      <div v-if="d.note" class="mt-2 text-sm leading-6 text-slate-500">{{ d.note }}</div>
+                      <div class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{{ d.name }}</div>
+                      <div class="mt-1 text-xs text-slate-400 dark:text-slate-500">{{ formatDate(d.uploadedAt) }}</div>
+                      <div v-if="d.note" class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ d.note }}</div>
                       <button v-if="d.url" @click="previewFile(d.url, d.name)" class="mt-2 inline-flex text-sm text-blue-600 hover:text-blue-700">预览文件</button>
                     </div>
                     <button @click="deleteDoc(d.id)" class="btn-ghost text-rose-500 hover:bg-rose-50 hover:text-rose-600">删除</button>
@@ -540,26 +509,62 @@
 
 
     <div v-if="showStatusModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showStatusModal = false">
-      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <h3 class="text-lg font-bold text-slate-800">变更案件状态</h3>
-        <div class="mt-4 space-y-2">
-          <button
-            v-for="s in statusOptions"
-            :key="s.value"
-            @click="changeStatus(s.value)"
-            class="flex w-full items-center gap-2 rounded-xl px-4 py-3 text-left transition hover:bg-slate-100"
-          >
-            <span>{{ s.icon }}</span>
-            <span>{{ s.label }}</span>
-          </button>
+      <div class="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
+        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">变更案件状态</h3>
+        <div class="mt-4 space-y-4">
+          <!-- 受理状态 -->
+          <div>
+            <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">① 受理状态</div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="s in acceptanceOptions"
+                :key="s.value"
+                @click="changeAcceptanceStatus(s.value)"
+                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
+                :class="c.acceptanceStatus === s.value ? 'border-blue-400 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
+              >
+                <span>{{ s.icon }}</span><span>{{ s.label }}</span>
+              </button>
+            </div>
+          </div>
+          <!-- 投诉跟进 -->
+          <div>
+            <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">② 投诉跟进</div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="s in mediationOptions"
+                :key="s.value"
+                @click="changeMediationStatus(s.value)"
+                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
+                :class="c.mediationStatus === s.value ? 'border-purple-400 bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
+              >
+                <span>{{ s.icon }}</span><span>{{ s.label }}</span>
+              </button>
+            </div>
+          </div>
+          <!-- 举报结果 -->
+          <div>
+            <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">③ 举报结果</div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="s in reportResultOptions"
+                :key="s.value"
+                @click="changeReportResultStatus(s.value)"
+                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
+                :class="c.reportResultStatus === s.value ? 'border-green-400 bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
+              >
+                <span>{{ s.icon }}</span><span>{{ s.label }}</span>
+              </button>
+            </div>
+          </div>
         </div>
         <button @click="showStatusModal = false" class="btn-secondary mt-4 w-full">取消</button>
       </div>
     </div>
 
     <div v-if="showReplyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showReplyModal = false">
-      <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-        <h3 class="text-lg font-bold text-slate-800">添加答复记录</h3>
+      <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
+        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">添加答复记录</h3>
         <div class="mt-4 space-y-4">
           <div>
             <label class="label">日期</label>
@@ -578,8 +583,8 @@
     </div>
 
     <div v-if="showDocModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showDocModal = false">
-      <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-        <h3 class="text-lg font-bold text-slate-800">新增文书材料</h3>
+      <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
+        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">新增文书材料</h3>
         <div class="mt-4 space-y-4">
           <div>
             <label class="label">文件名</label>
@@ -594,7 +599,7 @@
           <div>
             <label class="label">本地上传文件</label>
             <input ref="docFileInputRef" type="file" accept="image/*,.pdf,.doc,.docx" multiple class="input-field" @change="handleDocFileChange" />
-            <div class="mt-1 text-xs text-slate-500">{{ selectedDocFiles.length ? (selectedDocFiles.length === 1 ? `已选择：${selectedDocFiles[0].name}` : `已选择 ${selectedDocFiles.length} 个文件`) : '支持图片、信封图片、Word、PDF' }}</div>
+            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ selectedDocFiles.length ? (selectedDocFiles.length === 1 ? `已选择：${selectedDocFiles[0].name}` : `已选择 ${selectedDocFiles.length} 个文件`) : '支持图片、信封图片、Word、PDF' }}</div>
           </div>
           <div>
             <label class="label">材料备注</label>
@@ -609,9 +614,9 @@
     </div>
   </div>
 
-  <div v-else class="rounded-2xl border border-slate-100 bg-white py-32 text-center shadow-sm">
+  <div v-else class="rounded-2xl border border-slate-100 bg-white dark:bg-slate-900 py-32 text-center shadow-sm">
     <span class="text-8xl">🔍</span>
-    <p class="mt-4 mb-6 text-xl text-slate-400">案件不存在</p>
+    <p class="mt-4 mb-6 text-xl text-slate-400 dark:text-slate-500">案件不存在</p>
     <router-link to="/" class="btn-primary inline-flex items-center gap-2">返回列表</router-link>
   </div>
 
@@ -621,12 +626,12 @@
     <div v-if="previewImageUrl" class="flex items-center justify-center">
       <img :src="previewImageUrl" class="max-w-[90vw] max-h-[90vh] object-contain" @click.stop />
     </div>
-    <div v-else-if="previewPdfUrl" class="h-[88vh] w-[92vw] max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl" @click.stop>
-      <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm text-slate-600">
+    <div v-else-if="previewPdfUrl" class="h-[88vh] w-[92vw] max-w-6xl overflow-hidden rounded-2xl bg-white dark:bg-slate-900 shadow-2xl" @click.stop>
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
         <span class="truncate">{{ previewFileName || 'PDF 预览' }}</span>
         <a :href="previewPdfUrl" target="_blank" class="text-blue-600 hover:text-blue-700">新窗口打开</a>
       </div>
-      <iframe :src="previewPdfUrl" class="h-[calc(88vh-56px)] w-full bg-white"></iframe>
+      <iframe :src="previewPdfUrl" class="h-[calc(88vh-56px)] w-full bg-white dark:bg-slate-900"></iframe>
     </div>
     <div v-else class="flex flex-col items-center justify-center gap-4 p-8 text-center text-white" @click.stop>
       <div class="text-7xl">{{ getFileIconByUrl(previewNonImageUrl) }}</div>
@@ -702,6 +707,17 @@ const secondaryTitle = computed(() => {
   return pieces.length > 0 ? pieces.join(' · ') : '补充商品、店铺、材料后可形成完整案件档案'
 })
 
+// 终态综合状态：已调解最优先，其次举报结果，其次终止调解，最后受理状态
+// 如果所有子状态字段都为空，则直接视为"未受理"，不受原 c.status 影响
+const effectiveStatus = computed(() => {
+  const cv = caseData.value
+  if (!cv) return 'pending_report'
+  if (cv.mediationStatus === 'decided') return 'decided'
+  if (cv.reportResultStatus) return cv.reportResultStatus
+  if (cv.mediationStatus) return cv.mediationStatus
+  if (cv.acceptanceStatus) return cv.acceptanceStatus
+  return 'pending_report'
+})
 const statusOptions = [
   { value: 'pending_report', label: '未受理', icon: '⏳' },
   { value: 'accepted', label: '已受理', icon: '✅' },
@@ -710,6 +726,25 @@ const statusOptions = [
   { value: 'closed', label: '已处罚', icon: '⚖️' },
   { value: 'rejected', label: '不予立案', icon: '❌' },
   { value: 'not_punished', label: '责令改正', icon: '🚫' },
+  { value: 'exempted', label: '不予处罚', icon: '🚫' },
+  { value: 'mediation_terminated', label: '终止调解', icon: '✖️' },
+]
+
+const acceptanceOptions = [
+  { value: 'accepted', label: '已受理', icon: '✅' },
+  { value: 'reported', label: '不予受理', icon: '📝' },
+]
+
+const mediationOptions = [
+  { value: 'decided', label: '已调解', icon: '🤝' },
+  { value: 'mediation_terminated', label: '终止调解', icon: '✖️' },
+]
+
+const reportResultOptions = [
+  { value: 'closed', label: '已处罚', icon: '⚖️' },
+  { value: 'rejected', label: '不予立案', icon: '❌' },
+  { value: 'not_punished', label: '责令改正', icon: '🚫' },
+  { value: 'exempted', label: '不予处罚', icon: '🚫' },
 ]
 
 const statusLabels = {
@@ -720,6 +755,8 @@ const statusLabels = {
   closed: '已处罚',
   rejected: '不予立案',
   not_punished: '责令改正',
+  exempted: '不予处罚',
+  mediation_terminated: '终止调解',
 }
 
 const timelineItems = computed(() => {
@@ -759,20 +796,37 @@ const timelineItems = computed(() => {
     {
       key: 'acceptance',
       title: '受理跟进',
-      date: c.value.acceptanceDate || getStatusChangedAt('accepted', 'reported'),
-      description: c.value.acceptanceWay ? `受理方式：${c.value.acceptanceWay}` : `当前状态：${currentStatusLabel}`,
+      date: c.value.acceptanceDate || (c.value.acceptanceStatus ? new Date().toISOString().split('T')[0] : ''),
+      description: c.value.acceptanceStatus
+        ? statusLabel(c.value.acceptanceStatus)
+        : (c.value.acceptanceWay ? `受理方式：${c.value.acceptanceWay}` : '等待受理状态变更'),
     },
     {
-      key: 'reply',
-      title: '官方答复',
-      date: latestReply?.date || '',
-      description: latestReply?.content ? latestReply.content.slice(0, 32) : '收到答复后可沉淀流程依据',
+      key: 'mediation',
+      title: '投诉跟进',
+      date: c.value.mediationStatus ? (c.value.mediationDate || new Date().toISOString().split('T')[0]) : '',
+      description: c.value.mediationStatus
+        ? statusLabel(c.value.mediationStatus)
+        : '等待投诉跟进状态变更',
+    },
+    {
+      key: 'report_result',
+      title: '举报结果',
+      date: c.value.reportResultStatus ? (c.value.reportResultDate || new Date().toISOString().split('T')[0]) : '',
+      description: c.value.reportResultStatus
+        ? statusLabel(c.value.reportResultStatus)
+        : '等待举报结果状态变更',
     },
     {
       key: 'decision',
       title: '处置结果',
       date: finalStatusDate,
-      description: finalStatusDate ? `当前结果：${currentStatusLabel}` : '调解、处罚或不予立案后补齐结果日期',
+      description: (() => {
+        const parts = []
+        if (c.value.mediationStatus) parts.push(`投诉结果：${statusLabel(c.value.mediationStatus)}`)
+        if (c.value.reportResultStatus) parts.push(`举报结果：${statusLabel(c.value.reportResultStatus)}`)
+        return parts.length > 0 ? parts.join('；') : (finalStatusDate ? `处置结果：${currentStatusLabel}` : '调解、处罚或不予立案后补齐结果日期')
+      })(),
     },
     {
       key: 'review',
@@ -1000,12 +1054,6 @@ function buildCaseSummaryText() {
     '--------------------',
     ...timelineItems.value.map(item => `${item.title}｜${formatTimelineDate(item.date)}｜${item.description}`),
     '',
-    '状态流转记录',
-    '--------------------',
-    ...(Array.isArray(c.value.statusHistory) && c.value.statusHistory.length > 0
-      ? c.value.statusHistory.map((item, index) => `${index + 1}. ${formatDate(item.changedAt)}  ${statusLabel(item.from) || '初始'} -> ${statusLabel(item.to)}`)
-      : ['暂无状态流转记录']),
-    '',
     '答复记录',
     '--------------------',
     ...(Array.isArray(c.value.replies) && c.value.replies.length > 0
@@ -1098,11 +1146,44 @@ function loadCase() {
   c.value = caseData.value
 }
 
+function changeAcceptanceStatus(newStatus) {
+  if (c.value.acceptanceStatus === newStatus) {
+    store.updateCase(c.value.id, { acceptanceStatus: null, acceptanceDate: null })
+  } else {
+    store.updateCase(c.value.id, {
+      acceptanceStatus: newStatus,
+      acceptanceDate: dayjs().format('YYYY-MM-DD'),
+    })
+  }
+  loadCase()
+}
+
+function changeMediationStatus(newStatus) {
+  if (c.value.mediationStatus === newStatus) {
+    store.updateCase(c.value.id, { mediationStatus: null, mediationDate: null })
+  } else {
+    store.updateCase(c.value.id, {
+      mediationStatus: newStatus,
+      mediationDate: dayjs().format('YYYY-MM-DD'),
+    })
+  }
+  loadCase()
+}
+
+function changeReportResultStatus(newStatus) {
+  if (c.value.reportResultStatus === newStatus) {
+    store.updateCase(c.value.id, { reportResultStatus: null, reportResultDate: null })
+  } else {
+    store.updateCase(c.value.id, {
+      reportResultStatus: newStatus,
+      reportResultDate: dayjs().format('YYYY-MM-DD'),
+    })
+  }
+  loadCase()
+}
+
 function changeStatus(newStatus) {
   const updates = {}
-  if (newStatus === 'accepted') {
-    updates.acceptanceDate = dayjs().format('YYYY-MM-DD')
-  }
   store.changeStatus(c.value.id, newStatus, updates)
   loadCase()
   showStatusModal.value = false
@@ -1121,7 +1202,7 @@ function undoStatus(index) {
     status: targetStatus,
     statusHistory: newHistory,
   })
-  router.push('/')
+  loadCase()
 }
 
 function submitReply() {

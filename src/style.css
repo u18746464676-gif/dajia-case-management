@@ -162,6 +162,8 @@
 
 :root.dark .action-tile { background-color: #1e293b; border-color: #334155; }
 
+:root.dark .metric-card { background-color: #1e293b; border-color: #334155; }
+
 :root.dark input, 
 :root.dark select, 
 :root.dark textarea { background-color: #1e293b; border-color: #334155; color: #f1f5f9; }

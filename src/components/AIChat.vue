@@ -138,15 +138,26 @@ function buildContext() {
     return '当前没有案件记录。'
   }
 
+  // 终态综合状态：已调解最优先，其次举报结果，其次终止调解，最后受理状态
+  function getEffectiveStatus(c) {
+    if (c.mediationStatus === 'decided') return 'decided'
+    if (c.reportResultStatus) return c.reportResultStatus
+    if (c.mediationStatus) return c.mediationStatus
+    if (c.acceptanceStatus) return c.acceptanceStatus
+    return 'pending_report'
+  }
+
   const summary = {
     总数: cases.length,
-    未受理: cases.filter(c => c.status === 'pending_report').length,
-    已受理: cases.filter(c => c.status === 'accepted').length,
-    不予受理: cases.filter(c => c.status === 'reported').length,
-    已调解: cases.filter(c => c.status === 'decided').length,
-    已处罚: cases.filter(c => c.status === 'closed').length,
-    不予立案: cases.filter(c => c.status === 'rejected').length,
-    责令改正: cases.filter(c => c.status === 'not_punished').length,
+    未受理: cases.filter(c => getEffectiveStatus(c) === 'pending_report').length,
+    已受理: cases.filter(c => getEffectiveStatus(c) === 'accepted').length,
+    不予受理: cases.filter(c => getEffectiveStatus(c) === 'reported').length,
+    已调解: cases.filter(c => getEffectiveStatus(c) === 'decided').length,
+    已处罚: cases.filter(c => getEffectiveStatus(c) === 'closed').length,
+    不予立案: cases.filter(c => getEffectiveStatus(c) === 'rejected').length,
+    责令改正: cases.filter(c => getEffectiveStatus(c) === 'not_punished').length,
+    终止调解: cases.filter(c => getEffectiveStatus(c) === 'mediation_terminated').length,
+    不予处罚: cases.filter(c => getEffectiveStatus(c) === 'exempted').length,
   }
 
   const caseList = cases.slice(0, 10).map(c =>

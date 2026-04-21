@@ -20,18 +20,18 @@
       <div class="flex items-center justify-between gap-3 mb-2">
         <div class="flex items-center gap-2">
           <div class="h-2.5 w-2.5 animate-pulse rounded-full bg-blue-500"></div>
-          <span class="text-sm font-medium text-slate-700">
+          <span class="text-sm font-medium text-slate-700 dark:text-slate-200">
             正在上传 {{ uploadQueueActive }} 个文件...
           </span>
         </div>
         <div class="flex items-center gap-3">
-          <span class="text-xs text-slate-500">{{ uploadQueueItems.length }} 个文件</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ uploadQueueItems.length }} 个文件</span>
           <span class="text-xs font-medium text-blue-600">{{ uploadQueueProgress }}%</span>
-          <button @click="clearUploadFinished" class="text-xs text-slate-400 hover:text-slate-600">清空</button>
+          <button @click="clearUploadFinished" class="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300">清空</button>
         </div>
       </div>
       <!-- 总进度条 -->
-      <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
+      <div class="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
         <div
           class="h-full rounded-full bg-blue-500 transition-all duration-500"
           :style="{ width: uploadQueueProgress + '%' }"
@@ -50,12 +50,12 @@
           <span v-else-if="item.status === 'uploading'" class="animate-spin text-blue-400">⟳</span>
           <span v-else class="text-slate-300">○</span>
 
-          <span class="flex-1 truncate text-slate-600" :class="{ 'text-emerald-600 font-medium': item.status === 'done' }">{{ item.name }}</span>
+          <span class="flex-1 truncate text-slate-600 dark:text-slate-300" :class="{ 'text-emerald-600 font-medium': item.status === 'done' }">{{ item.name }}</span>
 
-          <span v-if="item.status === 'uploading'" class="text-slate-400">{{ item.progress }}%</span>
+          <span v-if="item.status === 'uploading'" class="text-slate-400 dark:text-slate-500">{{ item.progress }}%</span>
           <span v-else-if="item.status === 'done'" class="text-emerald-500">完成</span>
           <span v-else-if="item.status === 'error'" class="text-red-400" :title="item.error">{{ item.error || '失败' }}</span>
-          <span v-else class="text-slate-400">等待</span>
+          <span v-else class="text-slate-400 dark:text-slate-500">等待</span>
         </div>
       </div>
     </div>
@@ -64,14 +64,17 @@
       <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div class="space-y-3">
           <div>
-            <div class="text-xs uppercase tracking-[0.24em] text-slate-400">案件总览</div>
-            <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">待跟进案件</h1>
-            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">先筛出当前要处理的案件，再补材料、查单号、批量跟进，减少来回切换。</p>
+            <div class="text-xs uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">案件总览</div>
+            <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">待跟进案件</h1>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400 dark:text-slate-500">先筛出当前要处理的案件，再补材料、查单号、批量跟进，减少来回切换。</p>
         </div>
           <div class="flex flex-wrap gap-2">
             <span class="soft-tag">检索结果 {{ filteredCases.length }}</span>
             <span class="soft-tag">本页已选 {{ selectedIds.length }}</span>
             <span class="soft-tag">云端文件 {{ totalCloudFiles }}</span>
+            <span class="soft-tag">磁盘已用 {{ formatBytes(storageUsage.diskUsedBytes) }}</span>
+            <span class="soft-tag">磁盘剩余 {{ formatBytes(storageUsage.diskFreeBytes) }}</span>
+            <span class="soft-tag">上传目录 {{ formatBytes(storageUsage.uploadsUsedBytes) }}</span>
           </div>
         </div>
 
@@ -91,50 +94,50 @@
           <div v-if="showMoreActions" class="grid grid-cols-1 gap-3 mt-3 sm:grid-cols-2">
             <label for="input-envelope" class="action-tile cursor-pointer">
               <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">📮 上传信封</span>
-                <span class="mt-1 block text-xs text-slate-500">OCR识别 → 信封分类</span>
+                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">📮 上传信封</span>
+                <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">OCR识别 → 信封分类</span>
               </span>
             </label>
             <label for="input-envelope-batch" class="action-tile cursor-pointer">
               <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">🖼️ 批量上传信封</span>
-                <span class="mt-1 block text-xs text-slate-500">仅选图片，先预览再批量上传</span>
+                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">🖼️ 批量上传信封</span>
+                <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">仅选图片，先预览再批量上传</span>
               </span>
             </label>
             <label for="input-document" class="action-tile cursor-pointer">
               <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">📄 上传文书</span>
-                <span class="mt-1 block text-xs text-slate-500">OCR识别 → 文书分类</span>
+                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">📄 上传文书</span>
+                <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">OCR识别 → 文书分类</span>
               </span>
             </label>
             <label for="input-word" class="action-tile cursor-pointer">
               <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">📝 上传Word</span>
-                <span class="mt-1 block text-xs text-slate-500">文件名解析 → 文书分类</span>
+                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">📝 上传Word</span>
+                <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">文件名解析 → 文书分类</span>
               </span>
             </label>
             <button type="button" @click="showMoreActions = false; triggerFileUpload()" class="action-tile">
               <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">📎 混合上传</span>
-                <span class="mt-1 block text-xs text-slate-500">混合格式，系统自动分类</span>
+                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">📎 混合上传</span>
+                <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">混合格式，系统自动分类</span>
               </span>
             </button>
             <button type="button" @click="showMoreActions = false; triggerExcelUpload()" class="action-tile">
               <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">导入 Excel</span>
-                <span class="mt-1 block text-xs text-slate-500">先预览再勾选导入</span>
+                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">导入 Excel</span>
+                <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">先预览再勾选导入</span>
               </span>
             </button>
             <button type="button" @click="showMoreActions = false; exportCasesToExcel()" class="action-tile">
               <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">导出台账</span>
-                <span class="mt-1 block text-xs text-slate-500">有选中导出选中，否则导出当前筛选结果</span>
+                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">导出台账</span>
+                <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">有选中导出选中，否则导出当前筛选结果</span>
               </span>
             </button>
             <button type="button" @click="showMoreActions = false; showCloudFiles = true" class="action-tile">
               <span class="min-w-0">
-                <span class="block text-sm font-semibold text-slate-800">云端文件</span>
-                <span class="mt-1 block text-xs text-slate-500">当前 {{ totalCloudFiles }} 个文件可管理</span>
+                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">云端文件</span>
+                <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前 {{ totalCloudFiles }} 个文件可管理</span>
               </span>
             </button>
           </div>
@@ -164,11 +167,11 @@
         </div>
       </div>
 
-      <div v-if="albumUploads.length > 0" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+      <div v-if="albumUploads.length > 0" class="mt-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/80 dark:bg-slate-900/80 p-4">
         <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="text-sm text-slate-600">已选择 {{ albumUploads.length }} 张图片，先预览，再勾选上传。</div>
+          <div class="text-sm text-slate-600 dark:text-slate-300">已选择 {{ albumUploads.length }} 张图片，先预览，再勾选上传。</div>
           <div class="flex flex-wrap items-center gap-2">
-            <label class="flex items-center gap-2 text-sm text-slate-600">
+            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
               <input type="checkbox" :checked="selectAllAlbumUploads" @change="toggleSelectAllAlbumUploads" class="h-4 w-4 rounded" />
               <span>全选</span>
             </label>
@@ -177,13 +180,13 @@
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-          <div v-for="item in albumUploads" :key="item.id" class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <label class="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-white/90 px-1.5 py-1 text-xs text-slate-700">
+          <div v-for="item in albumUploads" :key="item.id" class="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <label class="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-white dark:bg-slate-900/90 px-1.5 py-1 text-xs text-slate-700 dark:text-slate-200">
               <input type="checkbox" v-model="item.selected" class="h-4 w-4 rounded" />
               <span>选中</span>
             </label>
-            <img :src="item.url" class="h-28 w-full bg-slate-50 object-contain" />
-            <div class="truncate p-2 text-xs text-slate-500">{{ item.name }}</div>
+            <img :src="item.url" class="h-28 w-full bg-slate-50 dark:bg-slate-900 object-contain" />
+            <div class="truncate p-2 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ item.name }}</div>
           </div>
         </div>
       </div>
@@ -200,7 +203,7 @@
           <span class="text-sm font-semibold text-emerald-700">
             <span v-if="ocrResult._ocrFailed" class="text-red-500">⚠️ OCR 识别失败</span>
             <span v-else>✅ OCR 识别结果</span>
-            <span class="ml-2 font-normal text-slate-400 text-xs">文件: {{ ocrResult.fileName || '-' }}</span>
+            <span class="ml-2 font-normal text-slate-400 dark:text-slate-500 text-xs">文件: {{ ocrResult.fileName || '-' }}</span>
           </span>
           <button @click="ocrResult = null; logisticsResult = null" class="btn-ghost p-0 text-emerald-600">×</button>
         </div>
@@ -208,7 +211,7 @@
           <div v-if="ocrResult.documentTitle" class="p-2 bg-emerald-100 rounded font-semibold">
             📄 OCR提取标题：{{ ocrResult.documentTitle }}
           </div>
-          <div v-else class="text-slate-400 text-xs">（未从图片中识别到文书标题）</div>
+          <div v-else class="text-slate-400 dark:text-slate-500 text-xs">（未从图片中识别到文书标题）</div>
           <div>执照名称：<strong>{{ ocrResult.licenseName || '-' }}</strong></div>
           <div>店铺名称：<strong>{{ ocrResult.shopName || '-' }}</strong></div>
           <div>文书类型：<strong>{{ ocrResult.documentType || '-' }}</strong></div>
@@ -228,7 +231,7 @@
                   class="accent-emerald-600"
                 />
                 <span class="text-sm">{{ tn }}</span>
-                <span class="text-xs text-slate-400">({{ ocrResult.isDoc ? '文件名' : 'AI优选' }})</span>
+                <span class="text-xs text-slate-400 dark:text-slate-500">({{ ocrResult.isDoc ? '文件名' : 'AI优选' }})</span>
               </label>
             </div>
             <strong v-else>{{ ocrResult.trackingNumber || '-' }}</strong>
@@ -243,7 +246,7 @@
           </div>
         </div>
 
-        <div v-if="logisticsResult" class="mt-3 rounded-2xl bg-white p-3 shadow-sm">
+        <div v-if="logisticsResult" class="mt-3 rounded-2xl bg-white dark:bg-slate-900 p-3 shadow-sm">
           <div class="mb-2 flex items-center justify-between">
             <span class="font-semibold text-emerald-700">物流信息</span>
             <span :class="logisticsResult.status === '签收' ? 'text-emerald-600' : 'text-yellow-600'" class="text-sm font-bold">
@@ -255,9 +258,9 @@
               v-for="(item, idx) in logisticsResult.details"
               :key="idx"
               class="flex gap-3 rounded-xl p-2"
-              :class="idx === 0 ? 'bg-emerald-50' : 'bg-slate-50'"
+              :class="idx === 0 ? 'bg-emerald-50' : 'bg-slate-50 dark:bg-slate-900'"
             >
-              <div class="shrink-0 text-slate-500">{{ item.time }}</div>
+              <div class="shrink-0 text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ item.time }}</div>
               <div class="flex-1">{{ item.description }}</div>
             </div>
           </div>
@@ -275,10 +278,10 @@
               v-for="matched in ocrResult.matchedCases"
               :key="matched.id"
               @click="applyOcrToCase(matched.id)"
-              class="w-full rounded-xl bg-white p-3 text-left text-sm transition hover:bg-emerald-100"
+              class="w-full rounded-xl bg-white dark:bg-slate-900 p-3 text-left text-sm transition hover:bg-emerald-100"
             >
               <span class="font-medium">{{ matched.licenseName || matched.shopName }}</span>
-              <span class="ml-2 text-slate-400">{{ matched.productName }}</span>
+              <span class="ml-2 text-slate-400 dark:text-slate-500">{{ matched.productName }}</span>
             </button>
           </div>
         </div>
@@ -287,9 +290,9 @@
 
       <div v-if="uploadedFiles.length > 0" class="mt-4 flex flex-wrap gap-3">
         <div v-for="(file, idx) in uploadedFiles" :key="'file-' + idx" class="group relative">
-          <div class="flex h-16 w-16 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-100">
+          <div class="flex h-16 w-16 flex-col items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
             <span class="text-2xl">📄</span>
-            <span class="w-full truncate px-1 text-center text-xs text-slate-500">{{ file.name.substring(0, 8) }}</span>
+            <span class="w-full truncate px-1 text-center text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ file.name.substring(0, 8) }}</span>
           </div>
           <button @click="removeFile(idx)" class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-sm text-white opacity-0 transition group-hover:opacity-100">×</button>
         </div>
@@ -299,25 +302,25 @@
     <section class="card">
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
         <button type="button" @click="focusMonthlyCases" class="metric-card text-left transition hover:border-slate-300 hover:shadow-md">
-          <div class="text-xs font-medium text-slate-500">当月花费</div>
-          <div class="mt-1 text-2xl font-bold text-slate-800">¥{{ monthlyStats.expense.toLocaleString() }}</div>
-          <div class="mt-1 text-xs text-slate-400">点击定位到案件列表</div>
+          <div class="text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500">当月花费</div>
+          <div class="mt-1 text-2xl font-bold text-slate-800 dark:text-slate-100">¥{{ monthlyStats.expense.toLocaleString() }}</div>
+          <div class="mt-1 text-xs text-slate-400 dark:text-slate-500">点击定位到案件列表</div>
         </button>
         <button type="button" @click="focusMonthlyCases" class="metric-card text-left transition hover:border-slate-300 hover:shadow-md">
-          <div class="text-xs font-medium text-slate-500">当月盈利</div>
-          <div class="mt-1 text-2xl font-bold text-slate-800">¥{{ monthlyStats.profit.toLocaleString() }}</div>
-          <div class="mt-1 text-xs text-slate-400">点击定位到案件列表</div>
+          <div class="text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500">当月盈利</div>
+          <div class="mt-1 text-2xl font-bold text-slate-800 dark:text-slate-100">¥{{ monthlyStats.profit.toLocaleString() }}</div>
+          <div class="mt-1 text-xs text-slate-400 dark:text-slate-500">点击定位到案件列表</div>
         </button>
       </div>
 
       <div class="mt-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <div class="text-sm font-semibold text-slate-800">检索与筛选</div>
-          <p class="mt-1 text-xs leading-5 text-slate-500">按月份、状态和关键词快速缩小范围，把今天要处理的案件先拎出来。</p>
+          <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">检索与筛选</div>
+          <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">按月份、状态和关键词快速缩小范围，把今天要处理的案件先拎出来。</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <span v-if="selectedIds.length > 0" class="soft-tag">已选 {{ selectedIds.length }} 条</span>
-          <button v-if="hasActiveFilters" type="button" @click="clearFilters" class="btn-ghost text-xs text-slate-500">清空筛选</button>
+          <button v-if="hasActiveFilters" type="button" @click="clearFilters" class="btn-ghost text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">清空筛选</button>
         </div>
       </div>
 
@@ -338,6 +341,8 @@
             <option value="closed">已处罚</option>
             <option value="rejected">不予立案</option>
             <option value="not_punished">责令改正</option>
+            <option value="exempted">不予处罚</option>
+            <option value="mediation_terminated">终止调解</option>
           </select>
           <div class="min-w-0 flex-1 xl:max-w-md">
             <input
@@ -352,11 +357,11 @@
         <button v-if="selectedIds.length > 0" @click="showBatchModal = true" class="btn-primary w-full xl:w-auto">
           <span>🧰</span>
           <span>批量操作</span>
-          <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ selectedIds.length }}</span>
+          <span class="rounded-full bg-white dark:bg-slate-900/20 px-2 py-0.5 text-xs">{{ selectedIds.length }}</span>
         </button>
       </div>
 
-      <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
         <span class="soft-tag">当前共 {{ filteredCases.length }} 条</span>
         <label class="flex items-center gap-1 cursor-pointer select-none">
           <input type="checkbox" :checked="isAllPageSelected" @change="toggleSelectAllPage" class="h-3.5 w-3.5 rounded" />
@@ -372,9 +377,9 @@
     </section>
 
     <div v-if="showBatchModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showBatchModal = false">
-      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <h3 class="text-lg font-bold text-slate-800">批量操作</h3>
-        <p class="mt-1 text-sm text-slate-500">已选 {{ selectedIds.length }} 个案件</p>
+      <div class="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
+        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">批量操作</h3>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">已选 {{ selectedIds.length }} 个案件</p>
         <div class="mt-4">
           <button
             @click="batchQueryLogisticsForSelected"
@@ -398,24 +403,24 @@
     </div>
 
     <div v-if="showImportPreview" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm" @click.self="closeImportPreview">
-      <div class="flex max-h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
+      <div class="flex max-h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900 p-4 shadow-2xl sm:p-6">
         <div class="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h3 class="text-lg font-bold text-slate-800">Excel 导入预览</h3>
-            <p class="mt-1 text-sm text-slate-500">先预览，再选择全选或单选后导入</p>
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Excel 导入预览</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">先预览，再选择全选或单选后导入</p>
           </div>
-          <button @click="closeImportPreview" class="btn-ghost p-0 text-2xl text-slate-400">×</button>
+          <button @click="closeImportPreview" class="btn-ghost p-0 text-2xl text-slate-400 dark:text-slate-500">×</button>
         </div>
         <div class="mb-3 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <label class="flex items-center gap-2 text-slate-600">
+          <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
             <input type="checkbox" :checked="selectAllImportRows" @change="toggleSelectAllImportRows" class="h-4 w-4 rounded" />
             <span>全选</span>
           </label>
-          <span class="text-slate-500">共 {{ importPreviewRows.length }} 条，已选 {{ selectedImportRows.length }} 条</span>
+          <span class="text-slate-500 dark:text-slate-400 dark:text-slate-500">共 {{ importPreviewRows.length }} 条，已选 {{ selectedImportRows.length }} 条</span>
         </div>
         <div class="flex-1 overflow-auto rounded-2xl border border-slate-100">
           <table class="w-full text-sm">
-            <thead class="sticky top-0 bg-slate-50">
+            <thead class="sticky top-0 bg-slate-50 dark:bg-slate-900">
               <tr>
                 <th class="w-10 py-2 px-3 text-left"></th>
                 <th class="py-2 px-3 text-left">管辖局</th>
@@ -427,7 +432,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="row in importPreviewRows" :key="row.__importId" class="hover:bg-slate-50">
+              <tr v-for="row in importPreviewRows" :key="row.__importId" class="hover:bg-slate-50 dark:bg-slate-900">
                 <td class="py-2 px-3">
                   <input type="checkbox" :checked="selectedImportRows.includes(row.__importId)" @change="toggleImportRow(row.__importId)" class="h-4 w-4 rounded" />
                 </td>
@@ -451,28 +456,28 @@
     </div>
 
     <div v-if="showCloudFiles" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm" @click.self="showCloudFiles = false">
-      <div class="flex max-h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
+      <div class="flex max-h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900 p-4 shadow-2xl sm:p-6">
         <div class="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h3 class="text-lg font-bold text-slate-800">☁️ 云端文件管理</h3>
-            <p class="mt-1 text-sm text-slate-500">统一查看未关联文件、图片与已上传材料。</p>
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">☁️ 云端文件管理</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">统一查看未关联文件、图片与已上传材料。</p>
           </div>
-          <button @click="showCloudFiles = false" class="btn-ghost p-0 text-2xl text-slate-400">×</button>
+          <button @click="showCloudFiles = false" class="btn-ghost p-0 text-2xl text-slate-400 dark:text-slate-500">×</button>
         </div>
 
         <div v-if="cloudFilesLoading" class="flex items-center justify-center py-8">
           <div class="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
-          <span class="ml-3 text-slate-500">加载中...</span>
+          <span class="ml-3 text-slate-500 dark:text-slate-400 dark:text-slate-500">加载中...</span>
         </div>
 
-        <div v-else-if="allCloudFiles.length === 0" class="py-8 text-center text-slate-400">
+        <div v-else-if="allCloudFiles.length === 0" class="py-8 text-center text-slate-400 dark:text-slate-500">
           <span class="text-4xl">☁️</span>
           <p class="mt-2">暂无云端文件</p>
         </div>
 
         <div v-else class="flex-1 overflow-y-auto">
           <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="text-sm text-slate-500">
+            <div class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
               共 {{ allCloudFiles.length }} 个文件
               <span class="ml-2 text-orange-500">（未关联: {{ allCloudFiles.length - assignedCount }}）</span>
             </div>
@@ -482,7 +487,7 @@
           </div>
 
           <table class="w-full text-sm">
-            <thead class="sticky top-0 bg-slate-50">
+            <thead class="sticky top-0 bg-slate-50 dark:bg-slate-900">
               <tr>
                 <th class="w-10 py-2 px-3 text-left">
                   <input type="checkbox" v-model="selectAllCloudFiles" @change="toggleSelectAllCloudFiles" class="h-4 w-4 rounded" />
@@ -495,18 +500,18 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-50">
-              <tr v-for="file in allCloudFiles" :key="file.Key || file.url" class="hover:bg-slate-50">
+              <tr v-for="file in allCloudFiles" :key="file.Key || file.url" class="hover:bg-slate-50 dark:bg-slate-900">
                 <td class="py-2 px-3">
                   <input :checked="selectedCloudFiles.includes(file)" @change="toggleSelectCloudFile(file)" type="checkbox" class="h-4 w-4 rounded" />
                 </td>
                 <td class="py-2 px-3">
-                  <button type="button" @click="openFilePreview(file)" class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-blue-400 hover:ring-2 hover:ring-blue-100">
-                    <img v-if="isImageFile(file)" :src="getCloudFileUrl(file.Key) || file.url" class="h-full w-full bg-slate-50 object-contain p-1" />
+                  <button type="button" @click="openFilePreview(file)" class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition hover:border-blue-400 hover:ring-2 hover:ring-blue-100">
+                    <img v-if="isImageFile(file)" :src="getCloudFileUrl(file.Key) || file.url" class="h-full w-full bg-slate-50 dark:bg-slate-900 object-contain p-1" />
                     <span v-else class="text-2xl">{{ getFileIcon(file) }}</span>
                   </button>
                 </td>
                 <td class="max-w-xs truncate py-2 px-3">
-                  <div class="truncate text-sm text-slate-800">{{ getFileName(file) }}</div>
+                  <div class="truncate text-sm text-slate-800 dark:text-slate-100">{{ getFileName(file) }}</div>
                   <div v-if="file.ocrTitle" class="truncate text-xs text-blue-500">{{ file.ocrTitle }}</div>
                 </td>
                 <td class="py-2 px-3">{{ file.LastModified ? new Date(file.LastModified).toLocaleString('zh-CN') : (file.uploadedAt ? new Date(file.uploadedAt).toLocaleString('zh-CN') : '-') }}</td>
@@ -533,19 +538,19 @@
 
     <div v-if="showImagePreview" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" @click="closeFilePreview">
       <button @click="closeFilePreview" class="absolute right-4 top-4 text-3xl text-white hover:text-gray-300">×</button>
-      <div class="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" @click.stop>
+      <div class="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900 shadow-2xl" @click.stop>
         <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
           <div class="min-w-0">
-            <div class="truncate font-semibold text-slate-800">{{ previewFile.name || '文件预览' }}</div>
-            <div class="truncate text-xs text-slate-400">{{ previewFile.url }}</div>
+            <div class="truncate font-semibold text-slate-800 dark:text-slate-100">{{ previewFile.name || '文件预览' }}</div>
+            <div class="truncate text-xs text-slate-400 dark:text-slate-500">{{ previewFile.url }}</div>
           </div>
           <button @click="openPreviewInNewTab" class="text-sm text-blue-500 hover:text-blue-700">新窗口打开</button>
         </div>
-        <div class="flex min-h-[70vh] max-h-[80vh] items-center justify-center overflow-auto bg-slate-50 p-4">
+        <div class="flex min-h-[70vh] max-h-[80vh] items-center justify-center overflow-auto bg-slate-50 dark:bg-slate-900 p-4">
           <img v-if="previewFile.kind === 'image'" :src="previewFile.url" class="max-h-[78vh] max-w-full rounded-xl object-contain shadow" />
-          <iframe v-else-if="previewFile.kind === 'pdf'" :src="previewFile.url" class="h-[78vh] w-full rounded-xl bg-white"></iframe>
-          <div v-else-if="previewFile.kind === 'text'" class="h-[78vh] w-full overflow-auto whitespace-pre-wrap rounded-xl bg-white p-4 text-sm text-slate-700">{{ previewTextContent || '正在加载文本预览...' }}</div>
-          <div v-else class="space-y-3 text-center text-slate-500">
+          <iframe v-else-if="previewFile.kind === 'pdf'" :src="previewFile.url" class="h-[78vh] w-full rounded-xl bg-white dark:bg-slate-900"></iframe>
+          <div v-else-if="previewFile.kind === 'text'" class="h-[78vh] w-full overflow-auto whitespace-pre-wrap rounded-xl bg-white dark:bg-slate-900 p-4 text-sm text-slate-700 dark:text-slate-200">{{ previewTextContent || '正在加载文本预览...' }}</div>
+          <div v-else class="space-y-3 text-center text-slate-500 dark:text-slate-400 dark:text-slate-500">
             <div class="text-5xl">{{ getFileIcon(previewFile) }}</div>
             <div>当前格式暂不支持弹窗内预览，请点击“新窗口打开”。</div>
           </div>
@@ -553,10 +558,10 @@
       </div>
     </div>
 
-    <div v-if="filteredCases.length === 0" class="rounded-2xl border border-slate-100 bg-white py-24 text-center shadow-sm">
+    <div v-if="filteredCases.length === 0" class="rounded-2xl border border-slate-100 bg-white dark:bg-slate-900 py-24 text-center shadow-sm">
       <div class="mb-6 text-7xl">📂</div>
-      <p class="mb-3 text-lg text-slate-400">{{ hasActiveFilters ? '没有找到符合条件的案件' : '还没有任何案件' }}</p>
-      <p class="mb-6 text-sm text-slate-400">{{ hasActiveFilters ? '可以试试清空筛选，或者换个关键词。' : '现在就新建第一条案件，后面批量处理会顺很多。' }}</p>
+      <p class="mb-3 text-lg text-slate-400 dark:text-slate-500">{{ hasActiveFilters ? '没有找到符合条件的案件' : '还没有任何案件' }}</p>
+      <p class="mb-6 text-sm text-slate-400 dark:text-slate-500">{{ hasActiveFilters ? '可以试试清空筛选，或者换个关键词。' : '现在就新建第一条案件，后面批量处理会顺很多。' }}</p>
       <div class="flex flex-col items-center justify-center gap-3 sm:flex-row">
         <router-link to="/case/new" class="btn-primary">
           <span>+</span>
@@ -573,7 +578,7 @@
         v-for="caseItem in paginatedCases"
         :key="caseItem.id"
         class="card p-0 transition"
-        :class="selectedIds.includes(caseItem.id) ? 'border-blue-200 ring-2 ring-blue-100' : 'hover:border-slate-200 hover:shadow-md'"
+        :class="selectedIds.includes(caseItem.id) ? 'border-blue-200 ring-2 ring-blue-100' : 'hover:border-slate-200 dark:border-slate-700 hover:shadow-md'"
       >
         <div class="flex flex-col gap-4 p-4 md:p-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="flex min-w-0 flex-1 gap-3">
@@ -592,44 +597,44 @@
                   <div class="mb-2 flex flex-wrap gap-2">
                     <span class="soft-tag">编号 {{ caseItem.caseNumber || '待生成' }}</span>
                   </div>
-                  <router-link :to="'/case/' + caseItem.id" class="block break-words text-lg font-semibold text-slate-900 hover:text-slate-600">
+                  <router-link :to="'/case/' + caseItem.id" class="block break-words text-lg font-semibold text-slate-900 dark:text-slate-100 hover:text-slate-600 dark:text-slate-300">
                     {{ getPrimaryCaseName(caseItem) }}
                   </router-link>
-                  <p class="mt-1 text-sm text-slate-500">{{ getSecondaryCaseName(caseItem) }}</p>
+                  <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ getSecondaryCaseName(caseItem) }}</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 md:justify-end">
-                  <StatusBadge :status="caseItem.status" :profit="caseItem.profit" />
+                  <StatusBadge :status="getEffectiveStatus(caseItem)" :profit="caseItem.profit" />
                   <span v-if="selectedIds.includes(caseItem.id)" class="soft-tag border-blue-200 bg-blue-50 text-blue-600">已选中</span>
-                  <div class="rounded-2xl bg-slate-100 px-3 py-2 text-right">
-                    <div class="text-[11px] text-slate-500">花费</div>
-                    <div class="text-base font-semibold text-slate-800">¥{{ formatMoney(caseItem.expense) }}</div>
+                  <div class="rounded-2xl bg-slate-100 dark:bg-slate-800 px-3 py-2 text-right">
+                    <div class="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">花费</div>
+                    <div class="text-base font-semibold text-slate-800 dark:text-slate-100">¥{{ formatMoney(caseItem.expense) }}</div>
                   </div>
-                  <div v-if="Number(caseItem.profit)" class="rounded-2xl bg-slate-100 px-3 py-2 text-right">
-                    <div class="text-[11px] text-slate-500">赔偿</div>
-                    <div class="text-base font-semibold text-slate-800">¥{{ formatMoney(caseItem.profit) }}</div>
+                  <div v-if="Number(caseItem.profit)" class="rounded-2xl bg-slate-100 dark:bg-slate-800 px-3 py-2 text-right">
+                    <div class="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">赔偿</div>
+                    <div class="text-base font-semibold text-slate-800 dark:text-slate-100">¥{{ formatMoney(caseItem.profit) }}</div>
                   </div>
                 </div>
               </div>
 
               <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-                <div class="rounded-2xl bg-slate-50/80 px-3 py-2">
-                  <div class="text-[11px] text-slate-400">商品</div>
-                  <div class="mt-1 text-sm font-medium text-slate-700">{{ caseItem.productName || '未填写商品名称' }}</div>
+                <div class="rounded-2xl bg-slate-50 dark:bg-slate-900/80 dark:bg-slate-900/80 px-3 py-2">
+                  <div class="text-[11px] text-slate-400 dark:text-slate-500">商品</div>
+                  <div class="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">{{ caseItem.productName || '未填写商品名称' }}</div>
                 </div>
-                <div class="rounded-2xl bg-slate-50/80 px-3 py-2">
-                  <div class="text-[11px] text-slate-400">快递单号</div>
-                  <div class="mt-1 break-all text-sm font-medium text-slate-700">{{ caseItem.trackingNumber || '暂无单号' }}</div>
+                <div class="rounded-2xl bg-slate-50 dark:bg-slate-900/80 dark:bg-slate-900/80 px-3 py-2">
+                  <div class="text-[11px] text-slate-400 dark:text-slate-500">快递单号</div>
+                  <div class="mt-1 break-all text-sm font-medium text-slate-700 dark:text-slate-200">{{ caseItem.trackingNumber || '暂无单号' }}</div>
                 </div>
-                <div class="rounded-2xl bg-slate-50/80 px-3 py-2">
-                  <div class="text-[11px] text-slate-400">管辖局</div>
-                  <div class="mt-1 text-sm font-medium text-slate-700">{{ caseItem.jurisdiction || '未填写' }}</div>
+                <div class="rounded-2xl bg-slate-50 dark:bg-slate-900/80 dark:bg-slate-900/80 px-3 py-2">
+                  <div class="text-[11px] text-slate-400 dark:text-slate-500">管辖局</div>
+                  <div class="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">{{ caseItem.jurisdiction || '未填写' }}</div>
                 </div>
               </div>
 
-              <div class="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
+              <div class="mt-3 flex flex-wrap gap-2 text-xs text-slate-400 dark:text-slate-500">
                 <span class="soft-tag">创建 {{ formatCaseDate(caseItem.createdAt) }}</span>
                 <span class="soft-tag">更新 {{ formatCaseDate(caseItem.updatedAt) }}</span>
-                <span v-if="caseItem.profit" class="soft-tag text-slate-600">赔偿 ¥{{ formatMoney(caseItem.profit) }}</span>
+                <span v-if="caseItem.profit" class="soft-tag text-slate-600 dark:text-slate-300">赔偿 ¥{{ formatMoney(caseItem.profit) }}</span>
               </div>
             </div>
           </div>
@@ -643,19 +648,19 @@
 
       <div class="card">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div class="text-sm text-slate-500">
-            共 <span class="font-semibold text-slate-700">{{ filteredCases.length }}</span> 条，第 <span class="font-semibold text-slate-700">{{ currentPage }}</span> / <span class="font-semibold text-slate-700">{{ totalPages }}</span> 页
+          <div class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
+            共 <span class="font-semibold text-slate-700 dark:text-slate-200">{{ filteredCases.length }}</span> 条，第 <span class="font-semibold text-slate-700 dark:text-slate-200">{{ currentPage }}</span> / <span class="font-semibold text-slate-700 dark:text-slate-200">{{ totalPages }}</span> 页
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <button @click="currentPage = 1" :disabled="currentPage === 1" class="btn-secondary px-3 py-2 text-xs disabled:opacity-40">首页</button>
             <button @click="currentPage--" :disabled="currentPage === 1" class="btn-secondary px-3 py-2 text-xs disabled:opacity-40">上一页</button>
             <template v-for="p in pageNumbers" :key="`page-${p}`">
-              <span v-if="p === '...'" class="px-1 text-sm text-slate-400">...</span>
+              <span v-if="p === '...'" class="px-1 text-sm text-slate-400 dark:text-slate-500">...</span>
               <button
                 v-else
                 @click="currentPage = p"
                 class="flex h-9 w-9 items-center justify-center rounded-xl text-xs font-medium transition"
-                :class="p === currentPage ? 'bg-slate-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                :class="p === currentPage ? 'bg-slate-700 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'"
               >{{ p }}</button>
             </template>
             <button @click="currentPage++" :disabled="currentPage === totalPages" class="btn-secondary px-3 py-2 text-xs disabled:opacity-40">下一页</button>
@@ -848,8 +853,19 @@ function getStatusLabel(status = '') {
     closed: '已处罚',
     rejected: '不予立案',
     not_punished: '责令改正',
+    exempted: '不予处罚',
+    mediation_terminated: '终止调解',
   }
   return labels[status] || status || '-'
+}
+
+// 终态综合状态：已调解最优先，其次举报结果，其次终止调解，最后受理状态
+function getEffectiveStatus(c) {
+  if (c.mediationStatus === 'decided') return 'decided'
+  if (c.reportResultStatus) return c.reportResultStatus
+  if (c.mediationStatus) return c.mediationStatus
+  if (c.acceptanceStatus) return c.acceptanceStatus
+  return 'pending_report'
 }
 
 function exportCasesToExcel() {
@@ -936,7 +952,7 @@ const filteredCases = computed(() => {
     list = list.filter(c => dayjs(c.createdAt).month() + 1 === Number(filterMonth.value))
   }
   if (filterStatus.value) {
-    list = list.filter(c => c.status === filterStatus.value)
+    list = list.filter(c => getEffectiveStatus(c) === filterStatus.value)
   }
   if (keyword.value) {
     const kw = keyword.value.toLowerCase()
@@ -2454,6 +2470,7 @@ const previewImageUrl = ref('')
 const previewFile = ref({ url: '', kind: '', name: '' })
 const previewTextContent = ref('')
 const totalCloudFiles = ref(0)
+const storageUsage = ref({ diskTotalBytes: 0, diskUsedBytes: 0, diskFreeBytes: 0, uploadsUsedBytes: 0 })
 const uploadLoading = ref(false)
 const processingStatus = ref('')
 const uploadResult = ref(null)
@@ -2468,6 +2485,33 @@ function dedupeCloudFiles(list = []) {
     map.set(key, { ...file, url: file.url || getCloudFileUrl(file.Key) || key })
   })
   return Array.from(map.values())
+}
+
+function formatBytes(bytes = 0) {
+  const value = Number(bytes || 0)
+  if (!value) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let size = value
+  let unitIndex = 0
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex += 1
+  }
+  return `${size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`
+}
+
+async function loadStorageUsage() {
+  try {
+    const data = await fetch('/api/storage/usage').then(r => r.json())
+    storageUsage.value = {
+      diskTotalBytes: Number(data.diskTotalBytes || 0),
+      diskUsedBytes: Number(data.diskUsedBytes || 0),
+      diskFreeBytes: Number(data.diskFreeBytes || 0),
+      uploadsUsedBytes: Number(data.uploadsUsedBytes || 0),
+    }
+  } catch (err) {
+    console.error('加载磁盘状态失败:', err)
+  }
 }
 
 async function loadCloudFiles() {
@@ -2699,6 +2743,8 @@ const assignedCount = computed(() => {
   })
   return count
 })
+
+loadStorageUsage()
 
 // 监听云端文件弹窗打开
 watch(showCloudFiles, (val) => {

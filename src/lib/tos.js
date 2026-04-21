@@ -17,7 +17,7 @@ function normalizeTosError(error) {
   const msg = error?.message || ''
 
   if (statusCode === 0 || msg.includes('Failed to fetch') || msg.includes('fetch') || msg.includes('NetworkError')) {
-    return new Error('网络请求失败，请关闭 VPN 后重试')
+    return new Error('当前网络无法连接上传服务，请检查网络或稍后重试。如使用了代理/VPN，也请先关闭后再试。')
   }
 
   if (statusCode === 403 || code === 'SignatureDoesNotMatch') {

@@ -22,8 +22,8 @@ const nearDeadline = computed(() => {
   const deadlines = []
   const now = dayjs()
 
-  // 受理后90天结案
-  if (props.caseObj.acceptanceDate && props.caseObj.status !== 'closed') {
+  // 受理后90天结案（未进入举报结果前适用）
+  if (props.caseObj.acceptanceDate && !props.caseObj.reportResultStatus) {
     const deadline = dayjs(props.caseObj.acceptanceDate).add(90, 'day')
     const daysLeft = deadline.diff(now, 'day')
     if (daysLeft >= 0) {

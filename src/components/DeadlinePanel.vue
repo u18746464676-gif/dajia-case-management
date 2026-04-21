@@ -148,7 +148,9 @@ function addWorkingDays(startDate, days) {
 // 检查是否超过法定受理期限（未受理状态下，签收日期起10个工作日）
 const overdueAlert = computed(() => {
   const c = props.caseObj
-  if (c.status === 'pending_report' && c.signDate) {
+  // 有受理状态后不再提示受理超期
+  if (c.acceptanceStatus && c.signDate) return false
+  if (!c.acceptanceStatus && c.signDate) {
     const deadline = addWorkingDays(c.signDate, 10)
     const workingDaysLeft = workingDaysDiff(dayjs(), deadline)
     return workingDaysLeft < 0
@@ -161,7 +163,8 @@ const legalDeadlines = computed(() => {
   const now = dayjs()
   const c = props.caseObj
 
-  if (c.status === 'pending_report' && c.signDate) {
+  // 阶段一：待受理（未填受理状态，有签收日期）
+  if (!c.acceptanceStatus && c.signDate) {
     const acceptanceDeadline = addWorkingDays(c.signDate, 10)
     const acceptanceDaysLeft = workingDaysDiff(dayjs(), acceptanceDeadline)
     list.push({
@@ -174,22 +177,21 @@ const legalDeadlines = computed(() => {
     })
   }
 
-  // 受理相关状态显示法定时限，不予受理只保留案件办结到期日
-  if (c.status === 'accepted' || c.status === 'reported' || c.status === 'decided' || c.status === 'closed') {
+  // 阶段二：已受理（acceptanceStatus = 'accepted'，且调解还未开始）
+  if (c.acceptanceStatus === 'accepted' && !c.mediationStatus) {
     if (c.acceptanceDate) {
-      if (c.status !== 'reported') {
-        const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
-        const mediationDaysLeft = dayjs(mediationDeadline).diff(now, 'day')
-        list.push({
-          name: '调解倒计时（60日）',
-          date: mediationDeadline,
-          daysLeft: mediationDaysLeft,
-          urgent: mediationDaysLeft <= 7,
-          expired: mediationDaysLeft < 0,
-          type: 'mediation'
-        })
-      }
-
+      // 调解倒计时（60日）
+      const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
+      const mediationDaysLeft = dayjs(mediationDeadline).diff(now, 'day')
+      list.push({
+        name: '调解倒计时（60日）',
+        date: mediationDeadline,
+        daysLeft: mediationDaysLeft,
+        urgent: mediationDaysLeft <= 7,
+        expired: mediationDaysLeft < 0,
+        type: 'mediation'
+      })
+      // 案件办结到期日（120日）
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
       list.push({
@@ -201,31 +203,61 @@ const legalDeadlines = computed(() => {
         type: 'completion'
       })
     }
+  }
 
-    // 责令改正整改期（15日，从决定日期算起）
-    if (c.acceptanceWay === '责令改正' && c.decisionDate) {
-      const rectDeadline = dayjs(c.decisionDate).add(15, 'day').format('YYYY-MM-DD')
-      const daysLeft = dayjs(rectDeadline).diff(now, 'day')
+  // 阶段三：不予受理（acceptanceStatus = 'reported'）
+  if (c.acceptanceStatus === 'reported' && !c.reportResultStatus) {
+    if (c.acceptanceDate) {
+      const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
+      const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
       list.push({
-        name: '责令改正整改期（15日）',
-        date: rectDeadline,
-        daysLeft,
-        urgent: daysLeft <= 3,
-        expired: daysLeft < 0,
-        type: 'rect'
+        name: '案件办结到期日（120日）',
+        date: completionDeadline,
+        daysLeft: completionDaysLeft,
+        urgent: completionDaysLeft <= 15,
+        expired: completionDaysLeft < 0,
+        type: 'completion'
       })
     }
   }
 
-  // 不予立案
-  if (c.status === 'rejected') {
+  // 阶段四：调解结果（mediationStatus 有值）→ 直接显示结果，不显示倒计时
+  if (c.mediationStatus === 'decided') {
     list.push({
-      name: '不予立案',
-      date: c.decisionDate || '',
+      name: '案件已调解',
+      date: c.mediationDate || '',
       daysLeft: '—',
       urgent: false,
       expired: false,
-      type: 'rejected'
+      type: 'mediation_decided'
+    })
+  }
+  if (c.mediationStatus === 'mediation_terminated') {
+    list.push({
+      name: '调解已终止',
+      date: c.mediationDate || '',
+      daysLeft: '—',
+      urgent: false,
+      expired: false,
+      type: 'mediation_terminated'
+    })
+  }
+
+  // 阶段五：举报结果（reportResultStatus 有值）→ 显示举报结果，保留调解结果
+  if (c.reportResultStatus) {
+    const reportLabels = {
+      closed: '已处罚',
+      rejected: '不予立案',
+      not_punished: '责令改正',
+      exempted: '不予处罚',
+    }
+    list.push({
+      name: `举报结果：${reportLabels[c.reportResultStatus] || c.reportResultStatus}`,
+      date: c.reportResultDate || '',
+      daysLeft: '—',
+      urgent: false,
+      expired: false,
+      type: 'report_result'
     })
   }
 
