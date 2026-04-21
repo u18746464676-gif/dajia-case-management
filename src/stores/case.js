@@ -540,24 +540,49 @@ export const useCaseStore = defineStore('case', () => {
     const imageRecord = normalizeImageRecord({ ...image, url: fileUrl })
     const patch = casePatch && typeof casePatch === 'object' ? casePatch : null
     const now = dayjs().toISOString()
+    const lowerUrl = String(fileUrl || '').toLowerCase()
+    const lowerName = String(image?.name || '').toLowerCase()
+    const explicitFileType = String(image?.fileType || '').toLowerCase()
+    const isDocumentFile = explicitFileType === 'doc' || explicitFileType === 'pdf' || /\.(doc|docx|pdf)$/i.test(lowerUrl) || /\.(doc|docx|pdf)$/i.test(lowerName)
     let changed = false
 
     cases.value = cases.value.map(c => {
       const currentImages = Array.isArray(c.images) ? c.images : []
+      const currentDocuments = Array.isArray(c.documents) ? c.documents : []
       const filteredImages = currentImages.filter(img => img.url !== fileUrl)
+      const filteredDocuments = currentDocuments.filter(doc => doc.url !== fileUrl)
       let nextImages = filteredImages
+      let nextDocuments = filteredDocuments
 
       if (caseId && c.id === caseId) {
-        nextImages = [...filteredImages, imageRecord]
+        if (isDocumentFile) {
+          nextDocuments = [
+            ...filteredDocuments,
+            {
+              id: uuid(),
+              name: image?.name || '未命名文档',
+              type: explicitFileType === 'pdf' || /\.pdf$/i.test(lowerUrl) || /\.pdf$/i.test(lowerName) ? 'pdf' : 'other',
+              category: 'other',
+              note: image?.note || '',
+              url: fileUrl,
+              uploadedAt: image?.uploadedAt || now,
+            },
+          ]
+        } else {
+          nextImages = [...filteredImages, imageRecord]
+        }
       }
 
       const shouldApplyPatch = Boolean(caseId && c.id === caseId && patch)
-      if (nextImages.length !== currentImages.length || (caseId && c.id === caseId) || shouldApplyPatch) {
+      const imagesChanged = nextImages.length !== currentImages.length || JSON.stringify(nextImages) !== JSON.stringify(currentImages)
+      const documentsChanged = nextDocuments.length !== currentDocuments.length || JSON.stringify(nextDocuments) !== JSON.stringify(currentDocuments)
+      if (imagesChanged || documentsChanged || (caseId && c.id === caseId) || shouldApplyPatch) {
         changed = true
         return {
           ...c,
           ...(shouldApplyPatch ? patch : {}),
           images: nextImages,
+          documents: nextDocuments,
           updatedAt: now,
         }
       }
@@ -577,7 +602,7 @@ export const useCaseStore = defineStore('case', () => {
         fileUrl,
         fileKey: extractTosKey(fileUrl),
         fileName: imageRecord.name,
-        fileType: 'image',
+        fileType: image.fileType || 'image',
         ocrTitle: imageRecord.ocrTitle || '',
       })
       if (regResult.error) {
