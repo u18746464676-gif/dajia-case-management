@@ -667,7 +667,7 @@ import { useCaseStore } from '@/stores/case'
 import dayjs from 'dayjs'
 import { extractFromImage } from '@/lib/doubao'
 import { queryExpress } from '@/lib/kuaidi100'
-import { uploadBase64ToTos, deleteFromTos, listTosObjects, getTosFileUrl } from '@/lib/tos'
+import { uploadBase64ToTos, uploadWordToTos, deleteFromTos, listTosObjects, getTosFileUrl } from '@/lib/tos'
 import { readFileAsDataUrl } from '@/lib/document-processing'
 import { detectBarcodeFromDataUrl } from '@/lib/barcode'
 import { extractTrackingCandidates, normalizeTrackingNumber, pickBestTrackingNumber, isBlockedTrackingCode } from '@/lib/tracking'
@@ -2305,43 +2305,51 @@ async function handleDocumentUpload(event) {
 
 // ── 上传Word → 文件名解析 → 文书分类 ──────────────────────
 async function handleWordUpload(event) {
-  addToast('📝 开始处理Word上传...', 'info')
+  addToast('[WORD] handleWordUpload called', 'info')
   const files = Array.from(event.target.files || [])
   if (files.length === 0) { addToast('未选择文件', 'warn'); ocrLoading.value = false; return }
   ocrLoading.value = true
   try {
     await Promise.all(files.map(async (file) => {
       try {
-        addToast('🔄 解析文件名: ' + file.name, 'info')
+        addToast('[WORD] file=' + file.name, 'info')
         const parsed = parseDocFileName(file.name)
-        addToast('☁️ 上传到云端...', 'info')
         const dataUrl = await readFileAsDataUrl(file)
-        const uploadedUrl = await uploadQueueCallback(dataUrl, file.name)
+        addToast('[WORD] calling uploadWordToTos...', 'info')
+        const uploadedUrl = await uploadWordToTos(dataUrl, file.name)
+        addToast('[WORD] uploadedUrl=' + (uploadedUrl || 'NULL'), 'info')
         if (!uploadedUrl) {
           addToast('❌ 云端上传失败，请重试', 'error')
           return
         }
-        addToast('🔗 匹配案件中...', 'info')
+        const extractedKey = (() => { try { return new URL(uploadedUrl).pathname.replace(/^\//, '') } catch { return 'PARSE_FAIL' } })()
+        addToast('[WORD] fileKey=' + extractedKey, 'info')
         const matchedCases = findMatchedCases(parsed)
         const bestMatch = matchedCases[0] || null
         if (bestMatch) {
-          await store.assignCloudFile(uploadedUrl, bestMatch.id, {
+          const payload = {
             url: uploadedUrl, name: buildWordDisplayName(file.name),
+            fileType: 'doc',
             date: dayjs().format('YYYY-MM-DD'),
             uploadedAt: dayjs().toISOString(),
             trackingNumber: parsed.trackingNumber || '',
             documentType: '其他文书',
-          }, parsed.trackingNumber ? { trackingNumber: parsed.trackingNumber } : null)
+          }
+          addToast('[WORD] assignCloudFile payload=' + JSON.stringify(payload), 'info')
+          await store.assignCloudFile(uploadedUrl, bestMatch.id, payload, parsed.trackingNumber ? { trackingNumber: parsed.trackingNumber } : null)
           addToast(`✅ 【${buildWordDisplayName(file.name)}】→ ${bestMatch.licenseName || bestMatch.shopName}（Word）`, 'success')
         } else {
           try {
-            await store.assignCloudFile(uploadedUrl, null, {
+            const payload = {
               url: uploadedUrl, name: buildWordDisplayName(file.name),
+              fileType: 'doc',
               date: dayjs().format('YYYY-MM-DD'),
               uploadedAt: dayjs().toISOString(),
               trackingNumber: parsed.trackingNumber || '',
               documentType: '其他文书',
-            })
+            }
+            addToast('[WORD] assignCloudFile (unmatched) payload=' + JSON.stringify(payload), 'info')
+            await store.assignCloudFile(uploadedUrl, null, payload)
             addToast(`📝 ${buildWordDisplayName(file.name)}（未匹配到案件，已存入云端文件）`, 'warn')
           } catch (err) {
             console.error('[Word上传] ❌ 未匹配文件写入 cloud_files 失败:', err)
@@ -2361,6 +2369,8 @@ async function handleWordUpload(event) {
     event.target.value = ''
   }
 }
+
+
 
 async function handleScanUpload(event) {
   const file = event.target.files?.[0]
@@ -2456,30 +2466,24 @@ function dedupeCloudFiles(list = []) {
 async function loadCloudFiles() {
   cloudFilesLoading.value = true
   try {
-    const storageFiles = await listTosObjects('case-images/')
-    const assignedFiles = store.cases.flatMap(c => (Array.isArray(c.images) ? c.images : []).map(img => ({
-      ...img,
-      url: img.url,
-      name: img.name || `${c.shopName || c.licenseName || '案件文件'}`,
-    })))
-
-    const mergedFiles = dedupeCloudFiles([
-      ...store.unassignedImages,
-      ...assignedFiles,
-      ...storageFiles.map(file => ({ ...file, url: getCloudFileUrl(file.Key) }))
-    ])
-
-    allCloudFiles.value = mergedFiles
-    totalCloudFiles.value = mergedFiles.length
+    // 只从 DB 记录加载，删除时才能命中 cloud_files 表
+    const { files } = await fetch('/api/storage/files').then(r => r.json())
+    const dbFiles = (files || []).map(f => ({
+      url: f.url,
+      Key: f.Key,
+      name: f.name || getFileName(f),
+      uploadedAt: f.LastModified || f.uploadedAt,
+    }))
+    allCloudFiles.value = dbFiles
+    totalCloudFiles.value = dbFiles.length
   } catch (err) {
     console.error('加载云端文件失败:', err)
-    allCloudFiles.value = dedupeCloudFiles([
-      ...store.unassignedImages,
-      ...store.cases.flatMap(c => Array.isArray(c.images) ? c.images : [])
-    ])
-    totalCloudFiles.value = allCloudFiles.value.length
+    addToast('☁️ 云端文件加载失败，请稍后重试', 'error')
+    allCloudFiles.value = []
+    totalCloudFiles.value = 0
+  } finally {
+    cloudFilesLoading.value = false
   }
-  cloudFilesLoading.value = false
 }
 
 function getCloudFileUrl(key) {
@@ -2602,10 +2606,12 @@ async function batchDeleteCloudFiles() {
   let successCount = 0
   let failCount = 0
   const removedUrls = []
+  const failReasons = []
 
   for (const file of selectedCloudFiles.value) {
     const fileUrl = file.url || getCloudFileUrl(file.Key)
     const fileKey = file.Key
+    const displayName = file.name || file.Key || fileUrl
 
     try {
       if (fileKey) {
@@ -2618,6 +2624,7 @@ async function batchDeleteCloudFiles() {
     } catch (err) {
       console.error('云端删除失败:', err)
       failCount++
+      failReasons.push(`${displayName}: ${err?.message || err}`)
     }
   }
 
@@ -2629,7 +2636,13 @@ async function batchDeleteCloudFiles() {
   selectedCloudFiles.value = []
   selectAllCloudFiles.value = false
 
-  alert(`批量删除完成：成功 ${successCount} 个${failCount > 0 ? '，失败 ' + failCount + ' 个' : ''}`)
+  if (failCount > 0) {
+    const reasonText = failReasons.join('\n')
+    addToast(`批量删除完成：成功 ${successCount} 个，失败 ${failCount} 个（详见控制台）`, 'warn')
+    console.warn(`[批量删除] 失败详情:\n${reasonText}`)
+  } else {
+    addToast(`批量删除成功：${successCount} 个文件已删除`, 'success')
+  }
 }
 
 async function openFilePreview(file) {

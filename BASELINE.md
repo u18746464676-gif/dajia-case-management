@@ -2,7 +2,7 @@
 
 ## 当前稳定 Bundle
 
-- **JS**: `index-0Bgdfb86.js`
+- **JS**: `index-CP0fHGGy.js`（= 源码 build `index-3kbFiamx.js`，修复云端列表数据源，2026-04-21）
 - **CSS**: `index-_zZAD9Z_.css`
 - **构建时间**: 2026-04-21
 
@@ -21,25 +21,34 @@
 - **当前线上上传主链路 = 8787 + 本地 `/uploads/`**
 - **当前线上上传不依赖 TOS**
 
+## 云端文件管理数据源（2026-04-21 确立）
+
+- **sole data source**: `cloud_files` 数据库（`deleted_at IS NULL` 的记录）
+- **list API**: `GET /api/storage/files`（查询 cloud_files 表）
+- **不再依赖**: `listTosObjects('case-images/')` / TOS 直列对象 / localStorage 兜底
+- **列表字段**: `url`, `Key`, `name`, `uploadedAt` 均来自 DB 记录
+- **删除链路**: `DELETE /api/storage/file?urlOrKey=...` → DB 软删除（`deleted_at` 写入）→ 列表自动过滤
+- **闭环已验**: 数据库软删除 + 列表消失（2026-04-21 测试通过，ID: 95133362-6825-43ca-8a25-0e4636970937）
+- **物理文件删除**: 将在后续用真实本地文件样本补测
+
 ## 回滚目标
 
-如需回滚，执行：
+如需回滚到上一版本，执行：
 
 ```bash
-# 1. 恢复源码
-git log --oneline -5
+# 1. 源码回滚
+git stash
 git checkout <目标 commit>
 npm run build
 
-# 2. 重新部署 dist/
-tar -czf /tmp/case-dist.tar.gz -C dist .
-scp /tmp/case-dist.tar.gz root@hzyhmz.top:/tmp/
-ssh root@hzyhmz.top "tar -xzf /tmp/case-dist.tar.gz -C /var/www/case-management/"
+# 2. 部署 dist/ 到服务器
+scp dist/assets/index-*.js root@hzyhmz.top:/var/www/case-management/assets/
 
-# 3. 回滚 nginx（如需）
+# 3. 如需恢复 nginx
 cp /etc/nginx/conf.d/case-management-ssl.conf.bak /etc/nginx/conf.d/case-management-ssl.conf
 nginx -t && nginx -s reload
 ```
 
-**当前稳定 bundle**: `index-0Bgdfb86.js`（CSS `index-_zZAD9Z_.css`）
-**上一个稳定 bundle**: `index-CP0fHGGy.js`（CSS `index-_zZAD9Z_.css`）
+**当前部署 bundle**（2026-04-21）: `index-CP0fHGGy.js`（= 源码 build `index-3kbFiamx.js`，修复云端列表数据源）
+**CSS**: `index-_zZAD9Z_.css`
+**上一稳定 bundle**: `index-CP0fHGGy.js`（修复前版本，列表含 TOS 孤儿）
