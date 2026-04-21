@@ -1121,19 +1121,42 @@ function deleteReply(replyId) {
   loadCase()
 }
 
+function inferDocTypeByName(name = '') {
+  const lowerName = String(name).toLowerCase()
+  if (/\.(pdf)$/i.test(lowerName)) return 'pdf'
+  if (/\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(lowerName)) return 'image'
+  return 'other'
+}
+
 function handleDocFileChange(event) {
-  selectedDocFile.value = event.target.files?.[0] || null
+  const file = event.target.files?.[0] || null
+  selectedDocFile.value = file
+  if (!file) return
+
+  if (!docForm.value.name.trim()) {
+    docForm.value.name = file.name || ''
+  }
+  if (!docForm.value.category) {
+    docForm.value.category = 'other'
+  }
+  docForm.value.type = inferDocTypeByName(docForm.value.name || file.name || '')
 }
 
 async function submitDoc() {
-  if (!docForm.value.name.trim()) return
   if (!selectedDocFile.value) return
 
   const file = selectedDocFile.value
+  if (!docForm.value.name.trim()) {
+    docForm.value.name = file.name || '未命名材料'
+  }
+  if (!docForm.value.category) {
+    docForm.value.category = 'other'
+  }
+
   const lowerName = docForm.value.name.toLowerCase()
   const originalLower = (file.name || '').toLowerCase()
   const isWord = /\.(doc|docx)$/i.test(originalLower)
-  const type = lowerName.endsWith('.pdf') ? 'pdf' : (lowerName.match(/\.(png|jpe?g|webp|gif|bmp|heic|heif)$/) ? 'image' : 'other')
+  const type = inferDocTypeByName(lowerName)
 
   docUploading.value = true
   try {
