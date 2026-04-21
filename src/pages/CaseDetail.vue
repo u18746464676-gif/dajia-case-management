@@ -526,7 +526,7 @@
                       <div class="truncate text-sm font-semibold text-slate-800">{{ d.name }}</div>
                       <div class="mt-1 text-xs text-slate-400">{{ formatDate(d.uploadedAt) }}</div>
                       <div v-if="d.note" class="mt-2 text-sm leading-6 text-slate-500">{{ d.note }}</div>
-                      <a v-if="d.url" :href="d.url" target="_blank" rel="noreferrer" class="mt-2 inline-flex text-sm text-blue-600 hover:text-blue-700">打开链接</a>
+                      <button v-if="d.url" @click="previewFile(d.url, d.name)" class="mt-2 inline-flex text-sm text-blue-600 hover:text-blue-700">预览文件</button>
                     </div>
                     <button @click="deleteDoc(d.id)" class="btn-ghost text-rose-500 hover:bg-rose-50 hover:text-rose-600">删除</button>
                   </div>
@@ -621,10 +621,18 @@
     <div v-if="previewImageUrl" class="flex items-center justify-center">
       <img :src="previewImageUrl" class="max-w-[90vw] max-h-[90vh] object-contain" @click.stop />
     </div>
-    <div v-else class="flex flex-col items-center justify-center gap-4 text-white text-center p-8">
+    <div v-else-if="previewPdfUrl" class="h-[88vh] w-[92vw] max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl" @click.stop>
+      <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm text-slate-600">
+        <span class="truncate">{{ previewFileName || 'PDF 预览' }}</span>
+        <a :href="previewPdfUrl" target="_blank" class="text-blue-600 hover:text-blue-700">新窗口打开</a>
+      </div>
+      <iframe :src="previewPdfUrl" class="h-[calc(88vh-56px)] w-full bg-white"></iframe>
+    </div>
+    <div v-else class="flex flex-col items-center justify-center gap-4 p-8 text-center text-white" @click.stop>
       <div class="text-7xl">{{ getFileIconByUrl(previewNonImageUrl) }}</div>
-      <div class="text-lg">当前格式不支持弹窗内预览</div>
-      <a :href="previewNonImageUrl" target="_blank" class="underline text-blue-300 hover:text-blue-200">点击新窗口打开 / 下载</a>
+      <div class="text-lg">{{ previewFileName || '当前格式暂不支持弹窗内预览' }}</div>
+      <div class="text-sm text-slate-300">Word 等文件先展示文件信息，不会直接自动下载。</div>
+      <a :href="previewNonImageUrl" target="_blank" class="underline text-blue-300 hover:text-blue-200">点击打开文件</a>
     </div>
   </div>
 </template>
@@ -651,7 +659,9 @@ const activeDetailTab = ref('info')
 const activeMaterialTab = ref('all')
 const showImagePreview = ref(false)
 const previewImageUrl = ref('')
+const previewPdfUrl = ref('')
 const previewNonImageUrl = ref('')
+const previewFileName = ref('')
 
 const replyForm = ref({ date: dayjs().format('YYYY-MM-DD'), content: '' })
 const docFileInputRef = ref(null)
@@ -885,11 +895,18 @@ function deleteImage(idx) {
   saveField('images', images)
 }
 
-function previewImage(url) {
-  const isImage = /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(url)
+function previewFile(url, name = '') {
+  const isImage = /\.(png|jpe?g|gif|webp|bmp|heic|heif)(\?|$)/i.test(url)
+  const isPdf = /\.(pdf)(\?|$)/i.test(url)
+  previewFileName.value = name || ''
   previewImageUrl.value = isImage ? url : ''
-  previewNonImageUrl.value = isImage ? '' : url
+  previewPdfUrl.value = isPdf ? url : ''
+  previewNonImageUrl.value = !isImage && !isPdf ? url : ''
   showImagePreview.value = true
+}
+
+function previewImage(url) {
+  previewFile(url)
 }
 
 function getFileIconByUrl(url) {
