@@ -109,10 +109,10 @@ export function checkOverdueCases(cases) {
         if (daysLeft < 0 || daysLeft <= 7) {
           let message = `${mediationName}：${formatCountdownStatus(daysLeft)}`
           if (isOldProcedure) {
-            message += '。工作日计算暂按排除周六、周日测算，法定节假日需人工复核。'
+            message += ' 工作日计算暂按排除周六、周日测算，法定节假日需人工复核。'
           }
           if (daysLeft < 0) {
-            message += '。调解期限已届满，可能存在未依法终止调解或未依法告知问题，可考虑行政复议、行政执法监督、政府督查。'
+            message += ' 调解期限已届满，可能存在未依法终止调解或未依法告知问题，可考虑行政复议、行政执法监督、政府督查。'
           }
           overdueList.push({
             id: c.id,
