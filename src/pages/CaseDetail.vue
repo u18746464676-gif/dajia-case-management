@@ -195,60 +195,165 @@
           </div>
         </section>
 
-        <section class="card">
-          <div class="flex items-center justify-between gap-3">
-            <h3 class="section-title mb-0">行政复议</h3>
-            <span class="soft-tag">{{ c.hasAdminReview === 'yes' ? '已申请复议' : '未申请复议' }}</span>
+        <section ref="disposalSectionRef" class="card">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 class="section-title mb-1">后续处置 / 救济监督</h3>
+              <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">把行政复议、监督督办、信访协调等后续程序统一记录在这里，倒计时提醒只负责给你快捷入口。</p>
+            </div>
+            <span class="soft-tag">已记录 {{ disposalRecords.length }} 条</span>
           </div>
 
-          <div class="mt-4 grid grid-cols-1 gap-4">
-            <div>
-              <label class="label">是否申请复议</label>
-              <select v-model="c.hasAdminReview" @change="saveField('hasAdminReview', c.hasAdminReview)" class="input-field">
-                <option value="">未申请</option>
-                <option value="yes">是</option>
-                <option value="no">否</option>
-              </select>
+          <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+            <div class="space-y-4">
+              <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-4">
+                <div class="text-xs uppercase tracking-wider text-slate-400">程序类型</div>
+                <div class="mt-3 space-y-3">
+                  <div v-for="group in disposalTypeGroups" :key="group.name">
+                    <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ group.name }}</div>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      <button
+                        v-for="item in group.items"
+                        :key="item"
+                        type="button"
+                        class="rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                        :class="disposalDraft.disposalType === item ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-600'"
+                        @click="selectDisposalType(item)"
+                      >
+                        {{ item }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="disposalContextLines.length" class="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                <div class="text-sm font-semibold text-blue-700">当前带入信息</div>
+                <div class="mt-2 space-y-1 text-xs leading-5 text-blue-700/90">
+                  <div v-for="(line, idx) in disposalContextLines" :key="`ctx-${idx}`">{{ line }}</div>
+                </div>
+              </div>
+
+              <div v-if="hasLegacyAdminReview" class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">旧行政复议信息</div>
+                  <span class="soft-tag">只读兼容</span>
+                </div>
+                <div class="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-600 dark:text-slate-300 md:grid-cols-2">
+                  <div v-for="item in legacyAdminReviewFields" :key="item.label">
+                    <div class="text-xs text-slate-400">{{ item.label }}</div>
+                    <div class="mt-1 break-all">{{ item.value || '未填写' }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">已保存处置记录</div>
+                  <button type="button" class="text-xs text-slate-500 hover:text-blue-600" @click="startNewDisposal()">新建一条</button>
+                </div>
+                <div v-if="disposalRecords.length" class="mt-3 space-y-3">
+                  <div v-for="item in disposalRecords" :key="item.id" class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
+                    <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <div class="min-w-0">
+                        <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ item.disposalType || '未命名处置' }}</div>
+                        <div class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                          <div v-if="item.targetOrgan">提交机关：{{ item.targetOrgan }}</div>
+                          <div v-if="item.submitDate">提交日期：{{ item.submitDate }}</div>
+                          <div v-if="item.status">办理状态：{{ item.status }}</div>
+                          <div v-if="item.reviewStatusText">期限状态：{{ item.reviewStatusText }}</div>
+                        </div>
+                      </div>
+                      <div class="flex shrink-0 flex-wrap gap-2">
+                        <button type="button" class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:border-blue-300 hover:text-blue-600" @click="editDisposal(item)">编辑</button>
+                        <button type="button" class="rounded-full border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50" @click="deleteDisposal(item)">删除</button>
+                      </div>
+                    </div>
+                    <div v-if="item.resultSummary" class="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">结果摘要：{{ item.resultSummary }}</div>
+                    <div v-if="formatRelatedMaterials(item.relatedMaterials)" class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">关联材料：{{ formatRelatedMaterials(item.relatedMaterials) }}</div>
+                    <div v-if="item.note" class="mt-2 whitespace-pre-line text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">备注：{{ item.note }}</div>
+                  </div>
+                </div>
+                <div v-else class="mt-3 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-5 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                  还没有保存任何后续处置记录，可以先从上方选择一个程序类型开始。
+                </div>
+              </div>
             </div>
 
-            <template v-if="c.hasAdminReview === 'yes'">
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+              <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <label class="label">复议结果</label>
-                  <select v-model="c.adminReviewResult" @change="saveField('adminReviewResult', c.adminReviewResult)" class="input-field">
+                  <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ editingDisposalId ? '编辑后续处置记录' : '新建后续处置记录' }}</div>
+                  <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">只在你点保存后写入 `disposals`，不会自动创建记录。</div>
+                </div>
+                <button type="button" class="text-xs text-slate-500 hover:text-blue-600" @click="resetDisposalDraft()">清空表单</button>
+              </div>
+
+              <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label class="label">处置类型</label>
+                  <select v-model="disposalDraft.disposalType" class="input-field">
                     <option value="">请选择</option>
-                    <option value="维持">维持</option>
-                    <option value="撤销">撤销</option>
-                    <option value="变更">变更</option>
-                    <option value="责令限期履行">责令限期履行</option>
-                    <option value="终止">终止</option>
+                    <optgroup v-for="group in disposalTypeGroups" :key="group.name" :label="group.name">
+                      <option v-for="item in group.items" :key="item" :value="item">{{ item }}</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div>
-                  <label class="label">复议机关</label>
-                  <input v-model="c.adminReviewAuthority" @change="saveField('adminReviewAuthority', c.adminReviewAuthority)" type="text" class="input-field" placeholder="行政复议机关名称" />
+                  <label class="label">提交机关 / 部门</label>
+                  <input v-model="disposalDraft.targetOrgan" type="text" class="input-field" placeholder="例如：运城市市场监督管理局" />
                 </div>
                 <div>
-                  <label class="label">复议申请日期</label>
-                  <input v-model="c.adminReviewApplyDate" @change="saveField('adminReviewApplyDate', c.adminReviewApplyDate)" type="date" class="input-field" />
+                  <label class="label">提交日期</label>
+                  <input v-model="disposalDraft.submitDate" type="date" class="input-field" />
                 </div>
                 <div>
-                  <label class="label">复议受理日期</label>
-                  <input v-model="c.adminReviewAcceptDate" @change="saveField('adminReviewAcceptDate', c.adminReviewAcceptDate)" type="date" class="input-field" />
+                  <label class="label">办理状态</label>
+                  <input v-model="disposalDraft.status" type="text" class="input-field" placeholder="例如：拟提交 / 已提交 / 办理中" />
                 </div>
                 <div>
-                  <label class="label">复议决定日期</label>
-                  <input v-model="c.adminReviewDecisionDate" @change="saveField('adminReviewDecisionDate', c.adminReviewDecisionDate)" type="date" class="input-field" />
+                  <label class="label">结果日期</label>
+                  <input v-model="disposalDraft.resultDate" type="date" class="input-field" />
                 </div>
                 <div>
-                  <label class="label">复议决定书编号</label>
-                  <input v-model="c.adminReviewDocNo" @change="saveField('adminReviewDocNo', c.adminReviewDocNo)" type="text" class="input-field" placeholder="例：x复字〔2024〕第xx号" />
+                  <label class="label">结果摘要</label>
+                  <input v-model="disposalDraft.resultSummary" type="text" class="input-field" placeholder="简要记录反馈结果" />
                 </div>
               </div>
-            </template>
 
-            <div v-else class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 px-4 py-6 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
-              未申请复议时，无需填写后续字段。
+              <div v-if="disposalDraft.disposalType === '行政复议'" class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label class="label">复议起算日</label>
+                  <input v-model="disposalDraft.reviewStartDate" type="date" class="input-field" />
+                </div>
+                <div>
+                  <label class="label">60 日复议截止日</label>
+                  <input v-model="disposalDraft.reviewDeadline60" type="date" class="input-field" />
+                </div>
+                <div>
+                  <label class="label">一年保护期日期</label>
+                  <input v-model="disposalDraft.reviewLongStopDate" type="date" class="input-field" />
+                </div>
+                <div>
+                  <label class="label">当前期限状态</label>
+                  <input v-model="disposalDraft.reviewStatusText" type="text" class="input-field" placeholder="例如：行政复议期限：剩余 12 天" />
+                </div>
+              </div>
+
+              <div class="mt-4">
+                <label class="label">关联材料说明（轻量）</label>
+                <textarea v-model="relatedMaterialsText" rows="3" class="input-field min-h-[88px]" placeholder="手动填写材料说明，或按“名称 | URL | 类型”一行一条记录。"></textarea>
+              </div>
+
+              <div class="mt-4">
+                <label class="label">备注</label>
+                <textarea v-model="disposalDraft.note" rows="5" class="input-field min-h-[120px]" placeholder="记录案件编号、期限状态、风险提示、沟通情况等。"></textarea>
+              </div>
+
+              <div class="mt-5 flex flex-wrap justify-end gap-2">
+                <button type="button" class="btn-secondary" @click="resetDisposalDraft()">取消</button>
+                <button type="button" class="btn-primary" @click="saveDisposal()">保存后续处置</button>
+              </div>
             </div>
           </div>
         </section>
@@ -256,7 +361,7 @@
     </template>
 
     <template v-else-if="activeDetailTab === 'timeline'">
-      <DeadlinePanel :case-obj="caseData" @update="loadCase" />
+      <DeadlinePanel :case-obj="caseData" @update="loadCase" @open-disposal="handleOpenDisposal" />
 
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <section class="card">
@@ -734,7 +839,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCaseStore } from '@/stores/case'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -773,8 +878,72 @@ const documentCategoryOptions = [
   { value: 'other', label: '其他文书' },
 ]
 const c = ref(null)
+const disposalSectionRef = ref(null)
+const editingDisposalId = ref('')
+const relatedMaterialsText = ref('')
+const disposalContext = ref(null)
+const disposalTypeGroups = [
+  { name: '法定救济', items: ['行政复议', '行政诉讼', '政府信息公开'] },
+  { name: '监督督办', items: ['上级主管机关反映', '行政执法监督', '政府督查', '人大监督', '人大代表建议 / 反映渠道', '政协民主监督 / 委员反映渠道'] },
+  { name: '问责线索', items: ['纪检监察举报', '派驻纪检监察组反映'] },
+  { name: '检察监督', items: ['检察监督', '行政公益诉讼线索', '行政诉讼监督'] },
+  { name: '信访协调', items: ['信访', '12345 政务服务热线', '领导信箱', '政府网站留言'] },
+  { name: '其他', items: ['其他监督 / 救济路径'] },
+]
 
+function createEmptyDisposalDraft() {
+  return {
+    disposalType: '',
+    targetOrgan: '',
+    submitDate: dayjs().format('YYYY-MM-DD'),
+    status: '',
+    resultDate: '',
+    resultSummary: '',
+    note: '',
+    reviewStartDate: '',
+    reviewDeadline60: '',
+    reviewLongStopDate: '',
+    reviewStatusText: '',
+  }
+}
+
+const disposalDraft = ref(createEmptyDisposalDraft())
 const caseData = computed(() => store.getCase(route.params.id))
+const disposalRecords = computed(() => Array.isArray(c.value?.disposals) ? c.value.disposals : [])
+const hasLegacyAdminReview = computed(() => Boolean(
+  c.value?.hasAdminReview === 'yes'
+  || c.value?.adminReviewResult
+  || c.value?.adminReviewApplyDate
+  || c.value?.adminReviewAuthority
+  || c.value?.adminReviewAcceptDate
+  || c.value?.adminReviewDecisionDate
+  || c.value?.adminReviewDocNo,
+))
+const legacyAdminReviewFields = computed(() => ([
+  { label: '是否申请复议', value: c.value?.hasAdminReview === 'yes' ? '是' : c.value?.hasAdminReview === 'no' ? '否' : '' },
+  { label: '复议结果', value: c.value?.adminReviewResult || '' },
+  { label: '复议机关', value: c.value?.adminReviewAuthority || '' },
+  { label: '复议申请日期', value: c.value?.adminReviewApplyDate || '' },
+  { label: '复议受理日期', value: c.value?.adminReviewAcceptDate || '' },
+  { label: '复议决定日期', value: c.value?.adminReviewDecisionDate || '' },
+  { label: '复议决定书编号', value: c.value?.adminReviewDocNo || '' },
+]).filter(item => item.value))
+const disposalContextLines = computed(() => {
+  const ctx = disposalContext.value || {}
+  return [
+    ctx.caseNumber ? `案件编号：${ctx.caseNumber}` : '',
+    ctx.jurisdiction ? `管辖局：${ctx.jurisdiction}` : '',
+    ctx.reportResultLabel ? `举报结果：${ctx.reportResultLabel}` : '',
+    ctx.reportResultDate ? `举报结果日期：${ctx.reportResultDate}` : '',
+    ctx.reviewDeadline60 ? `60 日复议截止日：${ctx.reviewDeadline60}` : '',
+    ctx.reviewLongStopDate ? `一年保护期日期：${ctx.reviewLongStopDate}` : '',
+    ctx.reviewStatusText ? `当前期限状态：${ctx.reviewStatusText}` : '',
+    ctx.acceptanceDate ? `受理日期：${ctx.acceptanceDate}` : '',
+    ctx.mediationDeadline ? `调解截止日：${ctx.mediationDeadline}` : '',
+    ctx.mediationOverdueText ? `超期状态：${ctx.mediationOverdueText}` : '',
+    ctx.mediationRiskHint ? `风险提示：${ctx.mediationRiskHint}` : '',
+  ].filter(Boolean)
+})
 
 const detailTabs = [
   { value: 'info', label: '案件信息' },
@@ -873,7 +1042,10 @@ const timelineItems = computed(() => {
 
   const replies = Array.isArray(c.value.replies) ? c.value.replies : []
   const latestReply = replies.length > 0 ? [...replies].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0] : null
-  const hasAdminReviewProgress = Boolean(c.value.adminReviewApplyDate || c.value.adminReviewAcceptDate || c.value.adminReviewDecisionDate || c.value.adminReviewDocNo)
+  const latestDisposal = Array.isArray(c.value.disposals) && c.value.disposals.length > 0
+    ? [...c.value.disposals].sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0]
+    : null
+  const hasAdminReviewProgress = Boolean(latestDisposal || c.value.adminReviewApplyDate || c.value.adminReviewAcceptDate || c.value.adminReviewDecisionDate || c.value.adminReviewDocNo)
   const finalStatusDate = c.value.decisionDate || getStatusChangedAt('decided', 'closed', 'rejected', 'not_punished')
   const currentStatusLabel = statusLabel(c.value.status)
 
@@ -933,11 +1105,13 @@ const timelineItems = computed(() => {
     },
     {
       key: 'review',
-      title: '行政复议',
-      date: c.value.adminReviewDecisionDate || c.value.adminReviewAcceptDate || c.value.adminReviewApplyDate,
-      description: hasAdminReviewProgress
-        ? `复议结果：${c.value.adminReviewResult || '处理中'}`
-        : '未进入复议时可暂不处理',
+      title: '后续处置 / 救济监督',
+      date: latestDisposal?.updatedAt || c.value.adminReviewDecisionDate || c.value.adminReviewAcceptDate || c.value.adminReviewApplyDate,
+      description: latestDisposal
+        ? `${latestDisposal.disposalType || '后续处置'}：${latestDisposal.status || latestDisposal.resultSummary || '已记录'}`
+        : hasAdminReviewProgress
+          ? `复议结果：${c.value.adminReviewResult || '处理中'}`
+          : '尚未记录后续处置时可暂不处理',
     },
   ]
 
@@ -1281,6 +1455,120 @@ async function saveProfit(value) {
 
 function loadCase() {
   c.value = caseData.value
+}
+
+function parseRelatedMaterials(text = '') {
+  return String(text)
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const [name = '', url = '', type = ''] = line.split('|').map(part => part.trim())
+      return { name, url, type: type || (url ? 'link' : 'note') }
+    })
+}
+
+function formatRelatedMaterials(materials = []) {
+  if (!Array.isArray(materials) || materials.length === 0) return ''
+  return materials.map(item => [item.name, item.url, item.type].filter(Boolean).join(' | ')).join('；')
+}
+
+function fillDisposalDraft(draft = {}, context = null) {
+  disposalDraft.value = {
+    ...createEmptyDisposalDraft(),
+    ...draft,
+  }
+  relatedMaterialsText.value = Array.isArray(draft.relatedMaterials)
+    ? draft.relatedMaterials.map(item => [item.name, item.url, item.type].filter(Boolean).join(' | ')).join('\n')
+    : ''
+  disposalContext.value = context
+}
+
+function resetDisposalDraft() {
+  editingDisposalId.value = ''
+  fillDisposalDraft(createEmptyDisposalDraft(), null)
+}
+
+function selectDisposalType(type) {
+  disposalDraft.value.disposalType = type
+  if (!disposalDraft.value.submitDate) {
+    disposalDraft.value.submitDate = dayjs().format('YYYY-MM-DD')
+  }
+}
+
+function startNewDisposal(type = '') {
+  resetDisposalDraft()
+  if (type) {
+    selectDisposalType(type)
+  }
+}
+
+function editDisposal(item) {
+  editingDisposalId.value = item.id
+  fillDisposalDraft({ ...item, relatedMaterials: item.relatedMaterials || [] }, null)
+}
+
+function buildDisposalPayload() {
+  const now = dayjs().toISOString()
+  return {
+    id: editingDisposalId.value || crypto.randomUUID(),
+    disposalType: disposalDraft.value.disposalType || '',
+    targetOrgan: disposalDraft.value.targetOrgan || '',
+    submitDate: disposalDraft.value.submitDate || '',
+    status: disposalDraft.value.status || '',
+    resultDate: disposalDraft.value.resultDate || '',
+    resultSummary: disposalDraft.value.resultSummary || '',
+    relatedMaterials: parseRelatedMaterials(relatedMaterialsText.value),
+    note: disposalDraft.value.note || '',
+    reviewStartDate: disposalDraft.value.reviewStartDate || '',
+    reviewDeadline60: disposalDraft.value.reviewDeadline60 || '',
+    reviewLongStopDate: disposalDraft.value.reviewLongStopDate || '',
+    reviewStatusText: disposalDraft.value.reviewStatusText || '',
+    createdAt: editingDisposalId.value
+      ? (disposalRecords.value.find(item => item.id === editingDisposalId.value)?.createdAt || now)
+      : now,
+    updatedAt: now,
+  }
+}
+
+function saveDisposal() {
+  if (!disposalDraft.value.disposalType) {
+    alert('请先选择处置类型')
+    return
+  }
+  const payload = buildDisposalPayload()
+  const next = editingDisposalId.value
+    ? disposalRecords.value.map(item => (item.id === editingDisposalId.value ? payload : item))
+    : [payload, ...disposalRecords.value]
+  store.updateCase(c.value.id, { disposals: next })
+  loadCase()
+  resetDisposalDraft()
+}
+
+function deleteDisposal(item) {
+  if (!confirm(`确认删除“${item.disposalType || '后续处置'}”这条记录吗？`)) return
+  const next = disposalRecords.value.filter(entry => entry.id !== item.id)
+  store.updateCase(c.value.id, { disposals: next })
+  loadCase()
+  if (editingDisposalId.value === item.id) {
+    resetDisposalDraft()
+  }
+}
+
+async function scrollToDisposalSection() {
+  activeDetailTab.value = 'info'
+  await nextTick()
+  disposalSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+async function handleOpenDisposal(payload = {}) {
+  await scrollToDisposalSection()
+  if (!payload?.type) return
+  editingDisposalId.value = ''
+  fillDisposalDraft({
+    ...createEmptyDisposalDraft(),
+    ...(payload.draft || {}),
+  }, payload.caseContext || null)
 }
 
 function updateStatusSection(statusField, dateField, newStatus) {

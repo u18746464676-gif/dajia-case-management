@@ -43,6 +43,17 @@
             <div v-if="d.hint" class="text-xs mt-1 leading-5" :class="d.expired ? 'text-red-500' : 'text-slate-500'">
               {{ d.hint }}
             </div>
+            <div v-if="d.actions?.length" class="mt-3 flex flex-wrap gap-2">
+              <button
+                v-for="action in d.actions"
+                :key="`${d.type || d.name}-${action.key}`"
+                type="button"
+                class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                @click="emit('open-disposal', action.payload)"
+              >
+                {{ action.label }}
+              </button>
+            </div>
           </div>
           <div v-if="d.statusText" class="text-right shrink-0">
             <div class="text-sm font-bold" :class="d.expired ? 'text-red-600' : d.urgent ? 'text-orange-600' : 'text-slate-700'">
@@ -103,7 +114,7 @@ import dayjs from 'dayjs'
 import { useCaseStore } from '@/stores/case'
 
 const props = defineProps(['caseObj'])
-const emit = defineEmits(['update'])
+const emit = defineEmits(['update', 'open-disposal'])
 const store = useCaseStore()
 
 const showAdd = ref(false)
@@ -166,6 +177,95 @@ function buildCountdownItem(name, date, daysLeft, type, extra = {}) {
     type,
     hint: extra.hint || '',
     metaLines: extra.metaLines || [],
+    actions: extra.actions || [],
+  }
+}
+
+function buildReviewDisposalPayload(c) {
+  if (!c?.reportResultDate) return null
+  const reviewDeadline60 = dayjs(c.reportResultDate).add(60, 'day').format('YYYY-MM-DD')
+  const reviewLongStopDate = dayjs(c.reportResultDate).add(1, 'year').format('YYYY-MM-DD')
+  const reviewDaysLeft = dayjs(reviewDeadline60).diff(dayjs(), 'day')
+  const reviewLongStopDaysLeft = dayjs(reviewLongStopDate).diff(dayjs(), 'day')
+  let reviewStatusText = `行政复议期限：${formatCountdownStatus(reviewDaysLeft)}`
+  if (reviewDaysLeft < 0 && reviewLongStopDaysLeft >= 0) {
+    reviewStatusText = `行政复议 60 日期限：${formatCountdownStatus(reviewDaysLeft)}；未告知救济途径最长保护期：尚余 ${reviewLongStopDaysLeft} 天`
+  }
+  if (reviewLongStopDaysLeft < 0) {
+    reviewStatusText = `行政复议 60 日期限：${formatCountdownStatus(reviewDaysLeft)}；未告知救济途径最长保护期：已超期 ${Math.abs(reviewLongStopDaysLeft)} 天`
+  }
+  return {
+    type: '行政复议',
+    source: 'review_deadline',
+    caseContext: {
+      caseNumber: c.caseNumber || '',
+      jurisdiction: c.jurisdiction || '',
+      reportResult: c.reportResultStatus || '',
+      reportResultLabel: {
+        closed: '已处罚',
+        rejected: '不予立案',
+        not_punished: '责令改正',
+        exempted: '不予处理',
+      }[c.reportResultStatus] || c.reportResultStatus || '',
+      reportResultDate: c.reportResultDate || '',
+      reviewDeadline60,
+      reviewLongStopDate,
+      reviewStatusText,
+    },
+    draft: {
+      disposalType: '行政复议',
+      targetOrgan: c.jurisdiction || '',
+      submitDate: dayjs().format('YYYY-MM-DD'),
+      status: '拟申请',
+      resultSummary: c.reportResultStatus ? `举报结果：${{
+        closed: '已处罚',
+        rejected: '不予立案',
+        not_punished: '责令改正',
+        exempted: '不予处理',
+      }[c.reportResultStatus] || c.reportResultStatus}` : '',
+      reviewStartDate: c.reportResultDate || '',
+      reviewDeadline60,
+      reviewLongStopDate,
+      reviewStatusText,
+      note: [
+        c.caseNumber ? `案件编号：${c.caseNumber}` : '',
+        c.jurisdiction ? `管辖局：${c.jurisdiction}` : '',
+        c.reportResultDate ? `举报结果日期：${c.reportResultDate}` : '',
+      ].filter(Boolean).join('\n'),
+    },
+  }
+}
+
+function buildMediationDisposalPayload(c, type, deadline, daysLeft) {
+  const labels = {
+    '行政执法监督': '行政执法监督',
+    '政府督查': '政府督查',
+    '12345 / 信访': '12345 / 信访',
+  }
+  return {
+    type,
+    source: 'mediation_overdue',
+    caseContext: {
+      caseNumber: c.caseNumber || '',
+      jurisdiction: c.jurisdiction || '',
+      acceptanceDate: c.acceptanceDate || '',
+      mediationDeadline: deadline,
+      mediationOverdueText: formatCountdownStatus(daysLeft),
+      mediationRiskHint: '调解期限已届满，可能存在未依法终止调解或未依法告知问题，可考虑行政复议、行政执法监督、政府督查。',
+    },
+    draft: {
+      disposalType: labels[type] || type,
+      targetOrgan: c.jurisdiction || '',
+      submitDate: dayjs().format('YYYY-MM-DD'),
+      status: '拟提交',
+      note: [
+        c.caseNumber ? `案件编号：${c.caseNumber}` : '',
+        c.acceptanceDate ? `受理日期：${c.acceptanceDate}` : '',
+        deadline ? `调解截止日：${deadline}` : '',
+        `期限状态：${formatCountdownStatus(daysLeft)}`,
+        '风险提示：调解期限已届满，可能存在未依法终止调解或未依法告知问题，可考虑行政复议、行政执法监督、政府督查。',
+      ].filter(Boolean).join('\n'),
+    },
   }
 }
 
@@ -230,6 +330,14 @@ const legalDeadlines = computed(() => {
         hint: mediationDaysLeft < 0
           ? '调解期限已届满，可能存在未依法终止调解或未依法告知问题，可考虑行政复议、行政执法监督、政府督查。'
           : '',
+        actions: mediationDaysLeft < 0
+          ? [
+              { key: 'law_supervision', label: '发起行政执法监督', payload: buildMediationDisposalPayload(c, '行政执法监督', mediationDeadline, mediationDaysLeft) },
+              { key: 'gov_inspection', label: '发起政府督查', payload: buildMediationDisposalPayload(c, '政府督查', mediationDeadline, mediationDaysLeft) },
+              { key: 'petition', label: '发起 12345 / 信访', payload: buildMediationDisposalPayload(c, '12345 / 信访', mediationDeadline, mediationDaysLeft) },
+              { key: 'view_all', label: '查看/编辑后续处置', payload: { type: '', source: 'disposals_overview' } },
+            ]
+          : [],
       }))
     }
 
@@ -323,6 +431,7 @@ const legalDeadlines = computed(() => {
       hint = '提示：通常已超过最长保护期；是否仍可救济需结合不可抗力、正当理由、是否另有新行政行为等人工审查。'
     }
 
+    const reviewPayload = buildReviewDisposalPayload(c)
     list.push({
       name,
       date: reviewDeadline60,
@@ -333,6 +442,12 @@ const legalDeadlines = computed(() => {
       type: 'review_deadline',
       metaLines,
       hint,
+      actions: reviewPayload
+        ? [
+            { key: 'start_review', label: '发起行政复议', payload: reviewPayload },
+            { key: 'view_all', label: '查看/编辑后续处置', payload: { type: '', source: 'disposals_overview' } },
+          ]
+        : [],
     })
   }
 

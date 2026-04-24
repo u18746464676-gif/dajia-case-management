@@ -114,6 +114,27 @@ function inferProcedureVersion(signDate) {
   return parsed.isBefore(dayjs(PROCEDURE_RULE_CUTOFF), 'day') ? 'old' : 'new'
 }
 
+function normalizeDisposalRecord(item = {}) {
+  const now = dayjs().toISOString()
+  return {
+    id: item.id || uuid(),
+    disposalType: item.disposalType || '',
+    targetOrgan: item.targetOrgan || '',
+    submitDate: item.submitDate || '',
+    status: item.status || '',
+    resultDate: item.resultDate || '',
+    resultSummary: item.resultSummary || '',
+    relatedMaterials: Array.isArray(item.relatedMaterials) ? item.relatedMaterials : [],
+    note: item.note || '',
+    reviewStartDate: item.reviewStartDate || '',
+    reviewDeadline60: item.reviewDeadline60 || '',
+    reviewLongStopDate: item.reviewLongStopDate || '',
+    reviewStatusText: item.reviewStatusText || '',
+    createdAt: item.createdAt || now,
+    updatedAt: item.updatedAt || now,
+  }
+}
+
 function normalizeCaseRecord(data = {}) {
   return {
     ...data,
@@ -122,6 +143,7 @@ function normalizeCaseRecord(data = {}) {
     filingDate: data.filingDate || null,
     filingNoticeDate: data.filingNoticeDate || null,
     filingNote: data.filingNote || '',
+    disposals: Array.isArray(data.disposals) ? data.disposals.map(item => normalizeDisposalRecord(item)) : [],
   }
 }
 
@@ -383,6 +405,7 @@ export const useCaseStore = defineStore('case', () => {
       adminReviewAcceptDate: normalized.adminReviewAcceptDate || '',
       adminReviewDecisionDate: normalized.adminReviewDecisionDate || '',
       adminReviewDocNo: normalized.adminReviewDocNo || '',
+      disposals: Array.isArray(normalized.disposals) ? normalized.disposals.map(item => normalizeDisposalRecord(item)) : [],
     }
   }
 
