@@ -509,12 +509,15 @@
 
 
     <div v-if="showStatusModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showStatusModal = false">
-      <div class="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
+      <div class="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
         <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">变更案件状态</h3>
-        <div class="mt-4 space-y-4">
+        <div class="mt-4 space-y-5">
           <!-- 受理状态 -->
-          <div>
-            <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">① 受理状态</div>
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">① 受理状态</div>
+              <button @click="clearAcceptanceStatus" class="text-xs text-rose-500 hover:text-rose-600">清空本段状态</button>
+            </div>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="s in acceptanceOptions"
@@ -526,10 +529,23 @@
                 <span>{{ s.icon }}</span><span>{{ s.label }}</span>
               </button>
             </div>
+            <div class="mt-3">
+              <label class="label">{{ c.acceptanceStatus === 'reported' ? '不予受理日期' : '受理日期' }}</label>
+              <input
+                :value="c.acceptanceDate || ''"
+                @change="saveAcceptanceDate($event.target.value)"
+                type="date"
+                class="input-field"
+              />
+            </div>
           </div>
+
           <!-- 投诉跟进 -->
-          <div>
-            <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">② 投诉跟进</div>
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">② 投诉跟进</div>
+              <button @click="clearMediationStatus" class="text-xs text-rose-500 hover:text-rose-600">清空本段状态</button>
+            </div>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="s in mediationOptions"
@@ -541,10 +557,23 @@
                 <span>{{ s.icon }}</span><span>{{ s.label }}</span>
               </button>
             </div>
+            <div class="mt-3">
+              <label class="label">{{ c.mediationStatus === 'mediation_terminated' ? '终止调解日期' : '调解日期' }}</label>
+              <input
+                :value="c.mediationDate || ''"
+                @change="saveMediationDate($event.target.value)"
+                type="date"
+                class="input-field"
+              />
+            </div>
           </div>
+
           <!-- 举报结果 -->
-          <div>
-            <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">③ 举报结果</div>
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">③ 举报结果</div>
+              <button @click="clearReportResultStatus" class="text-xs text-rose-500 hover:text-rose-600">清空本段状态</button>
+            </div>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="s in reportResultOptions"
@@ -555,6 +584,15 @@
               >
                 <span>{{ s.icon }}</span><span>{{ s.label }}</span>
               </button>
+            </div>
+            <div class="mt-3">
+              <label class="label">举报结果日期</label>
+              <input
+                :value="c.reportResultDate || ''"
+                @change="saveReportResultDate($event.target.value)"
+                type="date"
+                class="input-field"
+              />
             </div>
           </div>
         </div>
@@ -744,7 +782,7 @@ const reportResultOptions = [
   { value: 'closed', label: '已处罚', icon: '⚖️' },
   { value: 'rejected', label: '不予立案', icon: '❌' },
   { value: 'not_punished', label: '责令改正', icon: '🚫' },
-  { value: 'exempted', label: '不予处罚', icon: '🚫' },
+  { value: 'exempted', label: '不予处理', icon: '🚫' },
 ]
 
 const statusLabels = {
@@ -755,7 +793,7 @@ const statusLabels = {
   closed: '已处罚',
   rejected: '不予立案',
   not_punished: '责令改正',
-  exempted: '不予处罚',
+  exempted: '不予处理',
   mediation_terminated: '终止调解',
 }
 
@@ -1146,39 +1184,59 @@ function loadCase() {
   c.value = caseData.value
 }
 
+function updateStatusSection(statusField, dateField, newStatus) {
+  const nextDate = c.value?.[dateField] || dayjs().format('YYYY-MM-DD')
+  store.updateCase(c.value.id, {
+    [statusField]: newStatus,
+    [dateField]: nextDate,
+  })
+  loadCase()
+}
+
+function clearStatusSection(statusField, dateField) {
+  store.updateCase(c.value.id, {
+    [statusField]: null,
+    [dateField]: null,
+  })
+  loadCase()
+}
+
 function changeAcceptanceStatus(newStatus) {
-  if (c.value.acceptanceStatus === newStatus) {
-    store.updateCase(c.value.id, { acceptanceStatus: null, acceptanceDate: null })
-  } else {
-    store.updateCase(c.value.id, {
-      acceptanceStatus: newStatus,
-      acceptanceDate: dayjs().format('YYYY-MM-DD'),
-    })
-  }
+  updateStatusSection('acceptanceStatus', 'acceptanceDate', newStatus)
+}
+
+function clearAcceptanceStatus() {
+  clearStatusSection('acceptanceStatus', 'acceptanceDate')
+}
+
+function saveAcceptanceDate(value) {
+  store.updateCase(c.value.id, { acceptanceDate: value || null })
   loadCase()
 }
 
 function changeMediationStatus(newStatus) {
-  if (c.value.mediationStatus === newStatus) {
-    store.updateCase(c.value.id, { mediationStatus: null, mediationDate: null })
-  } else {
-    store.updateCase(c.value.id, {
-      mediationStatus: newStatus,
-      mediationDate: dayjs().format('YYYY-MM-DD'),
-    })
-  }
+  updateStatusSection('mediationStatus', 'mediationDate', newStatus)
+}
+
+function clearMediationStatus() {
+  clearStatusSection('mediationStatus', 'mediationDate')
+}
+
+function saveMediationDate(value) {
+  store.updateCase(c.value.id, { mediationDate: value || null })
   loadCase()
 }
 
 function changeReportResultStatus(newStatus) {
-  if (c.value.reportResultStatus === newStatus) {
-    store.updateCase(c.value.id, { reportResultStatus: null, reportResultDate: null })
-  } else {
-    store.updateCase(c.value.id, {
-      reportResultStatus: newStatus,
-      reportResultDate: dayjs().format('YYYY-MM-DD'),
-    })
-  }
+  updateStatusSection('reportResultStatus', 'reportResultDate', newStatus)
+}
+
+function clearReportResultStatus() {
+  clearStatusSection('reportResultStatus', 'reportResultDate')
+}
+
+function saveReportResultDate(value) {
+  store.updateCase(c.value.id, { reportResultDate: value || null })
   loadCase()
 }
 
