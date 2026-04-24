@@ -487,9 +487,9 @@
 
 
     <div v-if="showStatusModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showStatusModal = false">
-      <div class="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
-        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">变更案件状态</h3>
-        <div class="mt-4 space-y-5">
+      <div class="flex max-h-[90vh] w-full max-w-xl flex-col rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
+        <h3 class="shrink-0 text-lg font-bold text-slate-800 dark:text-slate-100">变更案件状态</h3>
+        <div class="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
           <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
             <div class="mb-3 flex items-center justify-between gap-3">
               <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">适用规则版本</div>
@@ -647,7 +647,9 @@
             </div>
           </div>
         </div>
-        <button @click="showStatusModal = false" class="btn-secondary mt-4 w-full">取消</button>
+        <div class="mt-4 shrink-0">
+          <button @click="showStatusModal = false" class="btn-secondary w-full">取消</button>
+        </div>
       </div>
     </div>
 
