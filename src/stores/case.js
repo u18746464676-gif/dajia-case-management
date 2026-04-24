@@ -18,6 +18,7 @@ const APP_META_ID = '00000000-0000-0000-0000-000000000000'
 const CASE_NUMBER_PREFIX = 'AJ'
 const CASE_NUMBER_PATTERN = /^AJ-(\d{8})-(\d{4})$/
 const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_BASE || 'http://192.168.1.28:8787'
+const PROCEDURE_RULE_CUTOFF = '2026-04-15'
 
 // 从 TOS URL 中提取对象 key，例如：
 // https://dajia-case.tos-cn-beijing.volces.com/case-images/abc.jpg → case-images/abc.jpg
@@ -106,6 +107,24 @@ function ensureCaseNumbers(list = []) {
   }))
 }
 
+function inferProcedureVersion(signDate) {
+  if (!signDate) return 'new'
+  const parsed = dayjs(signDate)
+  if (!parsed.isValid()) return 'new'
+  return parsed.isBefore(dayjs(PROCEDURE_RULE_CUTOFF), 'day') ? 'old' : 'new'
+}
+
+function normalizeCaseRecord(data = {}) {
+  return {
+    ...data,
+    procedureVersion: data.procedureVersion || inferProcedureVersion(data.signDate),
+    filingStatus: data.filingStatus || '',
+    filingDate: data.filingDate || null,
+    filingNoticeDate: data.filingNoticeDate || null,
+    filingNote: data.filingNote || '',
+  }
+}
+
 export const useCaseStore = defineStore('case', () => {
   const cases = ref([])
   const unassignedImages = ref([])
@@ -167,14 +186,14 @@ export const useCaseStore = defineStore('case', () => {
       const appMetaRow = rows.find(row => row.id === APP_META_ID || row.data?.id === APP_META_ID || row.data?.type === '__app_meta__')
       const caseRows = rows.filter(row => row.id !== APP_META_ID && row.data?.type !== '__app_meta__')
 
-      cases.value = ensureCaseNumbers(caseRows.map(row => row.data).filter(Boolean))
+      cases.value = ensureCaseNumbers(caseRows.map(row => normalizeCaseRecord(row.data)).filter(Boolean))
       unassignedImages.value = dedupeByUrl(appMetaRow?.data?.unassignedImages || loadUnassignedImagesFromLocalStorage())
 
       // 云端返回空但本地有数据时，用本地数据（防止上传失败导致刷新丢数据）
       if (cases.value.length === 0) {
         const localData = loadFromLocalStorage()
         if (localData.length > 0) {
-          cases.value = ensureCaseNumbers(localData)
+          cases.value = ensureCaseNumbers(localData.map(item => normalizeCaseRecord(item)))
         }
       }
 
@@ -183,7 +202,7 @@ export const useCaseStore = defineStore('case', () => {
     } catch (err) {
       console.error('[Supabase] 加载失败:', err)
       console.error('[Supabase] 尝试使用本地数据...')
-      cases.value = ensureCaseNumbers(loadFromLocalStorage())
+      cases.value = ensureCaseNumbers(loadFromLocalStorage().map(item => normalizeCaseRecord(item)))
       unassignedImages.value = loadUnassignedImagesFromLocalStorage()
       isSynced.value = false
     } finally {
@@ -320,44 +339,50 @@ export const useCaseStore = defineStore('case', () => {
   }
 
   function buildCaseRecord(data = {}) {
+    const normalized = normalizeCaseRecord(data)
     const now = dayjs().toISOString()
-    const status = data.status || 'pending_report'
+    const status = normalized.status || 'pending_report'
 
     return {
-      id: data.id || uuid(),
-      caseNumber: data.caseNumber || '',
-      createdAt: data.createdAt || now,
+      id: normalized.id || uuid(),
+      caseNumber: normalized.caseNumber || '',
+      createdAt: normalized.createdAt || now,
       updatedAt: now,
-      shopName: data.shopName || '',
-      productName: data.productName || '',
-      productPrice: Number(data.productPrice ?? data.expense) || 0,
-      licenseName: data.licenseName || '',
-      jurisdiction: data.jurisdiction || '',
-      expense: Number(data.expense ?? data.productPrice) || 0,
-      profit: Number(data.profit) || 0,
+      shopName: normalized.shopName || '',
+      productName: normalized.productName || '',
+      productPrice: Number(normalized.productPrice ?? normalized.expense) || 0,
+      licenseName: normalized.licenseName || '',
+      jurisdiction: normalized.jurisdiction || '',
+      expense: Number(normalized.expense ?? normalized.productPrice) || 0,
+      profit: Number(normalized.profit) || 0,
       status,
-      statusHistory: Array.isArray(data.statusHistory) && data.statusHistory.length > 0
-        ? data.statusHistory
+      statusHistory: Array.isArray(normalized.statusHistory) && normalized.statusHistory.length > 0
+        ? normalized.statusHistory
         : [{ from: '', to: status, changedAt: now }],
-      reportDate: data.reportDate || null,
-      signDate: data.signDate || null,
-      trackingNumber: data.trackingNumber || '',
-      reportPlatform: data.reportPlatform || '',
-      acceptanceDate: data.acceptanceDate || null,
-      acceptanceWay: data.acceptanceWay || '',
-      decisionDate: data.decisionDate || null,
-      replies: Array.isArray(data.replies) ? data.replies : [],
-      documents: Array.isArray(data.documents) ? data.documents : [],
-      images: Array.isArray(data.images) ? data.images : [],
-      deadlines: Array.isArray(data.deadlines) ? data.deadlines : [],
-      notes: data.notes || '',
-      hasAdminReview: data.hasAdminReview || '',
-      adminReviewResult: data.adminReviewResult || '',
-      adminReviewApplyDate: data.adminReviewApplyDate || '',
-      adminReviewAuthority: data.adminReviewAuthority || '',
-      adminReviewAcceptDate: data.adminReviewAcceptDate || '',
-      adminReviewDecisionDate: data.adminReviewDecisionDate || '',
-      adminReviewDocNo: data.adminReviewDocNo || '',
+      reportDate: normalized.reportDate || null,
+      signDate: normalized.signDate || null,
+      trackingNumber: normalized.trackingNumber || '',
+      reportPlatform: normalized.reportPlatform || '',
+      acceptanceDate: normalized.acceptanceDate || null,
+      acceptanceWay: normalized.acceptanceWay || '',
+      decisionDate: normalized.decisionDate || null,
+      procedureVersion: normalized.procedureVersion,
+      filingStatus: normalized.filingStatus,
+      filingDate: normalized.filingDate,
+      filingNoticeDate: normalized.filingNoticeDate,
+      filingNote: normalized.filingNote,
+      replies: Array.isArray(normalized.replies) ? normalized.replies : [],
+      documents: Array.isArray(normalized.documents) ? normalized.documents : [],
+      images: Array.isArray(normalized.images) ? normalized.images : [],
+      deadlines: Array.isArray(normalized.deadlines) ? normalized.deadlines : [],
+      notes: normalized.notes || '',
+      hasAdminReview: normalized.hasAdminReview || '',
+      adminReviewResult: normalized.adminReviewResult || '',
+      adminReviewApplyDate: normalized.adminReviewApplyDate || '',
+      adminReviewAuthority: normalized.adminReviewAuthority || '',
+      adminReviewAcceptDate: normalized.adminReviewAcceptDate || '',
+      adminReviewDecisionDate: normalized.adminReviewDecisionDate || '',
+      adminReviewDocNo: normalized.adminReviewDocNo || '',
     }
   }
 

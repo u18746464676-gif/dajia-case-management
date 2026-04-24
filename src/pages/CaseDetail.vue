@@ -115,7 +115,7 @@
             </div>
             <div>
               <label class="label">📬 签收日期</label>
-              <input v-model="c.signDate" @change="saveField('signDate', c.signDate)" type="date" class="input-field" />
+              <input v-model="c.signDate" @change="saveSignDate(c.signDate)" type="date" class="input-field" />
             </div>
             <div>
               <label class="label">📨 举报寄件日期</label>
@@ -494,6 +494,56 @@
       <div class="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
         <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">变更案件状态</h3>
         <div class="mt-4 space-y-5">
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">适用规则版本</div>
+              <span class="text-xs text-slate-400">默认按签收日期判断，可手动覆盖</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="s in procedureVersionOptions"
+                :key="s.value"
+                @click="saveProcedureVersion(s.value)"
+                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
+                :class="c.procedureVersion === s.value ? 'border-amber-400 bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
+              >
+                <span>{{ s.label }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="c.procedureVersion === 'old'" class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">举报立案信息（旧规案件）</div>
+              <button @click="clearFilingSection" class="text-xs text-rose-500 hover:text-rose-600">清空本段状态</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="s in filingStatusOptions"
+                :key="s.value"
+                @click="changeFilingStatus(s.value)"
+                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
+                :class="c.filingStatus === s.value ? 'border-amber-400 bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
+              >
+                <span>{{ s.label }}</span>
+              </button>
+            </div>
+            <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label class="label">立案日期</label>
+                <input :value="c.filingDate || ''" @change="saveFilingDate($event.target.value)" type="date" class="input-field" />
+              </div>
+              <div>
+                <label class="label">收到立案告知日期</label>
+                <input :value="c.filingNoticeDate || ''" @change="saveFilingNoticeDate($event.target.value)" type="date" class="input-field" />
+              </div>
+              <div class="md:col-span-2">
+                <label class="label">备注</label>
+                <textarea :value="c.filingNote || ''" @change="saveFilingNote($event.target.value)" class="input-field min-h-24 resize-none" placeholder="记录旧规立案说明、机关反馈等"></textarea>
+              </div>
+            </div>
+          </div>
+
           <!-- 受理状态 -->
           <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
             <div class="mb-3 flex items-center justify-between gap-3">
@@ -771,6 +821,18 @@ const statusOptions = [
   { value: 'not_punished', label: '责令改正', icon: '🚫' },
   { value: 'exempted', label: '不予处罚', icon: '🚫' },
   { value: 'mediation_terminated', label: '终止调解', icon: '✖️' },
+]
+
+const procedureVersionOptions = [
+  { value: 'old', label: '旧规案件（2026-04-15 前）' },
+  { value: 'new', label: '新规案件（2026-04-15 后）' },
+]
+
+const filingStatusOptions = [
+  { value: 'filed', label: '已立案' },
+  { value: 'not_filed', label: '不予立案' },
+  { value: 'not_notified', label: '未告知' },
+  { value: 'not_applicable', label: '不适用' },
 ]
 
 const acceptanceOptions = [
@@ -1151,8 +1213,65 @@ function printCaseDossier() {
   setTimeout(() => printWindow.print(), 300)
 }
 
+const PROCEDURE_RULE_CUTOFF = '2026-04-15'
+
+function inferProcedureVersion(signDate) {
+  if (!signDate) return 'new'
+  const parsed = dayjs(signDate)
+  if (!parsed.isValid()) return 'new'
+  return parsed.isBefore(dayjs(PROCEDURE_RULE_CUTOFF), 'day') ? 'old' : 'new'
+}
+
 function saveField(field, value) {
   store.updateCase(c.value.id, { [field]: value })
+}
+
+function saveSignDate(value) {
+  const patch = { signDate: value || null }
+  if (!c.value.procedureVersion) {
+    patch.procedureVersion = inferProcedureVersion(value)
+  }
+  store.updateCase(c.value.id, patch)
+  loadCase()
+}
+
+function saveProcedureVersion(value) {
+  store.updateCase(c.value.id, { procedureVersion: value })
+  loadCase()
+}
+
+function changeFilingStatus(value) {
+  const patch = { filingStatus: value }
+  if (value === 'filed' && !c.value.filingDate) {
+    patch.filingDate = dayjs().format('YYYY-MM-DD')
+  }
+  store.updateCase(c.value.id, patch)
+  loadCase()
+}
+
+function clearFilingSection() {
+  store.updateCase(c.value.id, {
+    filingStatus: '',
+    filingDate: null,
+    filingNoticeDate: null,
+    filingNote: '',
+  })
+  loadCase()
+}
+
+function saveFilingDate(value) {
+  store.updateCase(c.value.id, { filingDate: value || null })
+  loadCase()
+}
+
+function saveFilingNoticeDate(value) {
+  store.updateCase(c.value.id, { filingNoticeDate: value || null })
+  loadCase()
+}
+
+function saveFilingNote(value) {
+  store.updateCase(c.value.id, { filingNote: value || '' })
+  loadCase()
 }
 
 async function saveProfit(value) {

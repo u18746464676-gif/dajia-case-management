@@ -164,8 +164,12 @@ const legalDeadlines = computed(() => {
   const c = props.caseObj
   const hasTerminalOutcome = Boolean(c.reportResultStatus)
     || ['decided', 'mediation_terminated'].includes(c.mediationStatus)
+  const hasOldRuleFilingCountdown = c.procedureVersion === 'old'
+    && c.filingStatus === 'filed'
+    && Boolean(c.filingDate)
+    && !hasTerminalOutcome
 
-  // 阶段一：待受理（未填受理状态，有签收日期）
+  // 阶段一：待受理（未填 acceptanceStatus，有签收日期）
   if (!c.acceptanceStatus && c.signDate) {
     const acceptanceDeadline = addWorkingDays(c.signDate, 10)
     const acceptanceDaysLeft = workingDaysDiff(dayjs(), acceptanceDeadline)
@@ -179,9 +183,21 @@ const legalDeadlines = computed(() => {
     })
   }
 
+  if (hasOldRuleFilingCountdown) {
+    const filingCompletionDeadline = dayjs(c.filingDate).add(120, 'day').format('YYYY-MM-DD')
+    const filingCompletionDaysLeft = dayjs(filingCompletionDeadline).diff(now, 'day')
+    list.push({
+      name: '立案办结总控提醒（120日）',
+      date: filingCompletionDeadline,
+      daysLeft: filingCompletionDaysLeft,
+      urgent: filingCompletionDaysLeft <= 15,
+      expired: filingCompletionDaysLeft < 0,
+      type: 'filing_completion'
+    })
+  }
+
   // 阶段二：已受理（acceptanceStatus = 'accepted'）
   if (c.acceptanceStatus === 'accepted' && c.acceptanceDate) {
-    // 未进入投诉跟进时，保留调解倒计时
     if (!c.mediationStatus) {
       const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
       const mediationDaysLeft = dayjs(mediationDeadline).diff(now, 'day')
@@ -195,8 +211,7 @@ const legalDeadlines = computed(() => {
       })
     }
 
-    // completion 只作为低优先级兜底提醒，存在更高优先级终局状态时必须压掉
-    if (!hasTerminalOutcome) {
+    if (!hasTerminalOutcome && !hasOldRuleFilingCountdown) {
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
       list.push({
@@ -211,7 +226,7 @@ const legalDeadlines = computed(() => {
   }
 
   // 阶段三：不予受理（acceptanceStatus = 'reported'）
-  if (c.acceptanceStatus === 'reported' && !hasTerminalOutcome) {
+  if (c.acceptanceStatus === 'reported' && !hasTerminalOutcome && !hasOldRuleFilingCountdown) {
     if (c.acceptanceDate) {
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
@@ -226,7 +241,6 @@ const legalDeadlines = computed(() => {
     }
   }
 
-  // 阶段四：调解结果（mediationStatus 有值）→ 直接显示结果，不显示倒计时
   if (c.mediationStatus === 'decided') {
     list.push({
       name: '案件已调解',
@@ -248,13 +262,12 @@ const legalDeadlines = computed(() => {
     })
   }
 
-  // 阶段五：举报结果（reportResultStatus 有值）→ 显示举报结果，保留调解结果
   if (c.reportResultStatus) {
     const reportLabels = {
       closed: '已处罚',
       rejected: '不予立案',
       not_punished: '责令改正',
-      exempted: '不予处罚',
+      exempted: '不予处理',
     }
     list.push({
       name: `举报结果：${reportLabels[c.reportResultStatus] || c.reportResultStatus}`,

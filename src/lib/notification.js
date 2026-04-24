@@ -39,8 +39,11 @@ export function checkOverdueCases(cases) {
   for (const c of cases) {
     const hasTerminalOutcome = Boolean(c.reportResultStatus)
       || ['decided', 'mediation_terminated'].includes(c.mediationStatus)
+    const hasOldRuleFilingCountdown = c.procedureVersion === 'old'
+      && c.filingStatus === 'filed'
+      && Boolean(c.filingDate)
+      && !hasTerminalOutcome
 
-    // 阶段一：待受理（未填 acceptanceStatus，有签收日期）
     if (!c.acceptanceStatus && c.signDate) {
       const deadline = addWorkingDays(c.signDate, 10)
       const workingDaysLeft = workingDaysDiff(now, deadline)
@@ -68,7 +71,33 @@ export function checkOverdueCases(cases) {
       }
     }
 
-    // 阶段二：已受理（acceptanceStatus = 'accepted'）
+    if (hasOldRuleFilingCountdown) {
+      const filingCompletionDeadline = dayjs(c.filingDate).add(120, 'day').format('YYYY-MM-DD')
+      const filingCompletionDaysLeft = dayjs(filingCompletionDeadline).diff(now, 'day')
+      if (filingCompletionDaysLeft < 0) {
+        const overdueDays = Math.abs(filingCompletionDaysLeft)
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'filing_completion',
+          message: `立案办结总控已超过${overdueDays}天`,
+          deadline: filingCompletionDeadline,
+          urgency: 'danger'
+        })
+      } else if (filingCompletionDaysLeft <= 15) {
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'filing_completion',
+          message: `立案办结总控还剩${filingCompletionDaysLeft}天`,
+          deadline: filingCompletionDeadline,
+          urgency: filingCompletionDaysLeft <= 7 ? 'danger' : 'warning'
+        })
+      }
+    }
+
     if (c.acceptanceStatus === 'accepted' && c.acceptanceDate) {
       if (!c.mediationStatus) {
         const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
@@ -97,7 +126,7 @@ export function checkOverdueCases(cases) {
         }
       }
 
-      if (!hasTerminalOutcome) {
+      if (!hasTerminalOutcome && !hasOldRuleFilingCountdown) {
         const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
         const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
         if (completionDaysLeft < 0) {
@@ -125,8 +154,7 @@ export function checkOverdueCases(cases) {
       }
     }
 
-    // 阶段三：不予受理（acceptanceStatus = 'reported'，调解未开始）
-    if (c.acceptanceStatus === 'reported' && !hasTerminalOutcome && c.acceptanceDate) {
+    if (c.acceptanceStatus === 'reported' && !hasTerminalOutcome && !hasOldRuleFilingCountdown && c.acceptanceDate) {
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
       if (completionDaysLeft < 0) {
@@ -153,7 +181,6 @@ export function checkOverdueCases(cases) {
       }
     }
 
-    // 阶段四/五：出现更高优先级终局状态后，不再发 completion 类提醒
     if (hasTerminalOutcome) {
       continue
     }
