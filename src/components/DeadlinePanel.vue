@@ -162,6 +162,8 @@ const legalDeadlines = computed(() => {
   const list = []
   const now = dayjs()
   const c = props.caseObj
+  const hasTerminalOutcome = Boolean(c.reportResultStatus)
+    || ['decided', 'mediation_terminated'].includes(c.mediationStatus)
 
   // 阶段一：待受理（未填受理状态，有签收日期）
   if (!c.acceptanceStatus && c.signDate) {
@@ -193,8 +195,8 @@ const legalDeadlines = computed(() => {
       })
     }
 
-    // 只有未选择举报结果时，才显示案件办结到期日
-    if (!c.reportResultStatus) {
+    // completion 只作为低优先级兜底提醒，存在更高优先级终局状态时必须压掉
+    if (!hasTerminalOutcome) {
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
       list.push({
@@ -209,7 +211,7 @@ const legalDeadlines = computed(() => {
   }
 
   // 阶段三：不予受理（acceptanceStatus = 'reported'）
-  if (c.acceptanceStatus === 'reported' && !c.reportResultStatus) {
+  if (c.acceptanceStatus === 'reported' && !hasTerminalOutcome) {
     if (c.acceptanceDate) {
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')

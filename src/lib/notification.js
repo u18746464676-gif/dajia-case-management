@@ -37,6 +37,9 @@ export function checkOverdueCases(cases) {
   const overdueList = []
 
   for (const c of cases) {
+    const hasTerminalOutcome = Boolean(c.reportResultStatus)
+      || ['decided', 'mediation_terminated'].includes(c.mediationStatus)
+
     // 阶段一：待受理（未填 acceptanceStatus，有签收日期）
     if (!c.acceptanceStatus && c.signDate) {
       const deadline = addWorkingDays(c.signDate, 10)
@@ -94,7 +97,7 @@ export function checkOverdueCases(cases) {
         }
       }
 
-      if (!c.reportResultStatus) {
+      if (!hasTerminalOutcome) {
         const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
         const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
         if (completionDaysLeft < 0) {
@@ -123,7 +126,7 @@ export function checkOverdueCases(cases) {
     }
 
     // 阶段三：不予受理（acceptanceStatus = 'reported'，调解未开始）
-    if (c.acceptanceStatus === 'reported' && !c.reportResultStatus && c.acceptanceDate) {
+    if (c.acceptanceStatus === 'reported' && !hasTerminalOutcome && c.acceptanceDate) {
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
       if (completionDaysLeft < 0) {
@@ -150,10 +153,8 @@ export function checkOverdueCases(cases) {
       }
     }
 
-    // 阶段四：调解完成（mediationStatus 有值）→ 无倒计时提醒
-    // 阶段五：举报结果有值（reportResultStatus）→ 终态，不再提醒
-    if (c.reportResultStatus) {
-      // 终态，不显示任何倒计时提醒
+    // 阶段四/五：出现更高优先级终局状态后，不再发 completion 类提醒
+    if (hasTerminalOutcome) {
       continue
     }
   }
