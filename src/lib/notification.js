@@ -65,8 +65,8 @@ export function checkOverdueCases(cases) {
       }
     }
 
-    // 阶段二：已受理（acceptanceStatus = 'accepted'，调解未开始）
-    if (c.acceptanceStatus === 'accepted' && !c.mediationStatus && c.acceptanceDate) {
+    // 阶段二：已受理（acceptanceStatus = 'accepted'，且既未进入投诉跟进，也未产生举报结果）
+    if (c.acceptanceStatus === 'accepted' && !c.mediationStatus && !c.reportResultStatus && c.acceptanceDate) {
       const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
       const daysLeft = dayjs(mediationDeadline).diff(now, 'day')
       if (daysLeft < 0) {

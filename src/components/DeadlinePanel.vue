@@ -177,8 +177,8 @@ const legalDeadlines = computed(() => {
     })
   }
 
-  // 阶段二：已受理（acceptanceStatus = 'accepted'，且调解还未开始）
-  if (c.acceptanceStatus === 'accepted' && !c.mediationStatus) {
+  // 阶段二：已受理（acceptanceStatus = 'accepted'，且既未进入投诉跟进，也未产生举报结果）
+  if (c.acceptanceStatus === 'accepted' && !c.mediationStatus && !c.reportResultStatus) {
     if (c.acceptanceDate) {
       // 调解倒计时（60日）
       const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
