@@ -9,22 +9,6 @@
     <meta name="description" content="打假案件管理系统，支持案件进度跟踪与材料管理。" />
     <meta name="format-detection" content="telephone=no" />
     <title>打假案件管理系统</title>
-    <!-- Service Worker 注册（带版本更新机制）-->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then((reg) => {
-            console.log('[SW] 注册成功 version:', reg.active.scriptURL)
-          }).catch((err) => {
-            console.error('[SW] 注册失败:', err)
-          })
-          // 更新时强制激活
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            location.reload()
-          })
-        })
-      }
-    </script>
   </head>
   <body>
     <div id="app"></div>
