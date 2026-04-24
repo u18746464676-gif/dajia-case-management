@@ -300,11 +300,18 @@
               <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
                 <div>
                   <label class="label">处置类型</label>
-                  <select v-model="disposalDraft.disposalType" class="input-field">
+                  <select v-model="disposalDraft.disposalType" class="input-field" @change="selectDisposalType(disposalDraft.disposalType)">
                     <option value="">请选择</option>
                     <optgroup v-for="group in disposalTypeGroups" :key="group.name" :label="group.name">
                       <option v-for="item in group.items" :key="item" :value="item">{{ item }}</option>
                     </optgroup>
+                  </select>
+                </div>
+                <div>
+                  <label class="label">期限依据</label>
+                  <select v-model="disposalDraft.deadlineBasis" class="input-field">
+                    <option value="">请选择</option>
+                    <option v-for="item in deadlineBasisOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
                   </select>
                 </div>
                 <div>
@@ -322,6 +329,34 @@
                 <div>
                   <label class="label">结果日期</label>
                   <input v-model="disposalDraft.resultDate" type="date" class="input-field" />
+                </div>
+                <div>
+                  <label class="label">正式受理日期</label>
+                  <input v-model="disposalDraft.acceptDate" type="date" class="input-field" />
+                </div>
+                <div>
+                  <label class="label">签收日期</label>
+                  <input v-model="disposalDraft.mailSignedDate" type="date" class="input-field" />
+                </div>
+                <div>
+                  <label class="label">到期日期</label>
+                  <input v-model="disposalDraft.deadlineDate" type="date" class="input-field" />
+                </div>
+                <div>
+                  <label class="label">跟进日期</label>
+                  <input v-model="disposalDraft.followUpDate" type="date" class="input-field" />
+                </div>
+                <div>
+                  <label class="label">寄件单号</label>
+                  <input v-model="disposalDraft.mailTrackingNo" type="text" class="input-field" placeholder="如有可填写" />
+                </div>
+                <div>
+                  <label class="label">寄件日期</label>
+                  <input v-model="disposalDraft.mailSentDate" type="date" class="input-field" />
+                </div>
+                <div>
+                  <label class="label">送达状态</label>
+                  <input v-model="disposalDraft.deliveryStatus" type="text" class="input-field" placeholder="例如：已签收 / 查询中" />
                 </div>
                 <div v-if="disposalDraft.disposalType === '行政复议'">
                   <label class="label">复议起算日</label>
@@ -342,6 +377,10 @@
                 <div class="xl:col-span-3">
                   <label class="label">结果摘要</label>
                   <textarea v-model="disposalDraft.resultSummary" rows="3" class="input-field min-h-[88px]" placeholder="简要记录反馈结果"></textarea>
+                </div>
+                <div class="xl:col-span-3">
+                  <label class="label">期限说明</label>
+                  <textarea v-model="disposalDraft.deadlineNote" rows="3" class="input-field min-h-[88px]" placeholder="例如：需结合是否正式受理、是否延期、是否另有指定期限人工复核。"></textarea>
                 </div>
                 <div class="xl:col-span-3">
                   <label class="label">关联材料说明（轻量）</label>
@@ -373,10 +412,15 @@
                         <div v-if="item.targetOrgan">提交机关：{{ item.targetOrgan }}</div>
                         <div v-if="item.submitDate">提交日期：{{ item.submitDate }}</div>
                         <div v-if="item.status">办理状态：{{ item.status }}</div>
+                        <div>期限依据：{{ deadlineBasisLabel(item.deadlineBasis) }}</div>
                       </div>
                     </div>
                     <div class="min-w-0 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                      <div v-if="item.resultSummary">结果摘要：{{ item.resultSummary }}</div>
+                      <div v-if="item.acceptDate">正式受理日期：{{ item.acceptDate }}</div>
+                      <div v-if="item.mailSignedDate">签收日期：{{ item.mailSignedDate }}</div>
+                      <div v-if="item.deadlineDate">到期日期：{{ item.deadlineDate }}</div>
+                      <div v-if="item.resultSummary" class="mt-2">结果摘要：{{ item.resultSummary }}</div>
+                      <div v-if="item.deadlineNote" class="mt-2">期限说明：{{ item.deadlineNote }}</div>
                       <div v-if="formatRelatedMaterials(item.relatedMaterials)" class="mt-2">关联材料：{{ formatRelatedMaterials(item.relatedMaterials) }}</div>
                       <div v-if="item.note" class="mt-2 whitespace-pre-line">备注：{{ item.note }}</div>
                     </div>
@@ -926,6 +970,18 @@ const disposalTypeGroups = [
   { name: '信访协调', items: ['信访', '12345 政务服务热线', '领导信箱', '政府网站留言'] },
   { name: '其他', items: ['其他监督 / 救济路径'] },
 ]
+const deadlineBasisOptions = [
+  { value: 'petition_60', label: '信访事项60日' },
+  { value: 'gov_info_20wd', label: '政府信息公开20个工作日' },
+  { value: 'admin_review_apply_60', label: '行政复议申请期限60日' },
+  { value: 'admin_review_handle_60', label: '行政复议办理期限60日' },
+  { value: 'law_enforcement_supervision_60_90', label: '行政执法监督60/90日' },
+  { value: 'discipline_inspection_3m', label: '纪检监察交办件3个月' },
+  { value: 'gov_inspection_specified', label: '政府督查/督办指定期限' },
+  { value: 'npc_petition_60', label: '人大信访60日' },
+  { value: 'npc_deputy_suggestion_3m', label: '人大代表建议3个月' },
+  { value: 'custom_followup', label: '人工跟进提醒' },
+]
 
 function createEmptyDisposalDraft() {
   return {
@@ -940,6 +996,15 @@ function createEmptyDisposalDraft() {
     reviewDeadline60: '',
     reviewLongStopDate: '',
     reviewStatusText: '',
+    deadlineBasis: '',
+    acceptDate: '',
+    mailSignedDate: '',
+    deadlineDate: '',
+    followUpDate: '',
+    deadlineNote: '',
+    mailTrackingNo: '',
+    mailSentDate: '',
+    deliveryStatus: '',
   }
 }
 
@@ -1583,10 +1648,41 @@ function formatRelatedMaterials(materials = []) {
   return materials.map(item => [item.name, item.url, item.type].filter(Boolean).join(' | ')).join('；')
 }
 
+function getDefaultDeadlineBasis(type = '', source = '', draft = {}) {
+  if (source === 'review_deadline') return 'admin_review_apply_60'
+  const mapping = {
+    '信访': 'petition_60',
+    '12345 政务服务热线': 'petition_60',
+    '12345 / 信访': 'petition_60',
+    '领导信箱': 'petition_60',
+    '政府网站留言': 'petition_60',
+    '政府信息公开': 'gov_info_20wd',
+    '行政执法监督': 'law_enforcement_supervision_60_90',
+    '政府督查': 'gov_inspection_specified',
+    '纪检监察举报': 'discipline_inspection_3m',
+    '派驻纪检监察组反映': 'discipline_inspection_3m',
+    '人大监督': 'npc_petition_60',
+    '人大信访室': 'npc_petition_60',
+    '人大代表建议 / 反映渠道': 'npc_deputy_suggestion_3m',
+    '其他监督 / 救济路径': 'custom_followup',
+  }
+  if (type === '行政复议') {
+    return draft.acceptDate ? 'admin_review_handle_60' : 'admin_review_apply_60'
+  }
+  return mapping[type] || 'custom_followup'
+}
+
+function deadlineBasisLabel(value = '') {
+  return deadlineBasisOptions.find(item => item.value === value)?.label || (value || '待补充期限依据')
+}
+
 function fillDisposalDraft(draft = {}, context = null) {
   disposalDraft.value = {
     ...createEmptyDisposalDraft(),
     ...draft,
+  }
+  if (!disposalDraft.value.deadlineBasis && disposalDraft.value.disposalType) {
+    disposalDraft.value.deadlineBasis = getDefaultDeadlineBasis(disposalDraft.value.disposalType, context?.source || '', disposalDraft.value)
   }
   relatedMaterialsText.value = Array.isArray(draft.relatedMaterials)
     ? draft.relatedMaterials.map(item => [item.name, item.url, item.type].filter(Boolean).join(' | ')).join('\n')
@@ -1603,6 +1699,9 @@ function selectDisposalType(type) {
   disposalDraft.value.disposalType = type
   if (!disposalDraft.value.submitDate) {
     disposalDraft.value.submitDate = dayjs().format('YYYY-MM-DD')
+  }
+  if (!disposalDraft.value.deadlineBasis) {
+    disposalDraft.value.deadlineBasis = getDefaultDeadlineBasis(type, disposalContext.value?.source || '', disposalDraft.value)
   }
 }
 
@@ -1634,6 +1733,15 @@ function buildDisposalPayload() {
     reviewDeadline60: disposalDraft.value.reviewDeadline60 || '',
     reviewLongStopDate: disposalDraft.value.reviewLongStopDate || '',
     reviewStatusText: disposalDraft.value.reviewStatusText || '',
+    deadlineBasis: disposalDraft.value.deadlineBasis || '',
+    acceptDate: disposalDraft.value.acceptDate || '',
+    mailSignedDate: disposalDraft.value.mailSignedDate || '',
+    deadlineDate: disposalDraft.value.deadlineDate || '',
+    followUpDate: disposalDraft.value.followUpDate || '',
+    deadlineNote: disposalDraft.value.deadlineNote || '',
+    mailTrackingNo: disposalDraft.value.mailTrackingNo || '',
+    mailSentDate: disposalDraft.value.mailSentDate || '',
+    deliveryStatus: disposalDraft.value.deliveryStatus || '',
     createdAt: editingDisposalId.value
       ? (disposalRecords.value.find(item => item.id === editingDisposalId.value)?.createdAt || now)
       : now,
@@ -1678,7 +1786,7 @@ async function handleOpenDisposal(payload = {}) {
   fillDisposalDraft({
     ...createEmptyDisposalDraft(),
     ...(payload.draft || {}),
-  }, payload.caseContext || null)
+  }, { ...(payload.caseContext || {}), source: payload.source || '' })
 }
 
 function updateStatusSection(statusField, dateField, newStatus) {

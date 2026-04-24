@@ -64,6 +64,36 @@
       </div>
     </div>
 
+    <div v-if="disposalDeadlineItems.length" class="mb-4">
+      <div class="text-xs text-slate-400 mb-3 uppercase tracking-wider">后续处置期限提醒</div>
+      <div class="space-y-2">
+        <div
+          v-for="d in disposalDeadlineItems"
+          :key="d.id || d.name"
+          class="flex items-start justify-between gap-4 p-3 rounded-xl transition-colors"
+          :class="d.expired ? 'bg-red-50 border border-red-100' : d.urgent ? 'bg-orange-50 border border-orange-100' : 'bg-slate-50 border border-slate-100'"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-semibold" :class="d.expired ? 'text-red-600' : d.urgent ? 'text-orange-600' : 'text-slate-700'">
+              {{ d.name }}
+            </div>
+            <div v-if="d.date" class="text-xs text-slate-400 mt-0.5">到期：{{ d.date }}</div>
+            <div v-for="(line, idx) in d.metaLines || []" :key="`${d.id || d.name}-meta-${idx}`" class="text-xs text-slate-500 mt-1 leading-5">
+              {{ line }}
+            </div>
+            <div v-if="d.hint" class="text-xs mt-1 leading-5" :class="d.expired ? 'text-red-500' : 'text-slate-500'">
+              {{ d.hint }}
+            </div>
+          </div>
+          <div v-if="d.statusText" class="text-right shrink-0">
+            <div class="text-sm font-bold" :class="d.expired ? 'text-red-600' : d.urgent ? 'text-orange-600' : 'text-slate-700'">
+              {{ d.statusText }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 超期提醒 -->
     <div v-if="overdueAlert" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
       <div class="flex items-center gap-2 text-red-600">
@@ -227,6 +257,11 @@ function buildReviewDisposalPayload(c) {
       reviewDeadline60,
       reviewLongStopDate,
       reviewStatusText,
+      deadlineBasis: 'admin_review_apply_60',
+      acceptDate: '',
+      mailSignedDate: c.signDate || '',
+      deadlineDate: reviewDeadline60,
+      deadlineNote: '已超过系统测算期限时，需结合是否正式受理、是否延期、是否另有指定期限人工复核。',
       note: [
         c.caseNumber ? `案件编号：${c.caseNumber}` : '',
         c.jurisdiction ? `管辖局：${c.jurisdiction}` : '',
@@ -258,6 +293,11 @@ function buildMediationDisposalPayload(c, type, deadline, daysLeft) {
       targetOrgan: c.jurisdiction || '',
       submitDate: dayjs().format('YYYY-MM-DD'),
       status: '拟提交',
+      deadlineBasis: type === '行政执法监督' ? 'law_enforcement_supervision_60_90' : type === '政府督查' ? 'gov_inspection_specified' : 'petition_60',
+      acceptDate: c.acceptanceDate || '',
+      mailSignedDate: c.signDate || '',
+      deadlineDate: deadline || '',
+      deadlineNote: '已超过系统测算期限时，需结合是否正式受理、是否延期、是否另有指定期限人工复核。',
       note: [
         c.caseNumber ? `案件编号：${c.caseNumber}` : '',
         c.acceptanceDate ? `受理日期：${c.acceptanceDate}` : '',
@@ -280,6 +320,105 @@ const overdueAlert = computed(() => {
     return workingDaysLeft < 0
   }
   return false
+})
+
+function resolveDisposalStartDate(item) {
+  if (item.acceptDate) {
+    return { value: item.acceptDate, source: '正式受理日期' }
+  }
+  if (item.mailSignedDate) {
+    return { value: item.mailSignedDate, source: '签收日期（临时测算）', temporary: true }
+  }
+  if (item.mailSentDate) {
+    return { value: '', source: '仅有寄件日期，不能作为正式期限起算点', mailSentOnly: true }
+  }
+  return { value: '', source: '' }
+}
+
+function resolveDisposalDeadline(item) {
+  if (item.deadlineDate) return item.deadlineDate
+  const start = resolveDisposalStartDate(item)
+  if (!start.value) return ''
+  switch (item.deadlineBasis) {
+    case 'petition_60':
+    case 'admin_review_apply_60':
+    case 'admin_review_handle_60':
+      return dayjs(start.value).add(60, 'day').format('YYYY-MM-DD')
+    case 'gov_info_20wd':
+      return addWorkingDays(start.value, 20)
+    case 'law_enforcement_supervision_60_90':
+      return dayjs(start.value).add(60, 'day').format('YYYY-MM-DD')
+    case 'discipline_inspection_3m':
+    case 'npc_deputy_suggestion_3m':
+      return dayjs(start.value).add(3, 'month').format('YYYY-MM-DD')
+    case 'npc_petition_60':
+      return dayjs(start.value).add(60, 'day').format('YYYY-MM-DD')
+    default:
+      return ''
+  }
+}
+
+function getDeadlineBasisDescription(value) {
+  const descriptions = {
+    petition_60: '信访事项通常关注 15 日接收/处理途径告知、60 日办结，复杂情况可延长 30 日。',
+    gov_info_20wd: '政府信息公开通常按 20 个工作日答复，必要时可延长 20 个工作日。',
+    admin_review_apply_60: '行政复议申请期限通常按 60 日测算。',
+    admin_review_handle_60: '行政复议办理期限通常按受理后 60 日测算。',
+    law_enforcement_supervision_60_90: '行政执法监督通常按 60 日反馈处理结果，复杂情况可延长至 90 日，具体以当地规定为准。',
+    discipline_inspection_3m: '纪检监察交办件通常按 3 个月办理提醒，必要时可延长 3 个月。',
+    gov_inspection_specified: '政府督查/督办按督查方案、交办要求或督办通知指定期限执行。',
+    npc_petition_60: '人大信访渠道通常可按 60 日办结节奏测算。',
+    npc_deputy_suggestion_3m: '人大代表建议通常按 3 个月办理提醒测算。',
+    custom_followup: '人工跟进提醒，请结合具体交办要求或自定义日期处理。',
+  }
+  return descriptions[value] || '待补充期限依据'
+}
+
+const disposalDeadlineItems = computed(() => {
+  const c = props.caseObj
+  const list = []
+  const records = Array.isArray(c?.disposals) ? c.disposals : []
+
+  records.forEach(item => {
+    const start = resolveDisposalStartDate(item)
+    const deadline = resolveDisposalDeadline(item)
+    const hasDeadline = Boolean(deadline)
+    const daysLeft = hasDeadline ? dayjs(deadline).diff(dayjs(), 'day') : null
+    const metaLines = [
+      `类型：${item.disposalType || '未命名处置'}`,
+      item.targetOrgan ? `提交机关：${item.targetOrgan}` : '',
+      item.mailTrackingNo ? `寄件单号：${item.mailTrackingNo}` : '',
+      item.mailSignedDate ? `签收日期：${item.mailSignedDate}` : '',
+      start.value ? `起算日期：${start.value}${start.source ? `（${start.source}）` : ''}` : '',
+      deadline ? `到期日期：${deadline}` : '',
+      item.followUpDate ? `跟进日期：${item.followUpDate}` : '',
+      `期限依据：${getDeadlineBasisDescription(item.deadlineBasis)}`,
+      item.deadlineNote || '',
+    ].filter(Boolean)
+    let hint = '需结合是否正式受理、是否延期、是否另有指定期限人工复核。'
+    if (!item.deadlineBasis) {
+      hint = '待补充期限依据。'
+    } else if (start.temporary) {
+      hint = '当前按签收日期临时测算，需确认正式受理日期。'
+    } else if (start.mailSentOnly) {
+      hint = '仅有寄件日期，不能作为正式期限起算点。'
+    } else if (hasDeadline && daysLeft < 0) {
+      hint = '已超过系统测算期限，需结合是否正式受理、是否延期、是否另有指定期限人工复核。'
+    }
+
+    list.push({
+      id: item.id,
+      name: `后续处置：${item.disposalType || '未命名处置'}`,
+      date: deadline || '',
+      statusText: hasDeadline ? formatCountdownStatus(daysLeft) : '',
+      urgent: hasDeadline ? daysLeft >= 0 && daysLeft <= 15 : false,
+      expired: hasDeadline ? daysLeft < 0 : false,
+      metaLines,
+      hint,
+    })
+  })
+
+  return list
 })
 
 const legalDeadlines = computed(() => {
