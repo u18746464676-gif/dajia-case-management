@@ -31,6 +31,12 @@ function addWorkingDays(startDate, days) {
   return current.format('YYYY-MM-DD')
 }
 
+function formatCountdownStatus(daysLeft) {
+  if (daysLeft < 0) return `已超期 ${Math.abs(daysLeft)} 天`
+  if (daysLeft === 0) return '今日到期'
+  return `剩余 ${daysLeft} 天`
+}
+
 // 检查案件是否超期
 export function checkOverdueCases(cases) {
   const now = dayjs()
@@ -47,53 +53,45 @@ export function checkOverdueCases(cases) {
     if (!c.acceptanceStatus && c.signDate) {
       const deadline = addWorkingDays(c.signDate, 10)
       const workingDaysLeft = workingDaysDiff(now, deadline)
-      if (workingDaysLeft < 0) {
-        const overdueDays = Math.abs(workingDaysLeft)
+      if (workingDaysLeft < 0 || workingDaysLeft <= 3) {
         overdueList.push({
           id: c.id,
           shopName: c.shopName,
           productName: c.productName,
           type: 'acceptance',
-          message: `签收已超过${overdueDays}个工作日未受理`,
-          deadline: deadline,
-          urgency: overdueDays > 3 ? 'danger' : 'warning'
-        })
-      } else if (workingDaysLeft <= 3) {
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'acceptance',
-          message: `受理到期日还剩${workingDaysLeft}个工作日`,
-          deadline: deadline,
-          urgency: 'warning'
+          message: `受理到期日（10个工作日）：${formatCountdownStatus(workingDaysLeft)}`,
+          deadline,
+          urgency: workingDaysLeft < 0 ? 'danger' : 'warning'
         })
       }
     }
 
     if (hasOldRuleFilingCountdown) {
+      const filingNormalDeadline = dayjs(c.filingDate).add(90, 'day').format('YYYY-MM-DD')
+      const filingNormalDaysLeft = dayjs(filingNormalDeadline).diff(now, 'day')
+      if (filingNormalDaysLeft < 0 || filingNormalDaysLeft <= 15) {
+        overdueList.push({
+          id: c.id,
+          shopName: c.shopName,
+          productName: c.productName,
+          type: 'filing_normal',
+          message: `立案后普通办理期限（90日）：${formatCountdownStatus(filingNormalDaysLeft)}`,
+          deadline: filingNormalDeadline,
+          urgency: filingNormalDaysLeft < 0 ? 'danger' : 'warning'
+        })
+      }
+
       const filingCompletionDeadline = dayjs(c.filingDate).add(120, 'day').format('YYYY-MM-DD')
       const filingCompletionDaysLeft = dayjs(filingCompletionDeadline).diff(now, 'day')
-      if (filingCompletionDaysLeft < 0) {
-        const overdueDays = Math.abs(filingCompletionDaysLeft)
+      if (filingCompletionDaysLeft < 0 || filingCompletionDaysLeft <= 15) {
         overdueList.push({
           id: c.id,
           shopName: c.shopName,
           productName: c.productName,
           type: 'filing_completion',
-          message: `立案办结总控已超过${overdueDays}天`,
+          message: `立案办结总控提醒（120日）：${formatCountdownStatus(filingCompletionDaysLeft)}`,
           deadline: filingCompletionDeadline,
-          urgency: 'danger'
-        })
-      } else if (filingCompletionDaysLeft <= 15) {
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'filing_completion',
-          message: `立案办结总控还剩${filingCompletionDaysLeft}天`,
-          deadline: filingCompletionDeadline,
-          urgency: filingCompletionDaysLeft <= 7 ? 'danger' : 'warning'
+          urgency: filingCompletionDaysLeft < 0 ? 'danger' : 'warning'
         })
       }
     }
@@ -102,26 +100,17 @@ export function checkOverdueCases(cases) {
       if (!c.mediationStatus) {
         const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
         const daysLeft = dayjs(mediationDeadline).diff(now, 'day')
-        if (daysLeft < 0) {
-          const overdueDays = Math.abs(daysLeft)
+        if (daysLeft < 0 || daysLeft <= 7) {
           overdueList.push({
             id: c.id,
             shopName: c.shopName,
             productName: c.productName,
             type: 'mediation',
-            message: `调解期限已超过${overdueDays}天`,
+            message: daysLeft < 0
+              ? `调解倒计时（60日）：${formatCountdownStatus(daysLeft)}。自投诉受理之日起 60 日内未达成调解协议的，应进入终止调解处理；终止调解后应告知投诉人和被投诉人。`
+              : `调解倒计时（60日）：${formatCountdownStatus(daysLeft)}`,
             deadline: mediationDeadline,
-            urgency: 'danger'
-          })
-        } else if (daysLeft <= 7) {
-          overdueList.push({
-            id: c.id,
-            shopName: c.shopName,
-            productName: c.productName,
-            type: 'mediation',
-            message: `调解期限还剩${daysLeft}天`,
-            deadline: mediationDeadline,
-            urgency: 'warning'
+            urgency: daysLeft < 0 ? 'danger' : 'warning'
           })
         }
       }
@@ -129,26 +118,15 @@ export function checkOverdueCases(cases) {
       if (!hasTerminalOutcome && !hasOldRuleFilingCountdown) {
         const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
         const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
-        if (completionDaysLeft < 0) {
-          const overdueDays = Math.abs(completionDaysLeft)
+        if (completionDaysLeft < 0 || completionDaysLeft <= 15) {
           overdueList.push({
             id: c.id,
             shopName: c.shopName,
             productName: c.productName,
             type: 'completion',
-            message: `案件办结期限已超过${overdueDays}天`,
+            message: `案件办结到期日（120日）：${formatCountdownStatus(completionDaysLeft)}`,
             deadline: completionDeadline,
-            urgency: 'danger'
-          })
-        } else if (completionDaysLeft <= 15) {
-          overdueList.push({
-            id: c.id,
-            shopName: c.shopName,
-            productName: c.productName,
-            type: 'completion',
-            message: `案件办结期限还剩${completionDaysLeft}天`,
-            deadline: completionDeadline,
-            urgency: completionDaysLeft <= 7 ? 'danger' : 'warning'
+            urgency: completionDaysLeft < 0 ? 'danger' : 'warning'
           })
         }
       }
@@ -157,28 +135,37 @@ export function checkOverdueCases(cases) {
     if (c.acceptanceStatus === 'reported' && !hasTerminalOutcome && !hasOldRuleFilingCountdown && c.acceptanceDate) {
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
-      if (completionDaysLeft < 0) {
-        const overdueDays = Math.abs(completionDaysLeft)
+      if (completionDaysLeft < 0 || completionDaysLeft <= 15) {
         overdueList.push({
           id: c.id,
           shopName: c.shopName,
           productName: c.productName,
           type: 'completion',
-          message: `案件办结期限已超过${overdueDays}天`,
+          message: `案件办结到期日（120日）：${formatCountdownStatus(completionDaysLeft)}`,
           deadline: completionDeadline,
-          urgency: 'danger'
-        })
-      } else if (completionDaysLeft <= 15) {
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'completion',
-          message: `案件办结期限还剩${completionDaysLeft}天`,
-          deadline: completionDeadline,
-          urgency: completionDaysLeft <= 7 ? 'danger' : 'warning'
+          urgency: completionDaysLeft < 0 ? 'danger' : 'warning'
         })
       }
+    }
+
+    if (['rejected', 'exempted'].includes(c.reportResultStatus) && c.reportResultDate) {
+      const reviewDeadline60 = dayjs(c.reportResultDate).add(60, 'day').format('YYYY-MM-DD')
+      const reviewDaysLeft = dayjs(reviewDeadline60).diff(now, 'day')
+      const reviewLongStopDate = dayjs(c.reportResultDate).add(1, 'year').format('YYYY-MM-DD')
+      const reviewLongStopDaysLeft = dayjs(reviewLongStopDate).diff(now, 'day')
+      let message = `行政复议申请截止日：${reviewDeadline60}，行政复议期限：${formatCountdownStatus(reviewDaysLeft)}，未告知救济途径最长保护期：${reviewLongStopDate}。默认按举报结果日期起算 60 日。若文书未告知复议权利、复议机关、申请期限，可适用最长一年保护期规则。`
+      if (reviewDaysLeft < 0 && reviewLongStopDaysLeft >= 0) {
+        message += ` 60日复议期限已超期 ${Math.abs(reviewDaysLeft)} 天；如未告知复议权利、复议机关、申请期限，最长保护期尚余 ${reviewLongStopDaysLeft} 天。`
+      }
+      overdueList.push({
+        id: c.id,
+        shopName: c.shopName,
+        productName: c.productName,
+        type: 'review_deadline',
+        message,
+        deadline: reviewDeadline60,
+        urgency: reviewDaysLeft < 0 ? 'danger' : (reviewDaysLeft <= 15 ? 'warning' : 'info')
+      })
     }
 
     if (hasTerminalOutcome) {

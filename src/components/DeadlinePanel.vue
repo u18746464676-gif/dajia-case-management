@@ -29,19 +29,24 @@
         <div
           v-for="d in legalDeadlines"
           :key="d.name"
-          class="flex items-center justify-between p-3 rounded-xl transition-colors"
+          class="flex items-start justify-between gap-4 p-3 rounded-xl transition-colors"
           :class="d.expired ? 'bg-red-50 border border-red-100' : d.urgent ? 'bg-orange-50 border border-orange-100' : 'bg-slate-50 border border-slate-100'"
         >
-          <div>
+          <div class="min-w-0 flex-1">
             <div class="text-sm font-semibold" :class="d.expired ? 'text-red-600' : d.urgent ? 'text-orange-600' : 'text-slate-700'">
               {{ d.name }}
             </div>
-            <div class="text-xs text-slate-400 mt-0.5">截止：{{ d.date }}</div>
+            <div v-if="d.date" class="text-xs text-slate-400 mt-0.5">截止：{{ d.date }}</div>
+            <div v-for="(line, idx) in d.metaLines || []" :key="`${d.type || d.name}-meta-${idx}`" class="text-xs text-slate-500 mt-1 leading-5">
+              {{ line }}
+            </div>
+            <div v-if="d.hint" class="text-xs mt-1 leading-5" :class="d.expired ? 'text-red-500' : 'text-slate-500'">
+              {{ d.hint }}
+            </div>
           </div>
-          <div class="text-right">
-            <div v-if="d.expired" class="text-sm font-bold text-red-600">已过期</div>
-            <div v-else class="text-sm font-bold" :class="d.urgent ? 'text-orange-600' : 'text-slate-700'">
-              {{ d.daysLeft }}天
+          <div v-if="d.statusText" class="text-right shrink-0">
+            <div class="text-sm font-bold" :class="d.expired ? 'text-red-600' : d.urgent ? 'text-orange-600' : 'text-slate-700'">
+              {{ d.statusText }}
             </div>
           </div>
         </div>
@@ -64,19 +69,18 @@
         <div
           v-for="d in customDeadlines"
           :key="d.id"
-          class="flex items-center justify-between p-3 rounded-xl transition-colors"
+          class="flex items-start justify-between gap-4 p-3 rounded-xl transition-colors"
           :class="d.expired ? 'bg-red-50 border border-red-100' : d.urgent ? 'bg-orange-50 border border-orange-100' : 'bg-slate-50 border border-slate-100'"
         >
-          <div>
+          <div class="min-w-0 flex-1">
             <div class="text-sm font-semibold" :class="d.expired ? 'text-red-600' : d.urgent ? 'text-orange-600' : 'text-slate-700'">
               {{ d.name }}
             </div>
             <div class="text-xs text-slate-400 mt-0.5">截止：{{ d.date }}</div>
           </div>
-          <div class="flex items-center gap-2">
-            <div v-if="d.expired" class="text-sm font-bold text-red-600">已过期</div>
-            <div v-else class="text-sm font-bold" :class="d.urgent ? 'text-orange-600' : 'text-slate-700'">
-              {{ d.daysLeft }}天
+          <div class="flex items-center gap-2 shrink-0">
+            <div class="text-sm font-bold" :class="d.expired ? 'text-red-600' : d.urgent ? 'text-orange-600' : 'text-slate-700'">
+              {{ d.statusText }}
             </div>
             <button @click="removeDeadline(d.id)" class="text-red-400 hover:text-red-600 hover:bg-red-100 p-1 rounded transition-colors">×</button>
           </div>
@@ -145,6 +149,26 @@ function addWorkingDays(startDate, days) {
   return current.format('YYYY-MM-DD')
 }
 
+function formatCountdownStatus(daysLeft) {
+  if (daysLeft < 0) return `已超期 ${Math.abs(daysLeft)} 天`
+  if (daysLeft === 0) return '今日到期'
+  return `剩余 ${daysLeft} 天`
+}
+
+function buildCountdownItem(name, date, daysLeft, type, extra = {}) {
+  return {
+    name,
+    date,
+    daysLeft,
+    statusText: formatCountdownStatus(daysLeft),
+    urgent: daysLeft >= 0 && daysLeft <= (extra.urgentThreshold ?? 7),
+    expired: daysLeft < 0,
+    type,
+    hint: extra.hint || '',
+    metaLines: extra.metaLines || [],
+  }
+}
+
 // 检查是否超过法定受理期限（未受理状态下，签收日期起10个工作日）
 const overdueAlert = computed(() => {
   const c = props.caseObj
@@ -168,97 +192,71 @@ const legalDeadlines = computed(() => {
     && c.filingStatus === 'filed'
     && Boolean(c.filingDate)
     && !hasTerminalOutcome
+  const shouldShowReviewReminder = ['rejected', 'exempted'].includes(c.reportResultStatus) && Boolean(c.reportResultDate)
 
-  // 阶段一：待受理（未填 acceptanceStatus，有签收日期）
   if (!c.acceptanceStatus && c.signDate) {
     const acceptanceDeadline = addWorkingDays(c.signDate, 10)
     const acceptanceDaysLeft = workingDaysDiff(dayjs(), acceptanceDeadline)
-    list.push({
-      name: '受理到期日（10个工作日）',
-      date: acceptanceDeadline,
-      daysLeft: acceptanceDaysLeft,
-      urgent: acceptanceDaysLeft <= 3,
-      expired: acceptanceDaysLeft < 0,
-      type: 'acceptance'
-    })
+    list.push(buildCountdownItem('受理到期日（10个工作日）', acceptanceDeadline, acceptanceDaysLeft, 'acceptance', { urgentThreshold: 3 }))
   }
 
   if (hasOldRuleFilingCountdown) {
+    const filingNormalDeadline = dayjs(c.filingDate).add(90, 'day').format('YYYY-MM-DD')
+    const filingNormalDaysLeft = dayjs(filingNormalDeadline).diff(now, 'day')
+    list.push(buildCountdownItem('立案后普通办理期限（90日）', filingNormalDeadline, filingNormalDaysLeft, 'filing_normal', { urgentThreshold: 15 }))
+
     const filingCompletionDeadline = dayjs(c.filingDate).add(120, 'day').format('YYYY-MM-DD')
     const filingCompletionDaysLeft = dayjs(filingCompletionDeadline).diff(now, 'day')
-    list.push({
-      name: '立案办结总控提醒（120日）',
-      date: filingCompletionDeadline,
-      daysLeft: filingCompletionDaysLeft,
-      urgent: filingCompletionDaysLeft <= 15,
-      expired: filingCompletionDaysLeft < 0,
-      type: 'filing_completion'
-    })
+    list.push(buildCountdownItem('立案办结总控提醒（120日）', filingCompletionDeadline, filingCompletionDaysLeft, 'filing_completion', { urgentThreshold: 15 }))
   }
 
-  // 阶段二：已受理（acceptanceStatus = 'accepted'）
   if (c.acceptanceStatus === 'accepted' && c.acceptanceDate) {
     if (!c.mediationStatus) {
       const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
       const mediationDaysLeft = dayjs(mediationDeadline).diff(now, 'day')
-      list.push({
-        name: '调解倒计时（60日）',
-        date: mediationDeadline,
-        daysLeft: mediationDaysLeft,
-        urgent: mediationDaysLeft <= 7,
-        expired: mediationDaysLeft < 0,
-        type: 'mediation'
-      })
+      list.push(buildCountdownItem('调解倒计时（60日）', mediationDeadline, mediationDaysLeft, 'mediation', {
+        urgentThreshold: 7,
+        hint: mediationDaysLeft < 0
+          ? '自投诉受理之日起 60 日内未达成调解协议的，应进入终止调解处理；终止调解后应告知投诉人和被投诉人。'
+          : '',
+      }))
     }
 
     if (!hasTerminalOutcome && !hasOldRuleFilingCountdown) {
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
-      list.push({
-        name: '案件办结到期日（120日）',
-        date: completionDeadline,
-        daysLeft: completionDaysLeft,
-        urgent: completionDaysLeft <= 15,
-        expired: completionDaysLeft < 0,
-        type: 'completion'
-      })
+      list.push(buildCountdownItem('案件办结到期日（120日）', completionDeadline, completionDaysLeft, 'completion', { urgentThreshold: 15 }))
     }
   }
 
-  // 阶段三：不予受理（acceptanceStatus = 'reported'）
-  if (c.acceptanceStatus === 'reported' && !hasTerminalOutcome && !hasOldRuleFilingCountdown) {
-    if (c.acceptanceDate) {
-      const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
-      const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
-      list.push({
-        name: '案件办结到期日（120日）',
-        date: completionDeadline,
-        daysLeft: completionDaysLeft,
-        urgent: completionDaysLeft <= 15,
-        expired: completionDaysLeft < 0,
-        type: 'completion'
-      })
-    }
+  if (c.acceptanceStatus === 'reported' && !hasTerminalOutcome && !hasOldRuleFilingCountdown && c.acceptanceDate) {
+    const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
+    const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
+    list.push(buildCountdownItem('案件办结到期日（120日）', completionDeadline, completionDaysLeft, 'completion', { urgentThreshold: 15 }))
   }
 
   if (c.mediationStatus === 'decided') {
     list.push({
       name: '案件已调解',
       date: c.mediationDate || '',
-      daysLeft: '—',
+      statusText: '',
       urgent: false,
       expired: false,
-      type: 'mediation_decided'
+      type: 'mediation_decided',
+      metaLines: [],
+      hint: '',
     })
   }
   if (c.mediationStatus === 'mediation_terminated') {
     list.push({
       name: '调解已终止',
       date: c.mediationDate || '',
-      daysLeft: '—',
+      statusText: '',
       urgent: false,
       expired: false,
-      type: 'mediation_terminated'
+      type: 'mediation_terminated',
+      metaLines: [],
+      hint: '',
     })
   }
 
@@ -271,12 +269,35 @@ const legalDeadlines = computed(() => {
     }
     list.push({
       name: `举报结果：${reportLabels[c.reportResultStatus] || c.reportResultStatus}`,
-      date: c.reportResultDate || '',
-      daysLeft: '—',
+      date: '',
+      statusText: '',
       urgent: false,
       expired: false,
-      type: 'report_result'
+      type: 'report_result',
+      metaLines: c.reportResultDate ? [`结果日期：${c.reportResultDate}`] : [],
+      hint: '',
     })
+  }
+
+  if (shouldShowReviewReminder) {
+    const reviewDeadline60 = dayjs(c.reportResultDate).add(60, 'day').format('YYYY-MM-DD')
+    const reviewDaysLeft = dayjs(reviewDeadline60).diff(now, 'day')
+    const reviewLongStopDate = dayjs(c.reportResultDate).add(1, 'year').format('YYYY-MM-DD')
+    const reviewLongStopDaysLeft = dayjs(reviewLongStopDate).diff(now, 'day')
+    const metaLines = [
+      `结果日期：${c.reportResultDate}`,
+      `行政复议申请截止日：${reviewDeadline60}`,
+      `未告知救济途径最长保护期：${reviewLongStopDate}`,
+    ]
+    let hint = '默认按举报结果日期起算 60 日。若文书未告知复议权利、复议机关、申请期限，可适用最长一年保护期规则。'
+    if (reviewDaysLeft < 0 && reviewLongStopDaysLeft >= 0) {
+      hint += ` 60日复议期限已超期 ${Math.abs(reviewDaysLeft)} 天；如未告知复议权利、复议机关、申请期限，最长保护期尚余 ${reviewLongStopDaysLeft} 天。`
+    }
+    list.push(buildCountdownItem('行政复议期限（60日）', reviewDeadline60, reviewDaysLeft, 'review_deadline', {
+      urgentThreshold: 15,
+      metaLines,
+      hint,
+    }))
   }
 
   return list
@@ -286,7 +307,13 @@ const customDeadlines = computed(() => {
   const now = dayjs()
   return (props.caseObj.deadlines || []).map(d => {
     const daysLeft = dayjs(d.date).diff(now, 'day')
-    return { ...d, daysLeft, urgent: daysLeft <= 3, expired: daysLeft < 0 }
+    return {
+      ...d,
+      daysLeft,
+      urgent: daysLeft >= 0 && daysLeft <= 3,
+      expired: daysLeft < 0,
+      statusText: formatCountdownStatus(daysLeft),
+    }
   })
 })
 
