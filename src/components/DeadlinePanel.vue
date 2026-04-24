@@ -193,6 +193,7 @@ const legalDeadlines = computed(() => {
     && Boolean(c.filingDate)
     && !hasTerminalOutcome
   const shouldShowReviewReminder = ['rejected', 'exempted'].includes(c.reportResultStatus) && Boolean(c.reportResultDate)
+  const isOldProcedure = c.procedureVersion === 'old'
 
   if (!c.acceptanceStatus && c.signDate) {
     const acceptanceDeadline = addWorkingDays(c.signDate, 10)
@@ -212,12 +213,22 @@ const legalDeadlines = computed(() => {
 
   if (c.acceptanceStatus === 'accepted' && c.acceptanceDate) {
     if (!c.mediationStatus) {
-      const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
-      const mediationDaysLeft = dayjs(mediationDeadline).diff(now, 'day')
-      list.push(buildCountdownItem('调解倒计时（60日）', mediationDeadline, mediationDaysLeft, 'mediation', {
+      const mediationName = isOldProcedure ? '调解倒计时（45个工作日）' : '调解倒计时（60日）'
+      const mediationDeadline = isOldProcedure
+        ? addWorkingDays(c.acceptanceDate, 45)
+        : dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
+      const mediationDaysLeft = isOldProcedure
+        ? workingDaysDiff(now, mediationDeadline)
+        : dayjs(mediationDeadline).diff(now, 'day')
+      const mediationMetaLines = []
+      if (isOldProcedure) {
+        mediationMetaLines.push('工作日计算暂按排除周六、周日测算，法定节假日需人工复核。')
+      }
+      list.push(buildCountdownItem(mediationName, mediationDeadline, mediationDaysLeft, 'mediation', {
         urgentThreshold: 7,
+        metaLines: mediationMetaLines,
         hint: mediationDaysLeft < 0
-          ? '自投诉受理之日起 60 日内未达成调解协议的，应进入终止调解处理；终止调解后应告知投诉人和被投诉人。'
+          ? '调解期限已届满，可能存在未依法终止调解或未依法告知问题，可考虑行政复议、行政执法监督、政府督查。'
           : '',
       }))
     }
@@ -284,20 +295,45 @@ const legalDeadlines = computed(() => {
     const reviewDaysLeft = dayjs(reviewDeadline60).diff(now, 'day')
     const reviewLongStopDate = dayjs(c.reportResultDate).add(1, 'year').format('YYYY-MM-DD')
     const reviewLongStopDaysLeft = dayjs(reviewLongStopDate).diff(now, 'day')
-    const metaLines = [
-      `结果日期：${c.reportResultDate}`,
-      `行政复议申请截止日：${reviewDeadline60}`,
-      `未告知救济途径最长保护期：${reviewLongStopDate}`,
-    ]
-    let hint = '默认按举报结果日期起算 60 日。若文书未告知复议权利、复议机关、申请期限，可适用最长一年保护期规则。'
-    if (reviewDaysLeft < 0 && reviewLongStopDaysLeft >= 0) {
-      hint += ` 60日复议期限已超期 ${Math.abs(reviewDaysLeft)} 天；如未告知复议权利、复议机关、申请期限，最长保护期尚余 ${reviewLongStopDaysLeft} 天。`
+    const metaLines = [`结果日期：${c.reportResultDate}`]
+    let name = ''
+    let statusText = ''
+    let hint = ''
+
+    if (reviewDaysLeft >= 0) {
+      name = '行政复议期限'
+      statusText = formatCountdownStatus(reviewDaysLeft)
+      metaLines.push('状态：通常仍在 60 日期限内')
+      metaLines.push(`行政复议申请截止日：${reviewDeadline60}`)
+      metaLines.push(`未告知救济途径最长保护期：${reviewLongStopDate}`)
+      hint = '默认按举报结果日期起算 60 日。若文书未告知复议权利、复议机关、申请期限，可适用最长一年保护期规则。'
+    } else if (reviewLongStopDaysLeft >= 0) {
+      name = `行政复议 60 日期限：${formatCountdownStatus(reviewDaysLeft)}`
+      statusText = `尚余 ${reviewLongStopDaysLeft} 天`
+      metaLines.push(`未告知救济途径最长保护期：尚余 ${reviewLongStopDaysLeft} 天`)
+      metaLines.push(`行政复议申请截止日：${reviewDeadline60}`)
+      metaLines.push(`一年保护期截止日：${reviewLongStopDate}`)
+      hint = '提示：如文书未告知复议权利、复议机关、申请期限，可主张最长一年保护期，需人工确认。'
+    } else {
+      name = `行政复议 60 日期限：${formatCountdownStatus(reviewDaysLeft)}`
+      statusText = `已超期 ${Math.abs(reviewLongStopDaysLeft)} 天`
+      metaLines.push(`未告知救济途径最长保护期：已超期 ${Math.abs(reviewLongStopDaysLeft)} 天`)
+      metaLines.push(`行政复议申请截止日：${reviewDeadline60}`)
+      metaLines.push(`一年保护期截止日：${reviewLongStopDate}`)
+      hint = '提示：通常已超过最长保护期；是否仍可救济需结合不可抗力、正当理由、是否另有新行政行为等人工审查。'
     }
-    list.push(buildCountdownItem('行政复议期限（60日）', reviewDeadline60, reviewDaysLeft, 'review_deadline', {
-      urgentThreshold: 15,
+
+    list.push({
+      name,
+      date: reviewDeadline60,
+      daysLeft: reviewDaysLeft,
+      statusText,
+      urgent: reviewDaysLeft >= 0 ? reviewDaysLeft <= 15 : reviewLongStopDaysLeft >= 0,
+      expired: reviewDaysLeft < 0,
+      type: 'review_deadline',
       metaLines,
       hint,
-    }))
+    })
   }
 
   return list
