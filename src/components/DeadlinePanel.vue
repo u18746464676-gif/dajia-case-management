@@ -177,10 +177,10 @@ const legalDeadlines = computed(() => {
     })
   }
 
-  // 阶段二：已受理（acceptanceStatus = 'accepted'，且既未进入投诉跟进，也未产生举报结果）
-  if (c.acceptanceStatus === 'accepted' && !c.mediationStatus && !c.reportResultStatus) {
-    if (c.acceptanceDate) {
-      // 调解倒计时（60日）
+  // 阶段二：已受理（acceptanceStatus = 'accepted'）
+  if (c.acceptanceStatus === 'accepted' && c.acceptanceDate) {
+    // 未进入投诉跟进时，保留调解倒计时
+    if (!c.mediationStatus) {
       const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
       const mediationDaysLeft = dayjs(mediationDeadline).diff(now, 'day')
       list.push({
@@ -191,7 +191,10 @@ const legalDeadlines = computed(() => {
         expired: mediationDaysLeft < 0,
         type: 'mediation'
       })
-      // 案件办结到期日（120日）
+    }
+
+    // 只有未选择举报结果时，才显示案件办结到期日
+    if (!c.reportResultStatus) {
       const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
       const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
       list.push({

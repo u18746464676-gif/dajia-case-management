@@ -65,56 +65,60 @@ export function checkOverdueCases(cases) {
       }
     }
 
-    // 阶段二：已受理（acceptanceStatus = 'accepted'，且既未进入投诉跟进，也未产生举报结果）
-    if (c.acceptanceStatus === 'accepted' && !c.mediationStatus && !c.reportResultStatus && c.acceptanceDate) {
-      const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
-      const daysLeft = dayjs(mediationDeadline).diff(now, 'day')
-      if (daysLeft < 0) {
-        const overdueDays = Math.abs(daysLeft)
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'mediation',
-          message: `调解期限已超过${overdueDays}天`,
-          deadline: mediationDeadline,
-          urgency: 'danger'
-        })
-      } else if (daysLeft <= 7) {
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'mediation',
-          message: `调解期限还剩${daysLeft}天`,
-          deadline: mediationDeadline,
-          urgency: 'warning'
-        })
+    // 阶段二：已受理（acceptanceStatus = 'accepted'）
+    if (c.acceptanceStatus === 'accepted' && c.acceptanceDate) {
+      if (!c.mediationStatus) {
+        const mediationDeadline = dayjs(c.acceptanceDate).add(60, 'day').format('YYYY-MM-DD')
+        const daysLeft = dayjs(mediationDeadline).diff(now, 'day')
+        if (daysLeft < 0) {
+          const overdueDays = Math.abs(daysLeft)
+          overdueList.push({
+            id: c.id,
+            shopName: c.shopName,
+            productName: c.productName,
+            type: 'mediation',
+            message: `调解期限已超过${overdueDays}天`,
+            deadline: mediationDeadline,
+            urgency: 'danger'
+          })
+        } else if (daysLeft <= 7) {
+          overdueList.push({
+            id: c.id,
+            shopName: c.shopName,
+            productName: c.productName,
+            type: 'mediation',
+            message: `调解期限还剩${daysLeft}天`,
+            deadline: mediationDeadline,
+            urgency: 'warning'
+          })
+        }
       }
 
-      const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
-      const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
-      if (completionDaysLeft < 0) {
-        const overdueDays = Math.abs(completionDaysLeft)
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'completion',
-          message: `案件办结期限已超过${overdueDays}天`,
-          deadline: completionDeadline,
-          urgency: 'danger'
-        })
-      } else if (completionDaysLeft <= 15) {
-        overdueList.push({
-          id: c.id,
-          shopName: c.shopName,
-          productName: c.productName,
-          type: 'completion',
-          message: `案件办结期限还剩${completionDaysLeft}天`,
-          deadline: completionDeadline,
-          urgency: completionDaysLeft <= 7 ? 'danger' : 'warning'
-        })
+      if (!c.reportResultStatus) {
+        const completionDeadline = dayjs(c.acceptanceDate).add(120, 'day').format('YYYY-MM-DD')
+        const completionDaysLeft = dayjs(completionDeadline).diff(now, 'day')
+        if (completionDaysLeft < 0) {
+          const overdueDays = Math.abs(completionDaysLeft)
+          overdueList.push({
+            id: c.id,
+            shopName: c.shopName,
+            productName: c.productName,
+            type: 'completion',
+            message: `案件办结期限已超过${overdueDays}天`,
+            deadline: completionDeadline,
+            urgency: 'danger'
+          })
+        } else if (completionDaysLeft <= 15) {
+          overdueList.push({
+            id: c.id,
+            shopName: c.shopName,
+            productName: c.productName,
+            type: 'completion',
+            message: `案件办结期限还剩${completionDaysLeft}天`,
+            deadline: completionDeadline,
+            urgency: completionDaysLeft <= 7 ? 'danger' : 'warning'
+          })
+        }
       }
     }
 
