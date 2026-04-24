@@ -117,10 +117,6 @@
               <label class="label">📬 签收日期</label>
               <input v-model="c.signDate" @change="saveSignDate(c.signDate)" type="date" class="input-field" />
             </div>
-            <div>
-              <label class="label">📨 举报寄件日期</label>
-              <input v-model="c.reportDate" @change="saveField('reportDate', c.reportDate)" type="date" class="input-field" />
-            </div>
             <div class="md:col-span-2">
               <label class="label">📝 备注</label>
               <textarea
@@ -144,21 +140,21 @@
               </div>
 
               <div class="panel-card">
-                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">受理跟进</div>
-                <div class="mt-3 grid grid-cols-1 gap-3">
-                  <div>
-                    <label class="label">✅ 受理日期</label>
-                    <input v-model="c.acceptanceDate" @change="saveField('acceptanceDate', c.acceptanceDate)" type="date" class="input-field" />
-                  </div>
-                  <div>
-                    <label class="label">📮 受理方式</label>
-                    <input v-model="c.acceptanceWay" @change="saveField('acceptanceWay', c.acceptanceWay)" type="text" class="input-field" placeholder="电话、书面、平台等" />
-                  </div>
-                  <div>
-                    <label class="label">⚖️ 结果日期</label>
-                    <input v-model="c.decisionDate" @change="saveField('decisionDate', c.decisionDate)" type="date" class="input-field" />
-                  </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">✅ 受理日期</div>
+                <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.acceptanceDate || '未填写' }}</div>
+              </div>
+
+              <div class="panel-card">
+                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">📮 受理方式</div>
+                <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.acceptanceWay || '未填写' }}</div>
+              </div>
+
+              <div class="panel-card">
+                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">⚖️ 举报结果摘要</div>
+                <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ c.reportResultStatus ? statusLabel(c.reportResultStatus) : '未填写' }}
                 </div>
+                <div v-if="c.reportResultDate" class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">结果日期：{{ c.reportResultDate }}</div>
               </div>
             </div>
           </section>
