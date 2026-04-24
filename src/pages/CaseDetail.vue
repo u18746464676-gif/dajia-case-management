@@ -184,10 +184,10 @@
         <section class="card">
           <div class="flex items-center justify-between gap-3">
             <h3 class="section-title mb-0">财务信息</h3>
-            <span class="soft-tag">赔偿金额支持快捷填写</span>
+            <span class="soft-tag">记录商品价格与支出</span>
           </div>
 
-          <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label class="label">商品价格（元）</label>
               <input v-model="c.productPrice" @change="saveField('productPrice', c.productPrice)" type="number" step="0.01" class="input-field" placeholder="0.00" />
@@ -195,24 +195,6 @@
             <div>
               <label class="label">花费总额（元）</label>
               <input v-model="c.expense" @change="saveField('expense', c.expense)" type="number" step="0.01" class="input-field" placeholder="默认可与商品价格一致" />
-            </div>
-            <div class="md:col-span-3">
-              <label class="label">赔偿金额（元）</label>
-              <div class="space-y-3">
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    v-for="amount in compensationPresets"
-                    :key="amount"
-                    type="button"
-                    @click="selectCompensation(amount)"
-                    class="rounded-full border px-3 py-1.5 text-sm transition"
-                    :class="Number(c.profit || 0) === amount ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-slate-400 hover:text-slate-700 dark:text-slate-200'"
-                  >
-                    {{ amount }}
-                  </button>
-                </div>
-                <input v-model="c.profit" @change="applyCompensation($event.target.value)" type="number" step="0.01" class="input-field" placeholder="已赔付时填写，也可手动输入" />
-              </div>
             </div>
           </div>
         </section>
@@ -564,6 +546,29 @@
                 @change="saveMediationDate($event.target.value)"
                 type="date"
                 class="input-field"
+              />
+            </div>
+            <div v-if="c.mediationStatus === 'decided'" class="mt-3 space-y-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 p-3">
+              <label class="label">赔偿金额（元）</label>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="amount in compensationPresets"
+                  :key="amount"
+                  type="button"
+                  @click="saveProfit(amount)"
+                  class="rounded-full border px-3 py-1.5 text-sm transition"
+                  :class="Number(c.profit || 0) === amount ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-slate-400 hover:text-slate-700 dark:text-slate-200'"
+                >
+                  {{ amount }}
+                </button>
+              </div>
+              <input
+                :value="c.profit ?? ''"
+                @change="saveProfit($event.target.value)"
+                type="number"
+                step="0.01"
+                class="input-field"
+                placeholder="已调解后填写赔偿金额"
               />
             </div>
           </div>
@@ -1150,34 +1155,11 @@ function saveField(field, value) {
   store.updateCase(c.value.id, { [field]: value })
 }
 
-async function applyCompensation(value) {
+async function saveProfit(value) {
   const normalized = value === '' || value === null || value === undefined ? '' : Number(value)
   c.value.profit = normalized
   await store.updateCase(c.value.id, { profit: normalized })
-
-  if (normalized !== '' && c.value.status !== 'decided') {
-    await store.changeStatus(c.value.id, 'decided')
-  }
-
-  if (normalized === '' && c.value.status === 'decided') {
-    const history = Array.isArray(c.value.statusHistory) ? [...c.value.statusHistory] : []
-    const lastEntry = history[history.length - 1]
-
-    if (lastEntry?.to === 'decided') {
-      const targetStatus = lastEntry.from || 'pending_report'
-      const newHistory = history.slice(0, -1)
-      await store.updateCase(c.value.id, {
-        status: targetStatus,
-        statusHistory: newHistory.length > 0 ? newHistory : [{ from: '', to: targetStatus, changedAt: lastEntry.changedAt }],
-      })
-    }
-  }
-
   loadCase()
-}
-
-function selectCompensation(amount) {
-  applyCompensation(amount)
 }
 
 function loadCase() {
