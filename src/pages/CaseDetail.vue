@@ -1,11 +1,11 @@
 <template>
-  <div v-if="c" class="max-w-5xl mx-auto space-y-4">
+  <div v-if="c" class="case-detail-page">
     <button @click="$router.back()" class="btn-ghost px-0">
       <span>←</span>
       <span>返回列表</span>
     </button>
 
-    <div class="card overflow-hidden">
+    <div class="detail-hero glass-card">
       <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div class="space-y-4">
           <div>
@@ -16,14 +16,14 @@
 
           <div class="flex flex-wrap gap-2">
             <StatusBadge :status="effectiveStatus" :profit="c.profit" />
-            <span class="soft-tag">编号 {{ c.caseNumber || '待生成' }}</span>
-            <span class="soft-tag">管辖局 {{ c.jurisdiction || '未填写' }}</span>
-            <span class="soft-tag">快递单号 {{ c.trackingNumber || '暂无' }}</span>
-            <span class="soft-tag">修改后自动保存</span>
+            <span class="detail-tag">编号 {{ c.caseNumber || '待生成' }}</span>
+            <span class="detail-tag">管辖局 {{ c.jurisdiction || '未填写' }}</span>
+            <span class="detail-tag">快递单号 {{ c.trackingNumber || '暂无' }}</span>
+            <span class="detail-tag">修改后自动保存</span>
           </div>
 
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="metric-card">
+          <div class="detail-metrics-grid">
+            <div class="detail-metric-card">
               <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前状态</div>
               <div class="mt-2"><StatusBadge :status="effectiveStatus" :profit="c.profit" /></div>
             </div>
@@ -42,18 +42,18 @@
           </div>
         </div>
 
-        <div class="w-full xl:max-w-sm">
-          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4 shadow-sm">
-            <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">处置操作</div>
+        <div class="detail-action-panel-wrap">
+          <div class="detail-action-panel">
+            <div class="detail-action-title">处置操作</div>
             <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">围绕状态流转、答复补录与材料补充集中操作，基础字段在下方卷宗中直接维护。</p>
 
             <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              <button @click="showStatusModal = true" class="btn-primary w-full">变更状态</button>
-              <button @click="showReplyModal = true" class="btn-secondary w-full">添加答复</button>
-              <button @click="showDocModal = true" class="btn-secondary w-full">上传文书</button>
-              <button @click="downloadCaseSummary" class="btn-secondary w-full">导出卷宗摘要</button>
-              <button @click="printCaseDossier" class="btn-secondary w-full">打印卷宗</button>
-              <button @click="confirmDelete" class="btn-danger w-full">删除案件</button>
+              <button @click="showStatusModal = true" class="detail-btn detail-btn-primary w-full">变更状态</button>
+              <button @click="showReplyModal = true" class="detail-btn w-full">添加答复</button>
+              <button @click="showDocModal = true" class="detail-btn w-full">上传文书</button>
+              <button @click="downloadCaseSummary" class="detail-btn w-full">导出卷宗摘要</button>
+              <button @click="printCaseDossier" class="detail-btn w-full">打印卷宗</button>
+              <button @click="confirmDelete" class="detail-btn detail-btn-danger w-full">删除案件</button>
             </div>
 
             <div class="mt-4 border-t border-slate-200 dark:border-slate-700 pt-3 text-xs leading-5 text-slate-400 dark:text-slate-500">
@@ -65,7 +65,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="detail-tabs-wrap glass-card">
       <div class="flex gap-2 overflow-x-auto pb-1">
         <button
           v-for="tab in detailTabs"
@@ -82,31 +82,31 @@
 
     <template v-if="activeDetailTab === 'info'">
       <div class="space-y-4">
-        <section class="card">
+        <section class="detail-section glass-card">
           <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <h3 class="section-title mb-1">案件速览</h3>
+              <h3 class="detail-section-title mb-1">案件速览</h3>
               <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">顶部只读摘要，快速确认当前状态、关键节点和期限风险。</p>
             </div>
-            <span class="soft-tag">只读摘要</span>
+            <span class="detail-tag">只读摘要</span>
           </div>
 
           <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div class="panel-card">
+            <div class="detail-panel">
               <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前状态</div>
               <div class="mt-2"><StatusBadge :status="effectiveStatus" :profit="c.profit" /></div>
             </div>
-            <div class="panel-card">
+            <div class="detail-panel">
               <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">受理状态 / 日期</div>
               <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.acceptanceStatus ? statusLabel(c.acceptanceStatus) : '未填写' }}</div>
               <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.acceptanceDate || '日期未填写' }}</div>
             </div>
-            <div class="panel-card">
+            <div class="detail-panel">
               <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">举报结果 / 日期</div>
               <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.reportResultStatus ? statusLabel(c.reportResultStatus) : '未填写' }}</div>
               <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.reportResultDate || '日期未填写' }}</div>
             </div>
-            <div class="panel-card">
+            <div class="detail-panel">
               <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">关键期限风险</div>
               <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ keyRiskSummary.title }}</div>
               <div class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ keyRiskSummary.detail }}</div>
@@ -114,13 +114,13 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="detail-section glass-card">
           <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 class="section-title mb-1">基础信息</h3>
+              <h3 class="detail-section-title mb-1">基础信息</h3>
               <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">案件主字段保持两列布局，方便桌面端快速浏览，窄屏自动回落为一列。</p>
             </div>
-            <span class="soft-tag">主档信息</span>
+            <span class="detail-tag">主档信息</span>
           </div>
 
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -165,32 +165,32 @@
         </section>
 
         <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <section class="card">
+          <section class="detail-section glass-card">
             <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div>
-                <h3 class="section-title mb-1">流程状态摘要</h3>
+                <h3 class="detail-section-title mb-1">流程状态摘要</h3>
                 <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">这里只展示摘要和入口，完整编辑仍然只在“变更状态”弹窗中处理。</p>
               </div>
               <button class="btn-primary" @click="showStatusModal = true">变更状态</button>
             </div>
 
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <div class="panel-card">
+              <div class="detail-panel">
                 <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">受理状态 + 日期</div>
                 <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.acceptanceStatus ? statusLabel(c.acceptanceStatus) : '未填写' }}</div>
                 <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.acceptanceDate || '日期未填写' }}</div>
               </div>
-              <div class="panel-card">
+              <div class="detail-panel">
                 <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">投诉跟进 + 日期</div>
                 <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.mediationStatus ? statusLabel(c.mediationStatus) : '未填写' }}</div>
                 <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.mediationDate || '日期未填写' }}</div>
               </div>
-              <div class="panel-card">
+              <div class="detail-panel">
                 <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">举报结果 + 日期</div>
                 <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.reportResultStatus ? statusLabel(c.reportResultStatus) : '未填写' }}</div>
                 <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.reportResultDate || '日期未填写' }}</div>
               </div>
-              <div class="panel-card">
+              <div class="detail-panel">
                 <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">旧规 / 新规</div>
                 <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.procedureVersion === 'old' ? '旧规案件' : '新规案件' }}</div>
               </div>
@@ -205,13 +205,13 @@
           </section>
 
           <div class="space-y-4">
-            <section class="card">
+            <section class="detail-section glass-card">
               <div class="flex items-center justify-between gap-3">
                 <div>
-                  <h3 class="section-title mb-1">财务信息</h3>
+                  <h3 class="detail-section-title mb-1">财务信息</h3>
                   <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">压缩成小卡片，只保留商品价格和花费总额。</p>
                 </div>
-                <span class="soft-tag">简版</span>
+                <span class="detail-tag">简版</span>
               </div>
 
               <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
@@ -226,8 +226,8 @@
               </div>
             </section>
 
-            <section class="card">
-              <h3 class="section-title">填写提醒</h3>
+            <section class="detail-section glass-card">
+              <h3 class="detail-section-title">填写提醒</h3>
               <div class="mt-3 space-y-2 text-sm leading-6">
                 <div v-for="(item, idx) in filingReminders" :key="`reminder-${idx}`" :class="item.done ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 dark:text-slate-500'">
                   {{ item.text }}
@@ -237,13 +237,13 @@
           </div>
         </div>
 
-        <section ref="disposalSectionRef" class="card">
+        <section ref="disposalSectionRef" class="detail-section glass-card detail-section-wide">
           <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h3 class="section-title mb-1">后续处置 / 救济监督</h3>
+              <h3 class="detail-section-title mb-1">后续处置 / 救济监督</h3>
               <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">全宽展示程序类型、新建/编辑表单和已保存记录，避免字段被挤在窄栏里。</p>
             </div>
-            <span class="soft-tag">已记录 {{ disposalRecords.length }} 条</span>
+            <span class="detail-tag">已记录 {{ disposalRecords.length }} 条</span>
           </div>
 
           <div class="mt-4 space-y-4">
@@ -279,7 +279,7 @@
             <div v-if="hasLegacyAdminReview" class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-4">
               <div class="flex items-center justify-between gap-3">
                 <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">旧行政复议信息</div>
-                <span class="soft-tag">只读兼容</span>
+                <span class="detail-tag">只读兼容</span>
               </div>
               <div class="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-600 dark:text-slate-300 md:grid-cols-2 xl:grid-cols-4">
                 <div v-for="item in legacyAdminReviewFields" :key="item.label">
@@ -450,13 +450,13 @@
       <DeadlinePanel :case-obj="caseData" @update="loadCase" @open-disposal="handleOpenDisposal" />
 
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <section class="card">
+        <section class="detail-section glass-card">
           <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h3 class="section-title mb-1">流程时间轴</h3>
+              <h3 class="detail-section-title mb-1">流程时间轴</h3>
               <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">把建档、寄件、签收、受理、答复、结果、复议串成一条卷宗主线。</p>
             </div>
-            <span class="soft-tag">已完成 {{ timelineSummary.doneCount }}/{{ timelineSummary.total }}</span>
+            <span class="detail-tag">已完成 {{ timelineSummary.doneCount }}/{{ timelineSummary.total }}</span>
           </div>
 
           <div class="space-y-4">
@@ -496,18 +496,18 @@
         </section>
 
         <div class="space-y-4">
-          <section class="card">
-            <h3 class="section-title">流程摘要</h3>
+          <section class="detail-section glass-card">
+            <h3 class="detail-section-title">流程摘要</h3>
             <div class="space-y-3">
-              <div class="panel-card">
+              <div class="detail-panel">
                 <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前推进到</div>
                 <div class="mt-2 text-lg font-semibold text-slate-800 dark:text-slate-100">{{ timelineSummary.currentTitle }}</div>
               </div>
-              <div class="panel-card">
+              <div class="detail-panel">
                 <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">下一步建议补齐</div>
                 <div class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ timelineSummary.pendingText }}</div>
               </div>
-              <div class="panel-card">
+              <div class="detail-panel">
                 <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前状态</div>
                 <div class="mt-2"><StatusBadge :status="effectiveStatus" :profit="c.profit" /></div>
               </div>
@@ -516,7 +516,7 @@
 
           <section class="card">
             <div class="flex items-center justify-between gap-3 mb-4">
-              <h3 class="section-title mb-0">
+              <h3 class="detail-section-title mb-0">
                 <span>💬</span>
                 <span>流程答复记录</span>
               </h3>
@@ -542,10 +542,10 @@
     </template>
 
     <template v-else-if="activeDetailTab === 'materials'">
-      <section class="card">
+      <section class="detail-section glass-card">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 class="section-title mb-1">
+            <h3 class="detail-section-title mb-1 detail-inline-title">
               <span>📁</span>
               <span>材料中心</span>
             </h3>
@@ -604,7 +604,7 @@
                   <div class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{{ item.name }}</div>
                   <div class="mt-1 flex flex-wrap gap-2 text-xs text-slate-400 dark:text-slate-500">
                     <span>{{ item.date ? formatDate(item.date) : '未记录时间' }}</span>
-                    <span v-if="item.type === 'document'" class="soft-tag">{{ getDocumentCategoryLabel(item.category) }}</span>
+                    <span v-if="item.type === 'document'" class="detail-tag">{{ getDocumentCategoryLabel(item.category) }}</span>
                   </div>
                   <div v-if="item.note" class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ item.note }}</div>
                   <a v-if="item.url && item.type === 'document'" :href="item.url" target="_blank" rel="noreferrer" class="mt-2 inline-flex text-sm text-blue-600 hover:text-blue-700">打开链接</a>
@@ -650,7 +650,7 @@
                   <span>{{ group.icon }}</span>
                   <span>{{ group.label }}</span>
                 </div>
-                <span class="soft-tag">{{ group.items.length }} 项</span>
+                <span class="detail-tag">{{ group.items.length }} 项</span>
               </div>
               <div class="space-y-3">
                 <div
