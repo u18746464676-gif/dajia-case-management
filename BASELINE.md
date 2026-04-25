@@ -1,14 +1,14 @@
 # BASELINE.md - 稳定基线记录
 
-> 更新时间：2026-04-25 15:00
+> 更新时间：2026-04-25 22:15
 
 ## 当前稳定 Bundle
 
-- **JS**: `index-mSCsfelu.js`（2026-04-25 15:16，effectiveStatus 新增 filed 优先级，修正文案不予处理→不予处罚）
-- **CSS**: `index-CRVqBN4T.css`
-- **构建时间**: 2026-04-25 15:16
-- **Git commit**: `64348db`
-- **源码变更**: `stores/case.js`、`pages/CaseDetail.vue`、`components/AIChat.vue`、`pages/CaseList.vue`、`components/DeadlinePanel.vue`
+- **JS**: `index-DUetpow8.js`（2026-04-25 22:15，后续处置模块合并——单卡片列表、8字段主表单、下拉状态、自动联动、机关默认）
+- **CSS**: `index-DqwtR67z.css`
+- **构建时间**: 2026-04-25 22:15
+- **Git commit**: `4bcb07f`
+- **源码变更**: `src/pages/CaseDetail.vue`（只改了这一个文件）
 
 ## 三段独立状态联动（2026-04-22 确立）
 
@@ -43,6 +43,55 @@
 
 - `.metric-card` 深色背景覆盖（`bg-slate-900/80`）
 
+### 后续处置 / 救济监督模块（2026-04-25 确立）
+
+#### 模块结构
+- 「后续处置 / 救济监督」与「新建后续处置记录」已合并为单一模块
+- 右上角使用「+ 新增处置」按钮控制新建表单展开/收起
+- 已有记录以卡片展示，支持编辑、复制一条、删除（删除必须 confirm）
+
+#### 主表单——8 个核心字段
+1. 处置类型（select，按组分类）
+2. 提交机关 / 部门（input，根据类型自动建议，可手动修改）
+3. 寄件单号（input）
+4. 签收日期（date）
+5. 受理日期（date）
+6. 办理状态（select 下拉，10 选项）
+7. 结果日期（date）
+8. 结果摘要（textarea，xl:col-span-3 占满一行）
+
+#### 系统测算 / 更多字段（折叠区）
+- 提交日期
+- 期限依据（select）
+- 到期日期
+- 跟进日期
+- 寄件日期
+- 送达状态
+- 复议相关字段（仅行政复议类型时显示：复议起算日、60日截止日、一年保护期、期限状态）
+- 期限说明
+- 关联材料说明
+- 备注
+
+#### 办理状态规则
+- 下拉菜单，选项：拟提交 / 已寄出 / 已签收 / 已受理 / 办理中 / 已办结 / 已反馈 / 已退回 / 已撤回 / 已超期
+- 自动联动（均受 `statusTouched` 保护，用户手动选择后不得强制覆盖）：
+  - 填寄件单号：拟提交/空 → 已寄出
+  - 填签收日期：拟提交/已寄出/空 → 已签收
+  - 填受理日期：拟提交/已寄出/已签收/空 → 已受理
+  - 填结果日期或摘要：非终态（已办结/已反馈/已退回/已撤回）→ 建议已办结
+
+#### 提交机关默认规则
+- 根据案件 `jurisdiction`（管辖局）和处置类型自动建议
+- `extractRegionName` 正则：`^(.+?(?:市|区|县|旗))` → 提取完整行政区划
+- 例：「运城市市场监督管理局」→ 提取「运城市」→ 建议「运城市人民政府」
+- 切换处置类型时，只要 `targetOrganTouched` 为 false 即可自动覆盖，不要求原值非空
+- 用户手动修改后 `targetOrganTouched` 标记为 true，不再自动覆盖
+
+#### 内部标记不落库
+- `statusTouched`、`targetOrganTouched` 仅为表单内部控制标记
+- `buildDisposalPayload` 第一行解构剔除：`const { statusTouched, targetOrganTouched, ...draft } = disposalDraft.value`
+- 复制记录时也重置为 false
+
 ## 回滚方案（正式）
 
 > 不做同名 bundle 覆盖回滚。回滚时恢复 index.html 引用旧文件名。
@@ -68,9 +117,9 @@ nginx -t && nginx -s reload
 
 | 类型 | 标识 | 说明 |
 |------|------|------|
-| Git 回滚点 | `dccd0fc` | feat: 首页顶部状态栏新增已立案快捷胶囊 |
-| 当前稳定 bundle | `index-mSCsfelu.js` | 2026-04-25 15:16 |
-| 上一回滚目标 | `index-DwrVnEIA.js` | effectiveStatus 修改前稳定包 |
+| Git 回滚点 | `4bcb07f` | feat: 后续处置模块合并——单卡片列表、8字段表单、下拉状态、自动联动、机关默认 |
+| 当前稳定 bundle | `index-DUetpow8.js` | 2026-04-25 22:15 |
+| 上一回滚目标 | `index-DiWuj3bt.js` | getEffectiveStatus 修正 + 独立区块移除（提交待用户验证） |
 
 ## "已立案"最终规则（2026-04-25 确立）
 
