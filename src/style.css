@@ -250,6 +250,23 @@ body {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.24) !important;
   backdrop-filter: blur(18px) !important;
 }
+.card * {
+  background-color: transparent !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+/* ── 全局白底元素强覆盖为深色 ────────────────── */
+.bg-white, .bg-slate-50, .bg-slate-100, .bg-slate-200 {
+  background-color: var(--bg-panel) !important;
+  border-color: var(--border-soft) !important;
+}
+.bg-blue-50 { background-color: rgba(59, 130, 246, 0.1) !important; }
+.bg-blue-100 { background-color: rgba(59, 130, 246, 0.15) !important; }
+.border-slate-100 { border-color: var(--border-soft) !important; }
+.border-slate-200 { border-color: rgba(148, 163, 184, 0.22) !important; }
+.border-blue-200 { border-color: rgba(59, 130, 246, 0.35) !important; }
+.shadow-sm { box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important; }
+.shadow-lg { box-shadow: 0 16px 48px rgba(0,0,0,0.4) !important; }
 
 /* ── 表格深色覆盖 ─────────────────────────────── */
 table {
