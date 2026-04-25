@@ -1,27 +1,28 @@
 # BASELINE.md - 稳定基线记录
 
-> 更新时间：2026-04-25 11:30
+> 更新时间：2026-04-25 15:00
 
 ## 当前稳定 Bundle
 
-- **JS**: `index-ry_uUcsX.js`（2026-04-25 11:25，旧规已立案改造——视觉合并数据分离，修复倒计时联动，首页胶囊）
+- **JS**: `index-mSCsfelu.js`（2026-04-25 15:16，effectiveStatus 新增 filed 优先级，修正文案不予处理→不予处罚）
 - **CSS**: `index-CRVqBN4T.css`
-- **构建时间**: 2026-04-25 11:24
-- **Git commit**: `c72b646`
-- **源码变更**: 仅 `src/pages/CaseDetail.vue` 一处（`v-if`+`v-for` 同节点修复为 `<template v-if>` 包裹）
+- **构建时间**: 2026-04-25 15:16
+- **Git commit**: `64348db`
+- **源码变更**: `stores/case.js`、`pages/CaseDetail.vue`、`components/AIChat.vue`、`pages/CaseList.vue`、`components/DeadlinePanel.vue`
 
 ## 三段独立状态联动（2026-04-22 确立）
 
 详见 `CHANGE_GUARD.md` 第二阶段新增内容。
 
-### 终态综合状态 effectiveStatus 计算规则
+### 终态综合状态 effectiveStatus 计算规则（2026-04-25 修订）
 
 优先级（从高到低）：
-1. `mediationStatus === 'decided'` → "已调解"
-2. `reportResultStatus` 有值 → 显示对应胶囊（不予立案/不予处罚/责令改正/已处罚）
-3. `mediationStatus` 有值（非 decided）→ "终止调解"
-4. `acceptanceStatus` 有值 → "已受理" / "不予受理"
-5. 所有子状态为空 → "未受理"（强制，不 fallback 到 c.status）
+1. `mediationStatus === 'decided'` → "已调解"（优先级最高，即使同时有举报终局结果也显示已调解）
+2. `reportResultStatus` 有值 → 显示对应举报终局结果（已处罚/不予立案/责令改正/不予处罚）
+3. `procedureVersion === 'old' && filingStatus === 'filed' && !reportResultStatus` → "已立案"
+4. `mediationStatus === 'mediation_terminated'` → "终止调解"
+5. `acceptanceStatus` 有值 → "已受理" / "不予受理"
+6. 默认 → "pending_report"（不 fallback 到 c.status）
 
 ### 涉及文件（已统一 getEffectiveStatus 逻辑）
 
@@ -67,9 +68,9 @@ nginx -t && nginx -s reload
 
 | 类型 | 标识 | 说明 |
 |------|------|------|
-| Git 回滚点 | `53ef8e8` | feat: add batch envelope image picker entry（三段联动前） |
-| 当前稳定 bundle | `index-ry_uUcsX.js` | 2026-04-25 11:25 |
-| 上一回滚目标 | `index-CLevM67z.js` | 上线前生产稳定包 |
+| Git 回滚点 | `dccd0fc` | feat: 首页顶部状态栏新增已立案快捷胶囊 |
+| 当前稳定 bundle | `index-mSCsfelu.js` | 2026-04-25 15:16 |
+| 上一回滚目标 | `index-DwrVnEIA.js` | effectiveStatus 修改前稳定包 |
 
 ## "已立案"最终规则（2026-04-25 确立）
 
@@ -82,6 +83,21 @@ nginx -t && nginx -s reload
 - 旧规立案 90/120 日倒计时只被 `reportResultStatus`（举报终局结果）压制
 - 调解终局状态（`decided` / `mediation_terminated`）不压制旧规立案倒计时
 - 调解终局只压制普通受理链路 120 日，不压旧规立案 90/120 日
+
+### "已立案"当前状态规则（2026-04-25 确立）
+
+- 旧规已立案且无举报终局结果时，当前状态显示"已立案"
+- `mediation_terminated` 不得覆盖"已立案"（调解终止只压制普通受理链路，不压旧规立案）
+- 有举报终局结果时（`reportResultStatus`），举报结果优先于"已立案"
+- `mediationStatus = decided` 时已调解优先级最高，即使同时存在举报终局结果也显示"已调解"
+- 字段值统一为 `"filed"`，不得出现 `"filled"`
+
+### 文案规范（2026-04-25 确立）
+
+- UI 显示统一使用"不予处罚"
+- 底层字段值仍为 `"exempted"`，不做字段迁移
+- 不改变保存逻辑、筛选逻辑和复议期限触发规则
+- 涉及文件：`case-status.js`、`DeadlinePanel.vue`、`CaseDetail.vue`、`CaseList.vue`
 
 ### 首页胶囊筛选
 - 统计口径：`procedureVersion === 'old' && filingStatus === 'filed' && !reportResultStatus`
@@ -97,6 +113,15 @@ nginx -t && nginx -s reload
 3. **禁止在 JS 为 403 时切正式 index.html**（403 = nginx 无权读取，权限仍为 600，需先 `chmod 644`）
 4. **切包后再次验证线上实际返回**：防止浏览器缓存导致仍拉旧包
 
+## 本次未改（2026-04-25 确认冻结）
+
+- ❌ 变更状态弹窗保存逻辑
+- ❌ 倒计时规则
+- ❌ 已立案保存逻辑
+- ❌ 上传、入库、删除、云端文件、OCR
+- ❌ nginx、三通道、disposals
+- ❌ 文书生成、ZIP
+
 ## nginx 路由基线（无变更）
 
 - `/api/storage/upload` → `http://127.0.0.1:8787`（storage-server）
@@ -108,7 +133,7 @@ nginx -t && nginx -s reload
 
 | 文件 | 版本/说明 |
 |------|-----------|
-| 前端入口 | index.html（引用 index-DPLhptBW.js） |
+| 前端入口 | index.html（引用 index-mSCsfelu.js） |
 | 后端服务 | server/combined-server.cjs |
 | nginx 配置 | server/nginx-production.conf |
 | 云端文件数据源 | cloud_files（DB，deleted_at IS NULL） |
