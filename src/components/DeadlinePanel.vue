@@ -235,7 +235,7 @@ function buildReviewDisposalPayload(c) {
         closed: '已处罚',
         rejected: '不予立案',
         not_punished: '责令改正',
-        exempted: '不予处理',
+        exempted: '不予处罚',
       }[c.reportResultStatus] || c.reportResultStatus || '',
       reportResultDate: c.reportResultDate || '',
       reviewDeadline60,
@@ -251,7 +251,7 @@ function buildReviewDisposalPayload(c) {
         closed: '已处罚',
         rejected: '不予立案',
         not_punished: '责令改正',
-        exempted: '不予处理',
+        exempted: '不予处罚',
       }[c.reportResultStatus] || c.reportResultStatus}` : '',
       reviewStartDate: c.reportResultDate || '',
       reviewDeadline60,
@@ -537,7 +537,7 @@ const legalDeadlines = computed(() => {
       closed: '已处罚',
       rejected: '不予立案',
       not_punished: '责令改正',
-      exempted: '不予处理',
+      exempted: '不予处罚',
     }
     list.push({
       name: `举报结果：${reportLabels[c.reportResultStatus] || c.reportResultStatus}`,

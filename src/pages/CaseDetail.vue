@@ -1072,9 +1072,10 @@ const effectiveStatus = computed(() => {
   if (!cv) return 'pending_report'
   if (cv.mediationStatus === 'decided') return 'decided'
   if (cv.reportResultStatus) return cv.reportResultStatus
-  if (cv.mediationStatus) return cv.mediationStatus
+  if (cv.procedureVersion === 'old' && cv.filingStatus === 'filed' && !cv.reportResultStatus) return 'filed'
+  if (cv.mediationStatus === 'mediation_terminated') return 'mediation_terminated'
   if (cv.acceptanceStatus) return cv.acceptanceStatus
-  return 'pending_report'
+  return cv.status || 'pending_report'
 })
 const statusOptions = [
   { value: 'pending_report', label: '未受理', icon: '⏳' },
@@ -1185,7 +1186,7 @@ const reportResultOptions = [
   { value: 'closed', label: '已处罚', icon: '⚖️' },
   { value: 'rejected', label: '不予立案', icon: '❌' },
   { value: 'not_punished', label: '责令改正', icon: '🚫' },
-  { value: 'exempted', label: '不予处理', icon: '🚫' },
+  { value: 'exempted', label: '不予处罚', icon: '🚫' },
 ]
 
 const statusLabels = {
@@ -1196,7 +1197,7 @@ const statusLabels = {
   closed: '已处罚',
   rejected: '不予立案',
   not_punished: '责令改正',
-  exempted: '不予处理',
+  exempted: '不予处罚',
   mediation_terminated: '终止调解',
 }
 

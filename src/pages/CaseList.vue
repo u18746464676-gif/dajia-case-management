@@ -864,12 +864,12 @@ function getStatusLabel(status = '') {
 
 // 终态综合状态：已调解最优先，其次举报结果，其次终止调解，最后受理状态
 function getEffectiveStatus(c) {
-  if (c.procedureVersion === 'old' && c.filingStatus === 'filed' && !c.reportResultStatus) return 'filed'
   if (c.mediationStatus === 'decided') return 'decided'
   if (c.reportResultStatus) return c.reportResultStatus
-  if (c.mediationStatus) return c.mediationStatus
+  if (c.procedureVersion === 'old' && c.filingStatus === 'filed' && !c.reportResultStatus) return 'filed'
+  if (c.mediationStatus === 'mediation_terminated') return 'mediation_terminated'
   if (c.acceptanceStatus) return c.acceptanceStatus
-  return 'pending_report'
+  return c.status || 'pending_report'
 }
 
 function exportCasesToExcel() {
@@ -957,7 +957,7 @@ const filteredCases = computed(() => {
   }
   if (filterStatus.value) {
     if (filterStatus.value === 'filed') {
-      // 已立案：旧规案件 + filingStatus=filled + 无举报终局结果
+      // 已立案：旧规案件 + filingStatus='filed' + 无举报终局结果
       list = list.filter(c =>
         c.procedureVersion === 'old'
         && c.filingStatus === 'filed'
