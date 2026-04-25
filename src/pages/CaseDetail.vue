@@ -1176,6 +1176,7 @@ const reportResultOptions = [
   { value: 'rejected', label: '不予立案', icon: '❌' },
   { value: 'not_punished', label: '责令改正', icon: '🚫' },
   { value: 'exempted', label: '不予处理', icon: '🚫' },
+  { value: 'filed', label: '已立案', icon: '📋' },
 ]
 
 const statusLabels = {
@@ -1833,11 +1834,27 @@ function saveMediationDate(value) {
 }
 
 function changeReportResultStatus(newStatus) {
-  updateStatusSection('reportResultStatus', 'reportResultDate', newStatus)
+  const patch = { reportResultStatus: newStatus }
+  // 举报结果选"已立案"时，同时写入 filingStatus / filingDate 保证旧规倒计时联动
+  if (newStatus === 'filed') {
+    patch.filingStatus = 'filed'
+    patch.filingDate = c.value.reportResultDate || dayjs().format('YYYY-MM-DD')
+  }
+  store.updateCase(c.value.id, patch)
+  loadCase()
 }
 
 function clearReportResultStatus() {
+  const isFiled = c.value.reportResultStatus === 'filed'
   clearStatusSection('reportResultStatus', 'reportResultDate')
+  if (isFiled) {
+    store.updateCase(c.value.id, {
+      filingStatus: '',
+      filingDate: null,
+      filingNoticeDate: null,
+      filingNote: '',
+    })
+  }
 }
 
 function saveReportResultDate(value) {

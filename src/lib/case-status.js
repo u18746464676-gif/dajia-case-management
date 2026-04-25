@@ -14,6 +14,7 @@ const STATUS_META = {
   not_punished: { label: '责令改正', className: 'bg-slate-100 text-slate-700 border-slate-200', dotClass: 'bg-slate-400' },
   exempted: { label: '不予处罚', className: 'bg-slate-100 text-slate-600 border-slate-200', dotClass: 'bg-slate-400' },
   mediation_terminated: { label: '终止调解', className: 'bg-rose-50 text-rose-700 border-rose-200', dotClass: 'bg-rose-500' },
+  filed: { label: '已立案', className: 'bg-blue-50 text-blue-700 border-blue-200', dotClass: 'bg-blue-500' },
 }
 
 export function getCaseStatusMeta(caseOrStatus, profitValue) {

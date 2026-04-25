@@ -855,6 +855,7 @@ function getStatusLabel(status = '') {
     not_punished: '责令改正',
     exempted: '不予处罚',
     mediation_terminated: '终止调解',
+    filed: '已立案',
   }
   return labels[status] || status || '-'
 }

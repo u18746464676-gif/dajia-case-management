@@ -427,10 +427,17 @@ const legalDeadlines = computed(() => {
   const c = props.caseObj
   const hasTerminalOutcome = Boolean(c.reportResultStatus)
     || ['decided', 'mediation_terminated'].includes(c.mediationStatus)
+  // 旧规立案倒计时：来自独立 filingStatus=filled 或来自举报结果的 filed
   const hasOldRuleFilingCountdown = c.procedureVersion === 'old'
-    && c.filingStatus === 'filed'
-    && Boolean(c.filingDate)
+    && (
+      (c.filingStatus === 'filed' && Boolean(c.filingDate))
+      || (c.reportResultStatus === 'filed' && Boolean(c.reportResultDate))
+    )
     && !hasTerminalOutcome
+  // 立案日期：举报结果入口时用 reportResultDate
+  const filingCountdownDate = c.reportResultStatus === 'filed' && c.filingStatus !== 'filed'
+    ? c.reportResultDate
+    : c.filingDate
   const shouldShowReviewReminder = ['rejected', 'exempted'].includes(c.reportResultStatus) && Boolean(c.reportResultDate)
   const isOldProcedure = c.procedureVersion === 'old'
 
@@ -441,11 +448,11 @@ const legalDeadlines = computed(() => {
   }
 
   if (hasOldRuleFilingCountdown) {
-    const filingNormalDeadline = dayjs(c.filingDate).add(90, 'day').format('YYYY-MM-DD')
+    const filingNormalDeadline = dayjs(filingCountdownDate).add(90, 'day').format('YYYY-MM-DD')
     const filingNormalDaysLeft = dayjs(filingNormalDeadline).diff(now, 'day')
     list.push(buildCountdownItem('立案后普通办理期限（90日）', filingNormalDeadline, filingNormalDaysLeft, 'filing_normal', { urgentThreshold: 15 }))
 
-    const filingCompletionDeadline = dayjs(c.filingDate).add(120, 'day').format('YYYY-MM-DD')
+    const filingCompletionDeadline = dayjs(filingCountdownDate).add(120, 'day').format('YYYY-MM-DD')
     const filingCompletionDaysLeft = dayjs(filingCompletionDeadline).diff(now, 'day')
     list.push(buildCountdownItem('立案办结总控提醒（120日）', filingCompletionDeadline, filingCompletionDaysLeft, 'filing_completion', { urgentThreshold: 15 }))
   }
