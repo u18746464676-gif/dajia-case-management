@@ -362,6 +362,7 @@ export const useCaseStore = defineStore('case', () => {
       closed: cases.value.filter(c => getEffectiveStatus(c) === 'closed').length,
       rejected: cases.value.filter(c => getEffectiveStatus(c) === 'rejected').length,
       notPunished: cases.value.filter(c => getEffectiveStatus(c) === 'not_punished').length,
+      filed: cases.value.filter(c => c.procedureVersion === 'old' && c.filingStatus === 'filed' && !c.reportResultStatus).length,
     }
   })
 

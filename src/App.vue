@@ -139,6 +139,15 @@
             <span>已受理</span>
           </router-link>
           <router-link
+            to="/?status=filed"
+            class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full whitespace-nowrap transition-all duration-200 border font-medium text-sm"
+            :class="$route.query.status === 'filed' ? 'bg-amber-600 text-white border-amber-600 shadow-sm' : 'bg-white text-amber-700 border-amber-200 hover:border-amber-400'"
+          >
+            <span class="w-1.5 h-1.5 rounded-full" :class="$route.query.status === 'filed' ? 'bg-white' : 'bg-amber-500'"></span>
+            <span class="font-bold">{{ store.stats.filed }}</span>
+            <span>已立案</span>
+          </router-link>
+          <router-link
             to="/?status=reported"
             class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full whitespace-nowrap transition-all duration-200 border font-medium text-sm"
             :class="$route.query.status === 'reported' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-blue-700 border-blue-200 hover:border-blue-400'"
