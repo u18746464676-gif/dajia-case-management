@@ -980,14 +980,68 @@ const deadlineBasisOptions = [
   { value: 'custom_followup', label: '人工跟进提醒' },
 ]
 
+const disposalStatusOptions = [
+  { value: '拟提交', label: '拟提交' },
+  { value: '已寄出', label: '已寄出' },
+  { value: '已签收', label: '已签收' },
+  { value: '已受理', label: '已受理' },
+  { value: '办理中', label: '办理中' },
+  { value: '已办结', label: '已办结' },
+  { value: '已反馈', label: '已反馈' },
+  { value: '已退回', label: '已退回' },
+  { value: '已撤回', label: '已撤回' },
+  { value: '已超期', label: '已超期' },
+]
+
+// 提取行政区划名称：运城市市场监督管理局 → 运城市
+function extractRegionName(jurisdiction = '') {
+  const match = String(jurisdiction).match(/^(.+?(?:市|区|县|旗))/)
+  return match ? match[1] : ''
+}
+
+// 根据处置类型和管辖局获取默认提交机关
+function getDefaultOrgan(disposalType, jurisdiction) {
+  const region = extractRegionName(jurisdiction)
+  const map = {
+    '行政复议': region ? `${region}人民政府` : '有管辖权的复议机关',
+    '政府信息公开': jurisdiction || '',
+    '行政执法监督': region ? `${region}司法局 / 行政执法监督机构` : '有管辖权的司法行政机关',
+    '政府督查': region ? `${region}人民政府办公室督查室` : '有管辖权的政府督查机构',
+    '人大监督': region ? `${region}人大常委会 / 人大信访渠道` : '有管辖权的人大常委会',
+    '人大代表建议 / 反映渠道': region ? `${region}人大常委会 / 人大代表联络渠道` : '有管辖权的人大代表联络机构',
+    '政协民主监督 / 委员反映渠道': region ? `${region}政协 / 政协委员反映渠道` : '有管辖权的政协渠道',
+    '纪检监察举报': region ? `${region}纪委监委 / 派驻纪检监察组` : '有管辖权的纪检监察机关',
+    '派驻纪检监察组反映': region ? `派驻市场监管部门纪检监察组` : '派驻纪检监察组',
+    '信访': region ? `${region}信访局` : '有管辖权的信访局',
+    '12345 政务服务热线': '12345 政务服务热线',
+    '领导信箱': region ? `${region}人民政府领导信箱` : '有管辖权的政府领导信箱',
+    '政府网站留言': region ? `${region}人民政府网站留言` : '有管辖权的政府网站',
+    '检察监督': region ? `${region}人民检察院 / 12309 检察服务中心` : '有管辖权的人民检察院',
+    '行政公益诉讼线索': region ? `${region}人民检察院 / 公益诉讼部门` : '有管辖权的检察院公益诉讼部门',
+    '行政诉讼监督': region ? `${region}人民检察院` : '有管辖权的检察院',
+    '上级主管机关反映': jurisdiction || '',
+    '行政诉讼': '有管辖权的人民法院',
+    '其他监督 / 救济路径': '',
+  }
+  return map[disposalType] || ''
+}
+
+const showDisposalForm = ref(false)
+
+// 管辖局 computed
+const disposalJurisdiction = computed(() => c.value?.jurisdiction || '')
+
 function createEmptyDisposalDraft() {
   return {
     disposalType: '',
     targetOrgan: '',
     submitDate: dayjs().format('YYYY-MM-DD'),
-    status: '',
+    status: '拟提交',
     resultDate: '',
     resultSummary: '',
+    // 内部标记，不写入 disposals
+    statusTouched: false,
+    targetOrganTouched: false,
     note: '',
     reviewStartDate: '',
     reviewDeadline60: '',
@@ -1051,6 +1105,50 @@ const detailTabs = [
 
 onMounted(() => {
   c.value = caseData.value
+})
+
+// ---------- 办理状态自动联动 ----------
+watch(() => disposalDraft.value.mailTrackingNo, (val) => {
+  if (val && !disposalDraft.value.statusTouched) {
+    const s = disposalDraft.value.status || ''
+    if (['', '拟提交'].includes(s)) {
+      disposalDraft.value.status = '已寄出'
+    }
+  }
+})
+
+watch(() => disposalDraft.value.mailSignedDate, (val) => {
+  if (val && !disposalDraft.value.statusTouched) {
+    const s = disposalDraft.value.status || ''
+    if (['', '拟提交', '已寄出'].includes(s)) {
+      disposalDraft.value.status = '已签收'
+    }
+  }
+})
+
+watch(() => disposalDraft.value.acceptDate, (val) => {
+  if (val && !disposalDraft.value.statusTouched) {
+    const s = disposalDraft.value.status || ''
+    if (['', '拟提交', '已寄出', '已签收'].includes(s)) {
+      disposalDraft.value.status = '已受理'
+    }
+  }
+})
+
+watch([() => disposalDraft.value.resultDate, () => disposalDraft.value.resultSummary], ([resultDate, resultSummary]) => {
+  if (!disposalDraft.value.statusTouched && (resultDate || resultSummary)) {
+    const s = disposalDraft.value.status || ''
+    if (!['已办结', '已反馈', '已退回', '已撤回'].includes(s)) {
+      disposalDraft.value.status = '已办结'
+    }
+  }
+})
+
+// 用户手动填写 targetOrgan 时标记为已手动修改
+watch(() => disposalDraft.value.targetOrgan, (newVal, oldVal) => {
+  if (newVal && newVal !== oldVal) {
+    disposalDraft.value.targetOrganTouched = true
+  }
 })
 
 watch(caseData, (newVal) => {
@@ -1691,6 +1789,8 @@ function fillDisposalDraft(draft = {}, context = null) {
   disposalDraft.value = {
     ...createEmptyDisposalDraft(),
     ...draft,
+    statusTouched: false,
+    targetOrganTouched: false,
   }
   if (!disposalDraft.value.deadlineBasis && disposalDraft.value.disposalType) {
     disposalDraft.value.deadlineBasis = getDefaultDeadlineBasis(disposalDraft.value.disposalType, context?.source || '', disposalDraft.value)
@@ -1703,6 +1803,7 @@ function fillDisposalDraft(draft = {}, context = null) {
 
 function resetDisposalDraft() {
   editingDisposalId.value = ''
+  showDisposalForm.value = false
   fillDisposalDraft(createEmptyDisposalDraft(), null)
 }
 
@@ -1713,6 +1814,10 @@ function selectDisposalType(type) {
   }
   if (!disposalDraft.value.deadlineBasis) {
     disposalDraft.value.deadlineBasis = getDefaultDeadlineBasis(type, disposalContext.value?.source || '', disposalDraft.value)
+  }
+  // 只要用户没手动改过提交机关，切换类型时自动建议
+  if (!disposalDraft.value.targetOrganTouched) {
+    disposalDraft.value.targetOrgan = getDefaultOrgan(type, disposalJurisdiction.value)
   }
 }
 
@@ -1725,34 +1830,36 @@ function startNewDisposal(type = '') {
 
 function editDisposal(item) {
   editingDisposalId.value = item.id
+  showDisposalForm.value = true
   fillDisposalDraft({ ...item, relatedMaterials: item.relatedMaterials || [] }, null)
 }
 
 function buildDisposalPayload() {
+  const { statusTouched, targetOrganTouched, ...draft } = disposalDraft.value
   const now = dayjs().toISOString()
   return {
-    id: editingDisposalId.value || crypto.randomUUID(),
-    disposalType: disposalDraft.value.disposalType || '',
-    targetOrgan: disposalDraft.value.targetOrgan || '',
-    submitDate: disposalDraft.value.submitDate || '',
-    status: disposalDraft.value.status || '',
-    resultDate: disposalDraft.value.resultDate || '',
-    resultSummary: disposalDraft.value.resultSummary || '',
+    id: editingDisposalId.value || draft.id || crypto.randomUUID(),
+    disposalType: draft.disposalType || '',
+    targetOrgan: draft.targetOrgan || '',
+    submitDate: draft.submitDate || '',
+    status: draft.status || '',
+    resultDate: draft.resultDate || '',
+    resultSummary: draft.resultSummary || '',
     relatedMaterials: parseRelatedMaterials(relatedMaterialsText.value),
-    note: disposalDraft.value.note || '',
-    reviewStartDate: disposalDraft.value.reviewStartDate || '',
-    reviewDeadline60: disposalDraft.value.reviewDeadline60 || '',
-    reviewLongStopDate: disposalDraft.value.reviewLongStopDate || '',
-    reviewStatusText: disposalDraft.value.reviewStatusText || '',
-    deadlineBasis: disposalDraft.value.deadlineBasis || '',
-    acceptDate: disposalDraft.value.acceptDate || '',
-    mailSignedDate: disposalDraft.value.mailSignedDate || '',
-    deadlineDate: disposalDraft.value.deadlineDate || '',
-    followUpDate: disposalDraft.value.followUpDate || '',
-    deadlineNote: disposalDraft.value.deadlineNote || '',
-    mailTrackingNo: disposalDraft.value.mailTrackingNo || '',
-    mailSentDate: disposalDraft.value.mailSentDate || '',
-    deliveryStatus: disposalDraft.value.deliveryStatus || '',
+    note: draft.note || '',
+    reviewStartDate: draft.reviewStartDate || '',
+    reviewDeadline60: draft.reviewDeadline60 || '',
+    reviewLongStopDate: draft.reviewLongStopDate || '',
+    reviewStatusText: draft.reviewStatusText || '',
+    deadlineBasis: draft.deadlineBasis || '',
+    acceptDate: draft.acceptDate || '',
+    mailSignedDate: draft.mailSignedDate || '',
+    deadlineDate: draft.deadlineDate || '',
+    followUpDate: draft.followUpDate || '',
+    deadlineNote: draft.deadlineNote || '',
+    mailTrackingNo: draft.mailTrackingNo || '',
+    mailSentDate: draft.mailSentDate || '',
+    deliveryStatus: draft.deliveryStatus || '',
     createdAt: editingDisposalId.value
       ? (disposalRecords.value.find(item => item.id === editingDisposalId.value)?.createdAt || now)
       : now,
@@ -1784,6 +1891,27 @@ function deleteDisposal(item) {
   }
 }
 
+function copyDisposal(item) {
+  const copy = { ...item }
+  delete copy.id
+  delete copy.createdAt
+  delete copy.updatedAt
+  // 清空时效字段
+  copy.mailTrackingNo = ''
+  copy.mailSentDate = ''
+  copy.mailSignedDate = ''
+  copy.acceptDate = ''
+  copy.resultDate = ''
+  copy.resultSummary = ''
+  // 办理状态重置为拟提交
+  copy.status = '拟提交'
+  copy.statusTouched = false
+  copy.targetOrganTouched = false
+  editingDisposalId.value = ''
+  showDisposalForm.value = true
+  fillDisposalDraft(copy, null)
+}
+
 async function scrollToDisposalSection() {
   activeDetailTab.value = 'info'
   await nextTick()
@@ -1794,6 +1922,7 @@ async function handleOpenDisposal(payload = {}) {
   await scrollToDisposalSection()
   if (!payload?.type) return
   editingDisposalId.value = ''
+  showDisposalForm.value = true
   fillDisposalDraft({
     ...createEmptyDisposalDraft(),
     ...(payload.draft || {}),
