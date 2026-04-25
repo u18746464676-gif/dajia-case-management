@@ -1,305 +1,263 @@
 <template>
   <div v-if="c" class="case-detail-page">
-    <button @click="$router.back()" class="btn-ghost px-0">
-      <span>←</span>
-      <span>返回列表</span>
-    </button>
+    <section class="case-detail-page__header">
+      <button @click="$router.back()" class="case-detail-page__back">
+        <span>←</span>
+        <span>返回列表</span>
+      </button>
 
-    <div class="detail-hero glass-card">
-      <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div class="space-y-4">
-          <div>
-            <div class="text-xs uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">案件卷宗</div>
-            <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{{ primaryTitle }}</h2>
-            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ secondaryTitle }}</p>
-          </div>
+      <h1 class="case-detail-page__title">{{ primaryTitle }}</h1>
+      <p class="case-detail-page__subtitle">{{ secondaryTitle }}</p>
 
-          <div class="flex flex-wrap gap-2">
-            <StatusBadge :status="effectiveStatus" :profit="c.profit" />
-            <span class="detail-tag">编号 {{ c.caseNumber || '待生成' }}</span>
-            <span class="detail-tag">管辖局 {{ c.jurisdiction || '未填写' }}</span>
-            <span class="detail-tag">快递单号 {{ c.trackingNumber || '暂无' }}</span>
-            <span class="detail-tag">修改后自动保存</span>
-          </div>
+      <div class="case-detail-page__pills">
+        <span class="detail-pill detail-pill-status" :class="statusToneClass(effectiveStatus)">{{ statusLabel(effectiveStatus) }}</span>
+        <span class="detail-pill">编号 {{ c.caseNumber || '待生成' }}</span>
+        <span class="detail-pill">管辖局 {{ c.jurisdiction || '未填写' }}</span>
+        <span class="detail-pill">快递单号 {{ c.trackingNumber || '暂无' }}</span>
+        <span class="detail-pill">修改后自动保存</span>
+      </div>
+    </section>
 
-          <div class="detail-metrics-grid">
-            <div class="detail-metric-card">
-              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前状态</div>
-              <div class="mt-2"><StatusBadge :status="effectiveStatus" :profit="c.profit" /></div>
-            </div>
-            <div class="metric-card">
-              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">商品价格</div>
-              <div class="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">¥{{ formatCurrency(c.productPrice) }}</div>
-            </div>
-            <div class="metric-card">
-              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">花费总额</div>
-              <div class="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">¥{{ formatCurrency(c.expense) }}</div>
-            </div>
-            <div class="metric-card">
-              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">赔偿金额</div>
-              <div class="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">¥{{ formatCurrency(c.profit) }}</div>
-            </div>
+    <section class="case-detail-page__metrics detail-metrics">
+      <article class="detail-metric-card">
+        <div class="detail-metric-card__icon"><span v-html="detailMetricIcons.status"></span></div>
+        <div class="detail-metric-card__body">
+          <div class="detail-metric-card__label">当前状态</div>
+          <div class="detail-metric-card__value">
+            <span class="detail-pill detail-pill-status" :class="statusToneClass(effectiveStatus)">{{ statusLabel(effectiveStatus) }}</span>
           </div>
         </div>
-
-        <div class="detail-action-panel-wrap">
-          <div class="detail-action-panel">
-            <div class="detail-action-title">处置操作</div>
-            <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">围绕状态流转、答复补录与材料补充集中操作，基础字段在下方卷宗中直接维护。</p>
-
-            <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              <button @click="showStatusModal = true" class="detail-btn detail-btn-primary w-full">变更状态</button>
-              <button @click="showReplyModal = true" class="detail-btn w-full">添加答复</button>
-              <button @click="showDocModal = true" class="detail-btn w-full">上传文书</button>
-              <button @click="downloadCaseSummary" class="detail-btn w-full">导出卷宗摘要</button>
-              <button @click="printCaseDossier" class="detail-btn w-full">打印卷宗</button>
-              <button @click="confirmDelete" class="detail-btn detail-btn-danger w-full">删除案件</button>
-            </div>
-
-            <div class="mt-4 border-t border-slate-200 dark:border-slate-700 pt-3 text-xs leading-5 text-slate-400 dark:text-slate-500">
-              创建于 {{ formatDate(c.createdAt) }}<br />
-              更新于 {{ formatDate(c.updatedAt) }}
-            </div>
-          </div>
+      </article>
+      <article class="detail-metric-card">
+        <div class="detail-metric-card__icon"><span v-html="detailMetricIcons.price"></span></div>
+        <div class="detail-metric-card__body">
+          <div class="detail-metric-card__label">商品价格</div>
+          <div class="detail-metric-card__value detail-metric-card__value-gold">¥{{ formatCurrency(c.productPrice) }}</div>
         </div>
-      </div>
-    </div>
+      </article>
+      <article class="detail-metric-card">
+        <div class="detail-metric-card__icon"><span v-html="detailMetricIcons.expense"></span></div>
+        <div class="detail-metric-card__body">
+          <div class="detail-metric-card__label">花费总额</div>
+          <div class="detail-metric-card__value detail-metric-card__value-gold">¥{{ formatCurrency(c.expense) }}</div>
+        </div>
+      </article>
+      <article class="detail-metric-card">
+        <div class="detail-metric-card__icon"><span v-html="detailMetricIcons.compensation"></span></div>
+        <div class="detail-metric-card__body">
+          <div class="detail-metric-card__label">赔偿金额</div>
+          <div class="detail-metric-card__value detail-metric-card__value-gold">¥{{ formatCurrency(c.profit) }}</div>
+        </div>
+      </article>
+    </section>
 
-    <div class="detail-tabs-wrap glass-card">
-      <div class="flex gap-2 overflow-x-auto pb-1">
-        <button
-          v-for="tab in detailTabs"
-          :key="tab.value"
-          type="button"
-          @click="activeDetailTab = tab.value"
-          class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition"
-          :class="activeDetailTab === tab.value ? 'bg-slate-700 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:bg-slate-700'"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
+    <div class="detail-tabs">
+      <button
+        v-for="tab in detailTabs"
+        :key="tab.value"
+        type="button"
+        @click="selectDetailTab(tab.value)"
+        class="detail-tab"
+        :class="activeDetailTab === tab.value || (tab.value === 'disposal' && activeDetailTab === 'info') && disposalTabSelected ? 'detail-tab-active' : ''"
+      >
+        {{ tab.label }}
+      </button>
     </div>
 
     <template v-if="activeDetailTab === 'info'">
-      <div class="space-y-4">
-        <section class="detail-section glass-card">
-          <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h3 class="detail-section-title mb-1">案件速览</h3>
-              <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">顶部只读摘要，快速确认当前状态、关键节点和期限风险。</p>
-            </div>
-            <span class="detail-tag">只读摘要</span>
-          </div>
-
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div class="detail-panel">
-              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">当前状态</div>
-              <div class="mt-2"><StatusBadge :status="effectiveStatus" :profit="c.profit" /></div>
-            </div>
-            <div class="detail-panel">
-              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">受理状态 / 日期</div>
-              <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.acceptanceStatus ? statusLabel(c.acceptanceStatus) : '未填写' }}</div>
-              <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.acceptanceDate || '日期未填写' }}</div>
-            </div>
-            <div class="detail-panel">
-              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">举报结果 / 日期</div>
-              <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.reportResultStatus ? statusLabel(c.reportResultStatus) : '未填写' }}</div>
-              <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.reportResultDate || '日期未填写' }}</div>
-            </div>
-            <div class="detail-panel">
-              <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">关键期限风险</div>
-              <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ keyRiskSummary.title }}</div>
-              <div class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ keyRiskSummary.detail }}</div>
-            </div>
-          </div>
-        </section>
-
-        <section class="detail-section glass-card">
-          <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 class="detail-section-title mb-1">基础信息</h3>
-              <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">案件主字段保持两列布局，方便桌面端快速浏览，窄屏自动回落为一列。</p>
-            </div>
-            <span class="detail-tag">主档信息</span>
-          </div>
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label class="label">案件编号</label>
-              <input :value="c.caseNumber || '待生成'" type="text" class="input-field bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 dark:text-slate-500" readonly />
-            </div>
-            <div>
-              <label class="label">执照名称</label>
-              <input v-model="c.licenseName" @change="saveField('licenseName', c.licenseName)" type="text" class="input-field" placeholder="营业执照上的名称" />
-            </div>
-            <div>
-              <label class="label">店铺名称</label>
-              <input v-model="c.shopName" @change="saveField('shopName', c.shopName)" type="text" class="input-field" placeholder="例：xxx旗舰店" />
-            </div>
-            <div>
-              <label class="label">商品名称 / 涉案事项</label>
-              <input v-model="c.productName" @change="saveField('productName', c.productName)" type="text" class="input-field" placeholder="例：美白祛斑面膜" />
-            </div>
-            <div>
-              <label class="label">管辖局</label>
-              <input v-model="c.jurisdiction" @change="saveField('jurisdiction', c.jurisdiction)" type="text" class="input-field" placeholder="例：市场监督管理局" />
-            </div>
-            <div>
-              <label class="label">快递单号</label>
-              <input v-model="c.trackingNumber" @change="saveField('trackingNumber', c.trackingNumber)" type="text" class="input-field" placeholder="有单号时可直接录入" />
-            </div>
-            <div>
-              <label class="label">签收日期</label>
-              <input v-model="c.signDate" @change="saveSignDate(c.signDate)" type="date" class="input-field" />
-            </div>
-            <div class="md:col-span-2">
-              <label class="label">备注</label>
-              <textarea
-                v-model="c.notes"
-                @change="saveField('notes', c.notes)"
-                class="input-field min-h-28 resize-none"
-                placeholder="补充识别来源、店铺别名、案件说明等"
-              ></textarea>
-            </div>
-          </div>
-        </section>
-
-        <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <section class="detail-section glass-card">
-            <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h3 class="detail-section-title mb-1">流程状态摘要</h3>
-                <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">这里只展示摘要和入口，完整编辑仍然只在“变更状态”弹窗中处理。</p>
-              </div>
-              <button class="btn-primary" @click="showStatusModal = true">变更状态</button>
-            </div>
-
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <div class="detail-panel">
-                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">受理状态 + 日期</div>
-                <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.acceptanceStatus ? statusLabel(c.acceptanceStatus) : '未填写' }}</div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.acceptanceDate || '日期未填写' }}</div>
-              </div>
-              <div class="detail-panel">
-                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">投诉跟进 + 日期</div>
-                <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.mediationStatus ? statusLabel(c.mediationStatus) : '未填写' }}</div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.mediationDate || '日期未填写' }}</div>
-              </div>
-              <div class="detail-panel">
-                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">举报结果 + 日期</div>
-                <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.reportResultStatus ? statusLabel(c.reportResultStatus) : '未填写' }}</div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ c.reportResultDate || '日期未填写' }}</div>
-              </div>
-              <div class="detail-panel">
-                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">旧规 / 新规</div>
-                <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.procedureVersion === 'old' ? '旧规案件' : '新规案件' }}</div>
-              </div>
-              <div class="panel-card md:col-span-2 xl:col-span-2">
-                <div class="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">旧规立案状态 + 日期</div>
-                <div class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ c.filingStatus ? filingStatusLabel(c.filingStatus) : '未填写' }}</div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                  {{ c.filingDate || c.filingNoticeDate || '日期未填写' }}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <div class="space-y-4">
-            <section class="detail-section glass-card">
-              <div class="flex items-center justify-between gap-3">
+      <div class="main-detail-grid">
+        <div class="case-detail-page__main-col">
+          <div class="info-row">
+            <section class="detail-section detail-section overview">
+              <div class="detail-section__head">
                 <div>
-                  <h3 class="detail-section-title mb-1">财务信息</h3>
-                  <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">压缩成小卡片，只保留商品价格和花费总额。</p>
+                  <h3 class="detail-section-title">案件速览</h3>
+                  <p class="detail-section-desc">顶部只读摘要，快速确认当前状态、关键节点和期限风险。</p>
                 </div>
-                <span class="detail-tag">简版</span>
+                <span class="detail-chip-muted">只读摘要</span>
               </div>
 
-              <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
-                <div>
-                  <label class="label">商品价格（元）</label>
-                  <input v-model="c.productPrice" @change="saveField('productPrice', c.productPrice)" type="number" step="0.01" class="input-field" placeholder="0.00" />
+              <div class="detail-overview-grid">
+                <div class="detail-panel">
+                  <div class="detail-panel-label">当前状态</div>
+                  <div class="detail-panel-value"><span class="detail-pill detail-pill-status" :class="statusToneClass(effectiveStatus)">{{ statusLabel(effectiveStatus) }}</span></div>
                 </div>
-                <div>
-                  <label class="label">花费总额（元）</label>
-                  <input v-model="c.expense" @change="saveField('expense', c.expense)" type="number" step="0.01" class="input-field" placeholder="默认可与商品价格一致" />
+                <div class="detail-panel">
+                  <div class="detail-panel-label">受理状态 / 日期</div>
+                  <div class="detail-panel-value">{{ c.acceptanceStatus ? statusLabel(c.acceptanceStatus) : '未填写' }}</div>
+                  <div class="detail-panel-sub">{{ c.acceptanceDate || '日期未填写' }}</div>
+                </div>
+                <div class="detail-panel">
+                  <div class="detail-panel-label">举报结果 / 日期</div>
+                  <div class="detail-panel-value">{{ c.reportResultStatus ? statusLabel(c.reportResultStatus) : '未填写' }}</div>
+                  <div class="detail-panel-sub">{{ c.reportResultDate || '日期未填写' }}</div>
+                </div>
+                <div class="detail-panel">
+                  <div class="detail-panel-label">关键期限风险</div>
+                  <div class="detail-panel-value detail-panel-value-risk">{{ keyRiskSummary.title }}</div>
+                  <div class="detail-panel-sub">{{ keyRiskSummary.detail }}</div>
                 </div>
               </div>
             </section>
 
-            <section class="detail-section glass-card">
-              <h3 class="detail-section-title">填写提醒</h3>
-              <div class="mt-3 space-y-2 text-sm leading-6">
-                <div v-for="(item, idx) in filingReminders" :key="`reminder-${idx}`" :class="item.done ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 dark:text-slate-500'">
-                  {{ item.text }}
+            <section class="detail-section">
+              <div class="detail-section__head">
+                <div>
+                  <h3 class="detail-section-title">基础信息</h3>
+                  <p class="detail-section-desc">案件主字段保持两列布局，方便桌面端快速浏览，窄屏自动回落为一列。</p>
+                </div>
+                <span class="detail-chip-muted">主档信息</span>
+              </div>
+
+              <div class="detail-fields">
+                <div class="detail-field">
+                  <label>案件编号</label>
+                  <div class="detail-field__value">{{ c.caseNumber || '待生成' }}</div>
+                </div>
+                <div class="detail-field">
+                  <label>执照名称</label>
+                  <input v-model="c.licenseName" @change="saveField('licenseName', c.licenseName)" type="text" class="detail-field__input" placeholder="营业执照上的名称" />
+                </div>
+                <div class="detail-field">
+                  <label>店铺名称</label>
+                  <input v-model="c.shopName" @change="saveField('shopName', c.shopName)" type="text" class="detail-field__input" placeholder="例：xxx旗舰店" />
+                </div>
+                <div class="detail-field">
+                  <label>商品名称 / 涉案事项</label>
+                  <input v-model="c.productName" @change="saveField('productName', c.productName)" type="text" class="detail-field__input" placeholder="例：美白祛斑面膜" />
+                </div>
+                <div class="detail-field">
+                  <label>管辖局</label>
+                  <input v-model="c.jurisdiction" @change="saveField('jurisdiction', c.jurisdiction)" type="text" class="detail-field__input" placeholder="例：市场监督管理局" />
+                </div>
+                <div class="detail-field">
+                  <label>快递单号</label>
+                  <input v-model="c.trackingNumber" @change="saveField('trackingNumber', c.trackingNumber)" type="text" class="detail-field__input" placeholder="有单号时可直接录入" />
+                </div>
+                <div class="detail-field">
+                  <label>签收日期</label>
+                  <input v-model="c.signDate" @change="saveSignDate(c.signDate)" type="date" class="detail-field__input" />
+                </div>
+                <div class="detail-field detail-field--full">
+                  <label>备注</label>
+                  <textarea v-model="c.notes" @change="saveField('notes', c.notes)" class="detail-field__textarea" placeholder="补充识别来源、店铺别名、案件说明等"></textarea>
                 </div>
               </div>
             </section>
           </div>
-        </div>
 
-        <section ref="disposalSectionRef" class="detail-section glass-card detail-section-wide">
-          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h3 class="detail-section-title mb-1">后续处置 / 救济监督</h3>
-              <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">全宽展示程序类型、新建/编辑表单和已保存记录，避免字段被挤在窄栏里。</p>
-            </div>
-            <span class="detail-tag">已记录 {{ disposalRecords.length }} 条</span>
-          </div>
-
-          <div class="mt-4 space-y-4">
-            <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-4">
-              <div class="text-xs uppercase tracking-wider text-slate-400">程序类型选择区</div>
-              <div class="mt-3 space-y-3">
+          <div class="detail-lower-grid">
+            <section class="detail-section">
+              <div class="detail-section__head">
                 <div>
-                <div v-for="group in disposalTypeGroups" :key="group.name">
-                  <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ group.name }}</div>
-                  <div class="mt-2 flex flex-wrap gap-2">
-                    <button
-                      v-for="item in group.items"
-                      :key="item"
-                      type="button"
-                      class="rounded-full border px-3 py-1.5 text-xs font-medium transition"
-                      :class="disposalDraft.disposalType === item ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-600'"
-                      @click="selectDisposalType(item)"
-                    >
-                      {{ item }}
-                    </button>
+                  <h3 class="detail-section-title">流程状态摘要</h3>
+                  <p class="detail-section-desc">这里只展示摘要和入口，完整编辑仍然只在“变更状态”弹窗中处理。</p>
+                </div>
+                <button class="detail-mini-btn" @click="showStatusModal = true">变更状态</button>
+              </div>
+
+              <div class="detail-flow-grid">
+                <div class="detail-panel detail-panel-compact">
+                  <div class="detail-panel-label">受理状态 + 日期</div>
+                  <div class="detail-panel-value">{{ c.acceptanceStatus ? statusLabel(c.acceptanceStatus) : '未填写' }}</div>
+                  <div class="detail-panel-sub">{{ c.acceptanceDate || '日期未填写' }}</div>
+                </div>
+                <div class="detail-panel detail-panel-compact">
+                  <div class="detail-panel-label">投诉跟进 + 日期</div>
+                  <div class="detail-panel-value">{{ c.mediationStatus ? statusLabel(c.mediationStatus) : '未填写' }}</div>
+                  <div class="detail-panel-sub">{{ c.mediationDate || '日期未填写' }}</div>
+                </div>
+                <div class="detail-panel detail-panel-compact">
+                  <div class="detail-panel-label">举报结果 + 日期</div>
+                  <div class="detail-panel-value">{{ c.reportResultStatus ? statusLabel(c.reportResultStatus) : '未填写' }}</div>
+                  <div class="detail-panel-sub">{{ c.reportResultDate || '日期未填写' }}</div>
+                </div>
+                <div class="detail-panel detail-panel-compact">
+                  <div class="detail-panel-label">旧规 / 新规</div>
+                  <div class="detail-panel-value">{{ c.procedureVersion === 'old' ? '旧规案件' : '新规案件' }}</div>
+                </div>
+                <div class="detail-panel detail-panel-compact detail-panel-span-2">
+                  <div class="detail-panel-label">旧规立案状态 + 日期</div>
+                  <div class="detail-panel-value">{{ c.filingStatus ? filingStatusLabel(c.filingStatus) : '未填写' }}</div>
+                  <div class="detail-panel-sub">{{ c.filingDate || c.filingNoticeDate || '日期未填写' }}</div>
+                </div>
+              </div>
+            </section>
+
+            <div class="detail-side-stack">
+              <section class="detail-section">
+                <div class="detail-section__head">
+                  <div>
+                    <h3 class="detail-section-title">财务信息</h3>
+                    <p class="detail-section-desc">压缩成小卡片，只保留商品价格和花费总额。</p>
+                  </div>
+                  <span class="detail-chip-muted">简版</span>
+                </div>
+                <div class="detail-finance-grid">
+                  <div class="detail-panel detail-panel-compact">
+                    <div class="detail-panel-label">商品价格（元）</div>
+                    <div class="detail-finance-value">{{ formatCurrency(c.productPrice) }}</div>
+                  </div>
+                  <div class="detail-panel detail-panel-compact">
+                    <div class="detail-panel-label">花费总额（元）</div>
+                    <div class="detail-finance-value">{{ formatCurrency(c.expense) }}</div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </section>
 
-            <div v-if="disposalContextLines.length" class="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-              <div class="text-sm font-semibold text-blue-700">当前带入信息</div>
-              <div class="mt-2 space-y-1 text-xs leading-5 text-blue-700/90">
-                <div v-for="(line, idx) in disposalContextLines" :key="`ctx-${idx}`">{{ line }}</div>
-              </div>
-            </div>
-
-            <div v-if="hasLegacyAdminReview" class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-4">
-              <div class="flex items-center justify-between gap-3">
-                <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">旧行政复议信息</div>
-                <span class="detail-tag">只读兼容</span>
-              </div>
-              <div class="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-600 dark:text-slate-300 md:grid-cols-2 xl:grid-cols-4">
-                <div v-for="item in legacyAdminReviewFields" :key="item.label">
-                  <div class="text-xs text-slate-400">{{ item.label }}</div>
-                  <div class="mt-1 break-all">{{ item.value || '未填写' }}</div>
+              <section class="detail-section">
+                <div class="detail-section__head">
+                  <div>
+                    <h3 class="detail-section-title">填写提醒</h3>
+                  </div>
                 </div>
+                <div class="detail-reminders">
+                  <div v-for="(item, idx) in filingReminders" :key="`reminder-${idx}`" class="detail-reminder-item">
+                    <span class="detail-reminder-dot" :class="item.done ? 'detail-reminder-dot-ok' : 'detail-reminder-dot-warn'"></span>
+                    <span>{{ item.text }}</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <section ref="disposalSectionRef" class="detail-section detail-disposal-section">
+            <div class="detail-section__head">
+              <div>
+                <h3 class="detail-section-title">后续处置 / 救济监督</h3>
+                <p class="detail-section-desc">全宽展示程序类型，新增/编辑表单和已保存记录，维护字段精简，便于持续追踪。</p>
               </div>
+              <span class="detail-chip-muted">已记录 {{ disposalRecords.length }} 条</span>
             </div>
 
-            <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-              <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div class="detail-type-grid">
+              <template v-for="group in disposalTypeGroups" :key="group.name">
+                <button
+                  v-for="item in group.items"
+                  :key="item"
+                  type="button"
+                  class="detail-type-pill"
+                  :class="disposalDraft.disposalType === item ? 'detail-type-pill-active' : ''"
+                  @click="openNewDisposalForm(item)"
+                >
+                  {{ item }}
+                </button>
+              </template>
+            </div>
+
+            <div v-if="hasLegacyAdminReview" class="detail-legacy-bar">
+              <span v-for="item in legacyAdminReviewFields" :key="item.label">{{ item.label }}：{{ item.value || '未填写' }}</span>
+            </div>
+
+            <div class="detail-disposal-form-wrap">
+              <div class="detail-disposal-form-head">
                 <div>
-                  <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ editingDisposalId ? '编辑后续处置记录' : '新建后续处置记录' }}</div>
-                  <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">只在你点保存后写入 `disposals`，不会自动创建记录。</div>
+                  <div class="detail-disposal-form-title">{{ editingDisposalId ? '编辑后续处置记录' : '新增后续处置记录' }}</div>
+                  <div class="detail-disposal-form-subtitle">保存、编辑、删除仍沿用现有记录逻辑，只调整布局表现。</div>
                 </div>
-                <button type="button" class="text-xs text-slate-500 hover:text-blue-600" @click="resetDisposalDraft()">清空表单</button>
+                <button type="button" class="detail-form-link" @click="resetDisposalDraft()">清空表单</button>
               </div>
-
-              <!-- 8 个核心字段：处置类型 / 提交机关 / 寄件单号 / 签收日期 / 受理日期 / 办理状态 / 结果日期 / 结果摘要 -->
-              <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <div v-if="showDisposalForm" class="detail-form-grid">
                 <div>
                   <label class="label">处置类型</label>
                   <select v-model="disposalDraft.disposalType" class="input-field" @change="selectDisposalType(disposalDraft.disposalType)">
@@ -314,7 +272,7 @@
                   <input v-model="disposalDraft.targetOrgan" type="text" class="input-field" placeholder="根据处置类型自动带出，可手动修改" />
                 </div>
                 <div>
-                  <label class="label">寄件单号</label>
+                  <label class="label">卷件单号</label>
                   <input v-model="disposalDraft.mailTrackingNo" type="text" class="input-field" placeholder="如有可填写" />
                 </div>
                 <div>
@@ -333,116 +291,71 @@
                   </select>
                 </div>
                 <div>
-                  <label class="label">结果日期</label>
-                  <input v-model="disposalDraft.resultDate" type="date" class="input-field" />
+                  <label class="label">截止日期</label>
+                  <input v-model="disposalDraft.deadlineDate" type="date" class="input-field" />
                 </div>
-                <div class="xl:col-span-3">
-                  <label class="label">结果摘要</label>
-                  <textarea v-model="disposalDraft.resultSummary" rows="3" class="input-field min-h-[88px]" placeholder="简要记录反馈结果"></textarea>
+                <div class="full-width">
+                  <label class="label">结果说明 / 备注</label>
+                  <textarea v-model="disposalDraft.note" rows="3" class="input-field min-h-[88px]" placeholder="简要记录结果说明、备注和跟进情况"></textarea>
                 </div>
-              </div>
-
-              <!-- 系统测算 / 更多字段 -->
-              <div class="mt-3">
-                <button type="button" class="flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600" @click="showDisposalMore = !showDisposalMore">
-                  <span>系统测算 / 更多字段</span>
-                  <span :class="showDisposalMore ? 'rotate-90' : ''" class="transition-transform text-xs">▶</span>
-                </button>
-                <div v-if="showDisposalMore" class="mt-3 grid grid-cols-1 gap-4 xl:grid-cols-3">
-                  <div>
-                    <label class="label">提交日期</label>
-                    <input v-model="disposalDraft.submitDate" type="date" class="input-field" />
-                  </div>
-                  <div>
-                    <label class="label">期限依据</label>
-                    <select v-model="disposalDraft.deadlineBasis" class="input-field">
-                      <option value="">请选择</option>
-                      <option v-for="item in deadlineBasisOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="label">到期日期</label>
-                    <input v-model="disposalDraft.deadlineDate" type="date" class="input-field" />
-                  </div>
-                  <div>
-                    <label class="label">跟进日期</label>
-                    <input v-model="disposalDraft.followUpDate" type="date" class="input-field" />
-                  </div>
-                  <div>
-                    <label class="label">寄件日期</label>
-                    <input v-model="disposalDraft.mailSentDate" type="date" class="input-field" />
-                  </div>
-                  <div>
-                    <label class="label">送达状态</label>
-                    <input v-model="disposalDraft.deliveryStatus" type="text" class="input-field" placeholder="例如：已签收 / 查询中" />
-                  </div>
-                  <div v-if="disposalDraft.disposalType === '行政复议'">
-                    <label class="label">复议起算日</label>
-                    <input v-model="disposalDraft.reviewStartDate" type="date" class="input-field" />
-                  </div>
-                  <div v-if="disposalDraft.disposalType === '行政复议'">
-                    <label class="label">60 日复议截止日</label>
-                    <input v-model="disposalDraft.reviewDeadline60" type="date" class="input-field" />
-                  </div>
-                  <div v-if="disposalDraft.disposalType === '行政复议'">
-                    <label class="label">一年保护期日期</label>
-                    <input v-model="disposalDraft.reviewLongStopDate" type="date" class="input-field" />
-                  </div>
-                  <div v-if="disposalDraft.disposalType === '行政复议'" class="xl:col-span-3">
-                    <label class="label">当前期限状态</label>
-                    <input v-model="disposalDraft.reviewStatusText" type="text" class="input-field" placeholder="例如：行政复议期限：剩余 12 天" />
-                  </div>
-                  <div class="xl:col-span-3">
-                    <label class="label">期限说明</label>
-                    <textarea v-model="disposalDraft.deadlineNote" rows="3" class="input-field min-h-[88px]" placeholder="例如：需结合是否正式受理、是否延期、是否另有指定期限人工复核。"></textarea>
-                  </div>
-                  <div class="xl:col-span-3">
-                    <label class="label">关联材料说明（轻量）</label>
-                    <textarea v-model="relatedMaterialsText" rows="3" class="input-field min-h-[88px]" placeholder="手动填写材料说明，或按「名称 | URL | 类型」一行一条记录。"></textarea>
-                  </div>
-                  <div class="xl:col-span-3">
-                    <label class="label">备注</label>
-                    <textarea v-model="disposalDraft.note" rows="5" class="input-field min-h-[120px]" placeholder="记录案件编号、期限状态、风险提示、沟通情况等。"></textarea>
-                  </div>
+                <div class="full-width detail-form-actions">
+                  <button type="button" class="detail-btn detail-btn-primary detail-btn-inline" @click="saveDisposal()">保存处置记录</button>
+                  <button type="button" class="detail-btn detail-btn-inline" @click="resetDisposalDraft()">取消</button>
                 </div>
               </div>
-                <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">已有记录列表</div>
-                <button type="button" class="text-xs text-slate-500 hover:text-blue-600" @click="startNewDisposal()">新建一条</button>
-              </div>
-              <div v-if="disposalRecords.length" class="mt-3 space-y-3">
-                <div v-for="item in disposalRecords" :key="item.id" class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-                  <div class="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_auto] lg:items-start">
-                    <div class="min-w-0">
-                      <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ item.disposalType || '未命名处置' }}</div>
-                      <div class="mt-2 space-y-1 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                        <div v-if="item.targetOrgan">提交机关：{{ item.targetOrgan }}</div>
-                        <div v-if="item.submitDate">提交日期：{{ item.submitDate }}</div>
-                        <div v-if="item.status">办理状态：{{ item.status }}</div>
-                        <div>期限依据：{{ deadlineBasisLabel(item.deadlineBasis) }}</div>
-                      </div>
-                    </div>
-                    <div class="min-w-0 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                      <div v-if="item.acceptDate">正式受理日期：{{ item.acceptDate }}</div>
-                      <div v-if="item.mailSignedDate">签收日期：{{ item.mailSignedDate }}</div>
-                      <div v-if="item.deadlineDate">到期日期：{{ item.deadlineDate }}</div>
-                      <div v-if="item.resultSummary" class="mt-2">结果摘要：{{ item.resultSummary }}</div>
-                      <div v-if="item.deadlineNote" class="mt-2">期限说明：{{ item.deadlineNote }}</div>
-                      <div v-if="formatRelatedMaterials(item.relatedMaterials)" class="mt-2">关联材料：{{ formatRelatedMaterials(item.relatedMaterials) }}</div>
-                      <div v-if="item.note" class="mt-2 whitespace-pre-line">备注：{{ item.note }}</div>
-                    </div>
-                    <div class="flex shrink-0 flex-wrap gap-2 lg:justify-end">
-                      <button type="button" class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:border-blue-300 hover:text-blue-600" @click="editDisposal(item)">编辑</button>
-                      <button type="button" class="rounded-full border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50" @click="deleteDisposal(item)">删除</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="mt-3 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-5 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                还没有保存任何后续处置记录，可以先从上方选择一个程序类型开始。
+              <div v-else class="detail-record-empty">
+                先选择上方处置类型，或点击右侧、列表中的入口开始新增记录。
               </div>
             </div>
+
+            <div class="detail-record-block">
+              <div class="detail-record-block__head">
+                <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">后续处置记录</div>
+                <button type="button" class="text-xs text-slate-500 hover:text-blue-600" @click="openNewDisposalForm()">新增一条</button>
+              </div>
+              <div v-if="disposalRecords.length" class="mt-3 space-y-3">
+                <div v-for="item in disposalRecords" :key="item.id" class="detail-record-card">
+                  <div class="min-w-0">
+                    <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ item.disposalType || '未命名处置' }}</div>
+                    <div class="mt-2 space-y-1 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                      <div v-if="item.targetOrgan">提交机关：{{ item.targetOrgan }}</div>
+                      <div v-if="item.submitDate">提交日期：{{ item.submitDate }}</div>
+                      <div v-if="item.status">办理状态：{{ item.status }}</div>
+                    </div>
+                  </div>
+                  <div class="min-w-0 text-xs leading-5 text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                    <div v-if="item.acceptDate">受理日期：{{ item.acceptDate }}</div>
+                    <div v-if="item.deadlineDate">截止日期：{{ item.deadlineDate }}</div>
+                    <div v-if="item.resultSummary" class="mt-2">结果摘要：{{ item.resultSummary }}</div>
+                    <div v-if="item.note" class="mt-2 whitespace-pre-line">备注：{{ item.note }}</div>
+                  </div>
+                  <div class="detail-record-actions">
+                    <button type="button" class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:border-blue-300 hover:text-blue-600" @click="editDisposal(item)">编辑</button>
+                    <button type="button" class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:border-blue-300 hover:text-blue-600" @click="copyDisposal(item)">复制</button>
+                    <button type="button" class="rounded-full border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50" @click="deleteDisposal(item)">删除</button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="detail-record-empty">
+                开始新增你的第一条后续处置记录，形成案件救济链路。
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="detail-action-panel">
+          <div class="detail-action-title">处置操作</div>
+          <button @click="showStatusModal = true" class="detail-btn detail-btn-primary">变更状态</button>
+          <button @click="showReplyModal = true" class="detail-btn">添加答复</button>
+          <button @click="showDocModal = true" class="detail-btn">上传文书</button>
+          <button @click="downloadCaseSummary" class="detail-btn">导出卷宗摘要</button>
+          <button @click="printCaseDossier" class="detail-btn">打印卷宗</button>
+          <button @click="confirmDelete" class="detail-btn detail-btn-danger">删除案件</button>
+          <div class="detail-action-meta">
+            创建于 {{ formatDate(c.createdAt) }}<br />
+            更新于 {{ formatDate(c.updatedAt) }}
           </div>
-        </section>
+        </aside>
       </div>
     </template>
 
@@ -940,6 +853,7 @@ const showStatusModal = ref(false)
 const showReplyModal = ref(false)
 const showDocModal = ref(false)
 const activeDetailTab = ref('info')
+const disposalTabSelected = ref(false)
 const activeMaterialTab = ref('all')
 const showImagePreview = ref(false)
 const previewImageUrl = ref('')
@@ -1108,7 +1022,15 @@ const detailTabs = [
   { value: 'info', label: '案件信息' },
   { value: 'timeline', label: '流程时间轴' },
   { value: 'materials', label: '案件材料' },
+  { value: 'disposal', label: '后续处置' },
 ]
+
+const detailMetricIcons = {
+  status: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>`,
+  price: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+  expense: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>`,
+  compensation: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+}
 
 onMounted(() => {
   c.value = caseData.value
@@ -1163,6 +1085,13 @@ watch(caseData, (newVal) => {
     c.value = newVal
   }
 }, { immediate: true })
+
+watch(() => route.params.id, () => {
+  loadCase()
+  activeDetailTab.value = 'info'
+  disposalTabSelected.value = false
+  resetDisposalDraft()
+})
 
 const primaryTitle = computed(() => c.value?.licenseName || c.value?.shopName || '未命名案件')
 const secondaryTitle = computed(() => {
@@ -1230,6 +1159,25 @@ const keyRiskSummary = computed(() => {
     detail: '关键期限会随受理、调解、举报结果自动变化，这里只做摘要提示。',
   }
 })
+
+function statusToneClass(status) {
+  if (['rejected', 'reported', 'exempted', 'mediation_terminated'].includes(status)) return 'detail-pill-danger'
+  if (status === 'filed') return 'detail-pill-info'
+  if (['closed', 'decided'].includes(status)) return 'detail-pill-success'
+  return 'detail-pill-neutral'
+}
+
+function selectDetailTab(tab) {
+  disposalTabSelected.value = tab === 'disposal'
+  if (tab === 'disposal') {
+    activeDetailTab.value = 'info'
+    nextTick(() => {
+      disposalSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return
+  }
+  activeDetailTab.value = tab
+}
 
 const filingReminders = computed(() => {
   const cv = c.value || {}
@@ -1829,11 +1777,16 @@ function selectDisposalType(type) {
   }
 }
 
-function startNewDisposal(type = '') {
+function openNewDisposalForm(type = '') {
   resetDisposalDraft()
+  showDisposalForm.value = true
   if (type) {
     selectDisposalType(type)
   }
+}
+
+function startNewDisposal(type = '') {
+  openNewDisposalForm(type)
 }
 
 function editDisposal(item) {
@@ -1921,6 +1874,7 @@ function copyDisposal(item) {
 }
 
 async function scrollToDisposalSection() {
+  disposalTabSelected.value = true
   activeDetailTab.value = 'info'
   await nextTick()
   disposalSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
