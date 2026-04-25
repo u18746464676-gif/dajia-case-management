@@ -1073,8 +1073,8 @@ const effectiveStatus = computed(() => {
   if (cv.mediationStatus === 'decided') return 'decided'
   if (cv.reportResultStatus) return cv.reportResultStatus
   if (cv.procedureVersion === 'old' && cv.filingStatus === 'filed' && !cv.reportResultStatus) return 'filed'
-  if (cv.mediationStatus === 'mediation_terminated') return 'mediation_terminated'
   if (cv.acceptanceStatus) return cv.acceptanceStatus
+  if (cv.mediationStatus === 'mediation_terminated') return 'mediation_terminated'
   return cv.status || 'pending_report'
 })
 const statusOptions = [

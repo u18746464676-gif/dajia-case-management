@@ -143,8 +143,8 @@ function buildContext() {
     if (c.mediationStatus === 'decided') return 'decided'
     if (c.reportResultStatus) return c.reportResultStatus
     if (c.procedureVersion === 'old' && c.filingStatus === 'filed' && !c.reportResultStatus) return 'filed'
-    if (c.mediationStatus === 'mediation_terminated') return 'mediation_terminated'
     if (c.acceptanceStatus) return c.acceptanceStatus
+    if (c.mediationStatus === 'mediation_terminated') return 'mediation_terminated'
     return 'pending_report'
   }
 
