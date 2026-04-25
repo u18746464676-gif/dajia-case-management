@@ -250,6 +250,7 @@
             <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-4">
               <div class="text-xs uppercase tracking-wider text-slate-400">程序类型选择区</div>
               <div class="mt-3 space-y-3">
+                <div>
                 <div v-for="group in disposalTypeGroups" :key="group.name">
                   <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ group.name }}</div>
                   <div class="mt-2 flex flex-wrap gap-2">
@@ -297,6 +298,7 @@
                 <button type="button" class="text-xs text-slate-500 hover:text-blue-600" @click="resetDisposalDraft()">清空表单</button>
               </div>
 
+              <!-- 8 个核心字段：处置类型 / 提交机关 / 寄件单号 / 签收日期 / 受理日期 / 办理状态 / 结果日期 / 结果摘要 -->
               <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
                 <div>
                   <label class="label">处置类型</label>
@@ -308,98 +310,102 @@
                   </select>
                 </div>
                 <div>
-                  <label class="label">期限依据</label>
-                  <select v-model="disposalDraft.deadlineBasis" class="input-field">
-                    <option value="">请选择</option>
-                    <option v-for="item in deadlineBasisOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-                  </select>
-                </div>
-                <div>
                   <label class="label">提交机关 / 部门</label>
-                  <input v-model="disposalDraft.targetOrgan" type="text" class="input-field" placeholder="例如：运城市市场监督管理局" />
-                </div>
-                <div>
-                  <label class="label">提交日期</label>
-                  <input v-model="disposalDraft.submitDate" type="date" class="input-field" />
-                </div>
-                <div>
-                  <label class="label">办理状态</label>
-                  <input v-model="disposalDraft.status" type="text" class="input-field" placeholder="例如：拟提交 / 已提交 / 办理中" />
-                </div>
-                <div>
-                  <label class="label">结果日期</label>
-                  <input v-model="disposalDraft.resultDate" type="date" class="input-field" />
-                </div>
-                <div>
-                  <label class="label">正式受理日期</label>
-                  <input v-model="disposalDraft.acceptDate" type="date" class="input-field" />
-                </div>
-                <div>
-                  <label class="label">签收日期</label>
-                  <input v-model="disposalDraft.mailSignedDate" type="date" class="input-field" />
-                </div>
-                <div>
-                  <label class="label">到期日期</label>
-                  <input v-model="disposalDraft.deadlineDate" type="date" class="input-field" />
-                </div>
-                <div>
-                  <label class="label">跟进日期</label>
-                  <input v-model="disposalDraft.followUpDate" type="date" class="input-field" />
+                  <input v-model="disposalDraft.targetOrgan" type="text" class="input-field" placeholder="根据处置类型自动带出，可手动修改" />
                 </div>
                 <div>
                   <label class="label">寄件单号</label>
                   <input v-model="disposalDraft.mailTrackingNo" type="text" class="input-field" placeholder="如有可填写" />
                 </div>
                 <div>
-                  <label class="label">寄件日期</label>
-                  <input v-model="disposalDraft.mailSentDate" type="date" class="input-field" />
+                  <label class="label">签收日期</label>
+                  <input v-model="disposalDraft.mailSignedDate" type="date" class="input-field" />
                 </div>
                 <div>
-                  <label class="label">送达状态</label>
-                  <input v-model="disposalDraft.deliveryStatus" type="text" class="input-field" placeholder="例如：已签收 / 查询中" />
+                  <label class="label">受理日期</label>
+                  <input v-model="disposalDraft.acceptDate" type="date" class="input-field" />
                 </div>
-                <div v-if="disposalDraft.disposalType === '行政复议'">
-                  <label class="label">复议起算日</label>
-                  <input v-model="disposalDraft.reviewStartDate" type="date" class="input-field" />
+                <div>
+                  <label class="label">办理状态</label>
+                  <select v-model="disposalDraft.status" class="input-field">
+                    <option value="">请选择</option>
+                    <option v-for="s in disposalStatusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
+                  </select>
                 </div>
-                <div v-if="disposalDraft.disposalType === '行政复议'">
-                  <label class="label">60 日复议截止日</label>
-                  <input v-model="disposalDraft.reviewDeadline60" type="date" class="input-field" />
-                </div>
-                <div v-if="disposalDraft.disposalType === '行政复议'">
-                  <label class="label">一年保护期日期</label>
-                  <input v-model="disposalDraft.reviewLongStopDate" type="date" class="input-field" />
-                </div>
-                <div v-if="disposalDraft.disposalType === '行政复议'" class="xl:col-span-3">
-                  <label class="label">当前期限状态</label>
-                  <input v-model="disposalDraft.reviewStatusText" type="text" class="input-field" placeholder="例如：行政复议期限：剩余 12 天" />
+                <div>
+                  <label class="label">结果日期</label>
+                  <input v-model="disposalDraft.resultDate" type="date" class="input-field" />
                 </div>
                 <div class="xl:col-span-3">
                   <label class="label">结果摘要</label>
                   <textarea v-model="disposalDraft.resultSummary" rows="3" class="input-field min-h-[88px]" placeholder="简要记录反馈结果"></textarea>
                 </div>
-                <div class="xl:col-span-3">
-                  <label class="label">期限说明</label>
-                  <textarea v-model="disposalDraft.deadlineNote" rows="3" class="input-field min-h-[88px]" placeholder="例如：需结合是否正式受理、是否延期、是否另有指定期限人工复核。"></textarea>
-                </div>
-                <div class="xl:col-span-3">
-                  <label class="label">关联材料说明（轻量）</label>
-                  <textarea v-model="relatedMaterialsText" rows="3" class="input-field min-h-[88px]" placeholder="手动填写材料说明，或按“名称 | URL | 类型”一行一条记录。"></textarea>
-                </div>
-                <div class="xl:col-span-3">
-                  <label class="label">备注</label>
-                  <textarea v-model="disposalDraft.note" rows="5" class="input-field min-h-[120px]" placeholder="记录案件编号、期限状态、风险提示、沟通情况等。"></textarea>
-                </div>
               </div>
 
-              <div class="mt-5 flex flex-wrap justify-end gap-2">
-                <button type="button" class="btn-secondary" @click="resetDisposalDraft()">取消</button>
-                <button type="button" class="btn-primary" @click="saveDisposal()">保存后续处置</button>
+              <!-- 系统测算 / 更多字段 -->
+              <div class="mt-3">
+                <button type="button" class="flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600" @click="showDisposalMore = !showDisposalMore">
+                  <span>系统测算 / 更多字段</span>
+                  <span :class="showDisposalMore ? 'rotate-90' : ''" class="transition-transform text-xs">▶</span>
+                </button>
+                <div v-if="showDisposalMore" class="mt-3 grid grid-cols-1 gap-4 xl:grid-cols-3">
+                  <div>
+                    <label class="label">提交日期</label>
+                    <input v-model="disposalDraft.submitDate" type="date" class="input-field" />
+                  </div>
+                  <div>
+                    <label class="label">期限依据</label>
+                    <select v-model="disposalDraft.deadlineBasis" class="input-field">
+                      <option value="">请选择</option>
+                      <option v-for="item in deadlineBasisOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="label">到期日期</label>
+                    <input v-model="disposalDraft.deadlineDate" type="date" class="input-field" />
+                  </div>
+                  <div>
+                    <label class="label">跟进日期</label>
+                    <input v-model="disposalDraft.followUpDate" type="date" class="input-field" />
+                  </div>
+                  <div>
+                    <label class="label">寄件日期</label>
+                    <input v-model="disposalDraft.mailSentDate" type="date" class="input-field" />
+                  </div>
+                  <div>
+                    <label class="label">送达状态</label>
+                    <input v-model="disposalDraft.deliveryStatus" type="text" class="input-field" placeholder="例如：已签收 / 查询中" />
+                  </div>
+                  <div v-if="disposalDraft.disposalType === '行政复议'">
+                    <label class="label">复议起算日</label>
+                    <input v-model="disposalDraft.reviewStartDate" type="date" class="input-field" />
+                  </div>
+                  <div v-if="disposalDraft.disposalType === '行政复议'">
+                    <label class="label">60 日复议截止日</label>
+                    <input v-model="disposalDraft.reviewDeadline60" type="date" class="input-field" />
+                  </div>
+                  <div v-if="disposalDraft.disposalType === '行政复议'">
+                    <label class="label">一年保护期日期</label>
+                    <input v-model="disposalDraft.reviewLongStopDate" type="date" class="input-field" />
+                  </div>
+                  <div v-if="disposalDraft.disposalType === '行政复议'" class="xl:col-span-3">
+                    <label class="label">当前期限状态</label>
+                    <input v-model="disposalDraft.reviewStatusText" type="text" class="input-field" placeholder="例如：行政复议期限：剩余 12 天" />
+                  </div>
+                  <div class="xl:col-span-3">
+                    <label class="label">期限说明</label>
+                    <textarea v-model="disposalDraft.deadlineNote" rows="3" class="input-field min-h-[88px]" placeholder="例如：需结合是否正式受理、是否延期、是否另有指定期限人工复核。"></textarea>
+                  </div>
+                  <div class="xl:col-span-3">
+                    <label class="label">关联材料说明（轻量）</label>
+                    <textarea v-model="relatedMaterialsText" rows="3" class="input-field min-h-[88px]" placeholder="手动填写材料说明，或按「名称 | URL | 类型」一行一条记录。"></textarea>
+                  </div>
+                  <div class="xl:col-span-3">
+                    <label class="label">备注</label>
+                    <textarea v-model="disposalDraft.note" rows="5" class="input-field min-h-[120px]" placeholder="记录案件编号、期限状态、风险提示、沟通情况等。"></textarea>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-              <div class="flex items-center justify-between gap-3">
                 <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">已有记录列表</div>
                 <button type="button" class="text-xs text-slate-500 hover:text-blue-600" @click="startNewDisposal()">新建一条</button>
               </div>
@@ -1027,6 +1033,7 @@ function getDefaultOrgan(disposalType, jurisdiction) {
 }
 
 const showDisposalForm = ref(false)
+const showDisposalMore = ref(false)
 
 // 管辖局 computed
 const disposalJurisdiction = computed(() => c.value?.jurisdiction || '')
@@ -1804,6 +1811,7 @@ function fillDisposalDraft(draft = {}, context = null) {
 function resetDisposalDraft() {
   editingDisposalId.value = ''
   showDisposalForm.value = false
+  showDisposalMore.value = false
   fillDisposalDraft(createEmptyDisposalDraft(), null)
 }
 
