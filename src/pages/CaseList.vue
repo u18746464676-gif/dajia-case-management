@@ -71,6 +71,7 @@
           <div class="flex flex-wrap gap-2">
             <span class="soft-tag">检索结果 {{ filteredCases.length }}</span>
             <span class="soft-tag">本页已选 {{ selectedIds.length }}</span>
+            <span v-if="filedNotConcludedCount > 0" class="soft-tag border-blue-200 bg-blue-50 text-blue-600 cursor-pointer" @click="filterStatus = 'filed'">已立案 {{ filedNotConcludedCount }}</span>
             <span class="soft-tag">云端文件 {{ totalCloudFiles }}</span>
             <span class="soft-tag">磁盘已用 {{ formatBytes(storageUsage.diskUsedBytes) }}</span>
             <span class="soft-tag">磁盘剩余 {{ formatBytes(storageUsage.diskFreeBytes) }}</span>
@@ -343,6 +344,7 @@
             <option value="not_punished">责令改正</option>
             <option value="exempted">不予处罚</option>
             <option value="mediation_terminated">终止调解</option>
+            <option value="filed">已立案</option>
           </select>
           <div class="min-w-0 flex-1 xl:max-w-md">
             <input
@@ -862,6 +864,7 @@ function getStatusLabel(status = '') {
 
 // 终态综合状态：已调解最优先，其次举报结果，其次终止调解，最后受理状态
 function getEffectiveStatus(c) {
+  if (c.procedureVersion === 'old' && c.filingStatus === 'filed' && !c.reportResultStatus) return 'filed'
   if (c.mediationStatus === 'decided') return 'decided'
   if (c.reportResultStatus) return c.reportResultStatus
   if (c.mediationStatus) return c.mediationStatus
@@ -953,7 +956,16 @@ const filteredCases = computed(() => {
     list = list.filter(c => dayjs(c.createdAt).month() + 1 === Number(filterMonth.value))
   }
   if (filterStatus.value) {
-    list = list.filter(c => getEffectiveStatus(c) === filterStatus.value)
+    if (filterStatus.value === 'filed') {
+      // 已立案：旧规案件 + filingStatus=filled + 无举报终局结果
+      list = list.filter(c =>
+        c.procedureVersion === 'old'
+        && c.filingStatus === 'filed'
+        && !c.reportResultStatus
+      )
+    } else {
+      list = list.filter(c => getEffectiveStatus(c) === filterStatus.value)
+    }
   }
   if (keyword.value) {
     const kw = keyword.value.toLowerCase()
@@ -967,6 +979,15 @@ const filteredCases = computed(() => {
     )
   }
   return list
+})
+
+// 已立案案件数统计（用于胶囊显示）
+const filedNotConcludedCount = computed(() => {
+  return store.cases.filter(c =>
+    c.procedureVersion === 'old'
+    && c.filingStatus === 'filed'
+    && !c.reportResultStatus
+  ).length
 })
 
 // 当月统计

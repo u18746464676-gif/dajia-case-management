@@ -693,37 +693,7 @@
             </div>
           </div>
 
-          <div v-if="c.procedureVersion === 'old'" class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-            <div class="mb-3 flex items-center justify-between gap-3">
-              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">举报立案信息（旧规案件）</div>
-              <button @click="clearFilingSection" class="text-xs text-rose-500 hover:text-rose-600">清空本段状态</button>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="s in filingStatusOptions"
-                :key="s.value"
-                @click="changeFilingStatus(s.value)"
-                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
-                :class="c.filingStatus === s.value ? 'border-amber-400 bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
-              >
-                <span>{{ s.label }}</span>
-              </button>
-            </div>
-            <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div>
-                <label class="label">立案日期</label>
-                <input :value="c.filingDate || ''" @change="saveFilingDate($event.target.value)" type="date" class="input-field" />
-              </div>
-              <div>
-                <label class="label">收到立案告知日期</label>
-                <input :value="c.filingNoticeDate || ''" @change="saveFilingNoticeDate($event.target.value)" type="date" class="input-field" />
-              </div>
-              <div class="md:col-span-2">
-                <label class="label">备注</label>
-                <textarea :value="c.filingNote || ''" @change="saveFilingNote($event.target.value)" class="input-field min-h-24 resize-none" placeholder="记录旧规立案说明、机关反馈等"></textarea>
-              </div>
-            </div>
-          </div>
+
 
           <!-- 受理状态 -->
           <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
@@ -808,7 +778,16 @@
           <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
             <div class="mb-3 flex items-center justify-between gap-3">
               <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">③ 举报结果</div>
-              <button @click="clearReportResultStatus" class="text-xs text-rose-500 hover:text-rose-600">清空本段状态</button>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="c.procedureVersion === 'old' && c.filingStatus === 'filed'"
+                  @click="clearFilingQuickStatus"
+                  class="text-xs text-rose-500 hover:text-rose-600">清空已立案</button>
+                <button
+                  v-if="c.reportResultStatus"
+                  @click="clearReportResultStatus"
+                  class="text-xs text-rose-500 hover:text-rose-600">清空举报结果</button>
+              </div>
             </div>
             <div class="flex flex-wrap gap-2">
               <button
@@ -820,10 +799,28 @@
               >
                 <span>{{ s.icon }}</span><span>{{ s.label }}</span>
               </button>
+              <button
+                v-if="c.procedureVersion === 'old'"
+                v-for="s in filingQuickOptions"
+                :key="s.value"
+                @click="changeFilingQuickStatus(s.value)"
+                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
+                :class="c.filingStatus === s.value ? 'border-amber-400 bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
+              >
+                <span>{{ s.icon }}</span><span>{{ s.label }}</span>
+              </button>
             </div>
             <div class="mt-3">
-              <label class="label">举报结果日期</label>
+              <label class="label">{{ reportDateLabel }}</label>
               <input
+                v-if="c.procedureVersion === 'old' && c.filingStatus === 'filed' && !c.reportResultStatus"
+                :value="c.filingDate || ''"
+                @change="saveFilingDate($event.target.value)"
+                type="date"
+                class="input-field"
+              />
+              <input
+                v-else
                 :value="c.reportResultDate || ''"
                 @change="saveReportResultDate($event.target.value)"
                 type="date"
@@ -1171,12 +1168,24 @@ const mediationOptions = [
   { value: 'mediation_terminated', label: '终止调解', icon: '✖️' },
 ]
 
+const filingQuickOptions = [
+  { value: 'filed', label: '已立案', icon: '📋' },
+]
+
+// 举报结果区域日期框 label：已立案时显示“立案日期”，其他显示“举报结果日期”
+const reportDateLabel = computed(() => {
+  const cv = c.value || {}
+  if (cv.procedureVersion === 'old' && cv.filingStatus === 'filed' && !cv.reportResultStatus) {
+    return '立案日期'
+  }
+  return '举报结果日期'
+})
+
 const reportResultOptions = [
   { value: 'closed', label: '已处罚', icon: '⚖️' },
   { value: 'rejected', label: '不予立案', icon: '❌' },
   { value: 'not_punished', label: '责令改正', icon: '🚫' },
   { value: 'exempted', label: '不予处理', icon: '🚫' },
-  { value: 'filed', label: '已立案', icon: '📋' },
 ]
 
 const statusLabels = {
@@ -1834,27 +1843,39 @@ function saveMediationDate(value) {
 }
 
 function changeReportResultStatus(newStatus) {
-  const patch = { reportResultStatus: newStatus }
-  // 举报结果选"已立案"时，同时写入 filingStatus / filingDate 保证旧规倒计时联动
-  if (newStatus === 'filed') {
-    patch.filingStatus = 'filed'
-    patch.filingDate = c.value.reportResultDate || dayjs().format('YYYY-MM-DD')
-  }
-  store.updateCase(c.value.id, patch)
+  // 只写举报结果字段，不触碰 filingStatus / filingDate
+  store.updateCase(c.value.id, {
+    reportResultStatus: newStatus,
+    reportResultDate: c.value.reportResultDate || dayjs().format('YYYY-MM-DD'),
+  })
   loadCase()
 }
 
 function clearReportResultStatus() {
-  const isFiled = c.value.reportResultStatus === 'filed'
-  clearStatusSection('reportResultStatus', 'reportResultDate')
-  if (isFiled) {
-    store.updateCase(c.value.id, {
-      filingStatus: '',
-      filingDate: null,
-      filingNoticeDate: null,
-      filingNote: '',
-    })
-  }
+  // 只清举报结果字段，不触碰 filingStatus / filingDate
+  store.updateCase(c.value.id, {
+    reportResultStatus: null,
+    reportResultDate: null,
+  })
+  loadCase()
+}
+
+// 点击「已立案」——只写立案字段，绝不触碰 reportResultStatus / reportResultDate
+function changeFilingQuickStatus(value) {
+  store.updateCase(c.value.id, {
+    filingStatus: value, // 'filed'
+    filingDate: c.value.filingDate || dayjs().format('YYYY-MM-DD'),
+  })
+  loadCase()
+}
+
+// 清空已立案——只清立案字段，不触碰 reportResultStatus / reportResultDate
+function clearFilingQuickStatus() {
+  store.updateCase(c.value.id, {
+    filingStatus: '',
+    filingDate: null,
+  })
+  loadCase()
 }
 
 function saveReportResultDate(value) {
