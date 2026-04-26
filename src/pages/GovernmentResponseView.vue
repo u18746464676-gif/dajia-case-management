@@ -150,8 +150,8 @@ import dayjs from 'dayjs'
 const store = useCaseStore()
 const openAINextStepDrawer = inject('openAINextStepDrawer', null)
 
-const UNFAVORABLE = ['rejected', 'not_punished', 'not_accepted', 'exempted', 'mediation_terminated']
-const FAVORABLE = ['closed', 'decided']
+const UNFAVORABLE = ['rejected', 'not_accepted', 'not_punished', 'exempted', 'mediation_terminated']
+const FAVORABLE = ['decided', 'closed', 'compensated', 'paid']
 
 const statCards = computed(() => {
   const all = store.cases
@@ -176,7 +176,6 @@ const statCards = computed(() => {
   const favorable = all.filter(c => {
     if (c.mediationStatus === 'decided') return true
     if (c.reportResultStatus && FAVORABLE.includes(c.reportResultStatus)) return true
-    if (c.reportResultStatus === 'not_punished') return true
     return false
   }).length
   return [
