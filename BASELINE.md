@@ -1,20 +1,34 @@
 # BASELINE.md - 稳定基线记录
 
-> 更新时间：2026-04-26 21:14
+> 更新时间：2026-04-26 21:59
 
 ## 当前稳定版本
 
-- **commit**: `06601d9`
-- **JS**: `index-_xsBaZb8.js`
-- **CSS**: `index-Dm9aJsKk.css`
-- **上线时间**: 2026-04-26 21:13
+- **commit**: `17b56bd`
+- **JS**: `index-DY5OGi-E.js`
+- **CSS**: `index-B1qeXMdA.css`
+- **上线时间**: 2026-04-26 21:59
 - **线上目录**: `/var/www/case-management`
 
 ---
 
 ## 本次上线内容
 
-**浅色 SaaS UI + 真实数据绑定 + 假数据清理**
+**导航修复 + 侧边栏统一 + 工作台筛选修复**
+
+### 本次修复（8 项）
+1. `/` 默认进入 `/workbench`（redirect）
+2. 案件档案迁移到 `/cases`（原 `/` 不再指向案件档案）
+3. 左侧菜单高亮修复（用 menu key 精确匹配，不再误高亮）
+4. 全部 10 个页面侧边栏统一浅色（`sidebar-light` 固定）
+5. 工作台统计卡点击筛选修复（案件总数=全量，不再过滤 pending_report；已寄出=有单号，不再额外加签收条件）
+6. 工作台"查看"按钮跳转案件详情（`router.push('/case/${id}')`）
+7. CaseDetail/CaseForm 返回列表 → `/cases`（不再返回 `/`）
+8. ReliefSupervision 空状态「去案件档案」→ `/cases`
+
+---
+
+## 上次上线内容（真实数据绑定 + 假数据清理）
 
 ### UI 改造（10 页）
 1. 工作台 — page-header-row + header-actions
@@ -55,6 +69,7 @@
 - 线上 10 个菜单全部可打开
 - 线上首页 HTTP 200，引用正确 JS/CSS
 - MD5 本地与线上完全一致
+- Playwright 截图 3 张全部生成（case-archive / relief / workbench-filter），0 控制台错误
 
 ---
 
@@ -62,21 +77,21 @@
 
 | 项 | 状态 |
 |---|---|
-| JS 文件大小 | 1,290,496 bytes |
-| CSS 文件大小 | 33,902 bytes |
+| JS 文件大小 | 1,291,323 bytes |
+| CSS 文件大小 | 33,980 bytes |
 | JS 权限 644 | ✅ |
 | CSS 权限 644 | ✅ |
 | JS HTTP 200 | ✅ |
 | CSS HTTP 200 | ✅ |
 | 首页引用正确 JS/CSS | ✅ |
-| MD5 本地=线上 | ✅ (`d64149f6c291db740f117b15a2be7280`) |
+| MD5 本地=线上 | ✅ (`8e11e22424486b3f6ba6bbd848f516b1` / `f851d71809c5abce5f007316baff74f1`) |
 
 ---
 
 ## 当前回滚点
 
-- **commit**: `4c34f30`
-- **备份文件**: `index.html.bak-before-real-data-20260426-2113`
+- **commit**: `37f3187`
+- **备份文件**: `index.html.bak-before-nav-filter-fix-20260426-2157`
 - **说明**: 回滚仅切 bundle 引用，不需要重新构建
 
 ---
@@ -88,7 +103,7 @@
 ```bash
 # 线上目录
 cd /var/www/case-management
-cp index.html.bak-before-real-data-20260426-2113 index.html
+cp index.html.bak-before-nav-filter-fix-20260426-2157 index.html
 ```
 
 ### 需要同时回滚源码
@@ -96,7 +111,7 @@ cp index.html.bak-before-real-data-20260426-2113 index.html
 ```bash
 # 本地源码
 cd /Users/huangcheng/.agents/skills/case-management
-git reset --hard 4c34f30
+git reset --hard 37f3187
 npm run build
 # 然后重新上传新的 bundle 到 /var/www/case-management/assets/
 ```
@@ -107,6 +122,22 @@ npm run build
 
 <details>
 <summary>展开历史基线记录</summary>
+
+### v2026-04-26-2159 导航修复 + 侧边栏统一 + 工作台筛选（当前）
+
+- commit: `17b56bd`
+- JS: `index-DY5OGi-E.js`
+- CSS: `index-B1qeXMdA.css`
+- 上线时间: 2026-04-26 21:59
+- 备份文件: `index.html.bak-before-nav-filter-fix-20260426-2157`
+
+### v2026-04-26-2113 真实数据绑定 + 假数据清理（已回滚）
+
+- commit: `06601d9`
+- JS: `index-_xsBaZb8.js`
+- CSS: `index-Dm9aJsKk.css`
+- 上线时间: 2026-04-26 21:13
+- 备份文件: `index.html.bak-before-real-data-20260426-2113`
 
 ### v2026-04-26-1830 浅色 SaaS UI（已回滚）
 
