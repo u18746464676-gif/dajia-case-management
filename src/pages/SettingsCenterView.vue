@@ -15,8 +15,8 @@
     </div>
 
     <div class="info-strip blue">
-      <span class="info-icon">ℹ️</span>
-      <span>基础资料用于配置系统中使用的各类基础选项，这些选项将在新建案件、录入数据等场景中使用。</span>
+      <span class="info-icon">i️</span>
+      <span>基础资料用于配置系统中使用的各类基础选项,这些选项将在新建案件、录入数据等场景中使用。</span>
     </div>
 
     <div class="settings-layout">
@@ -32,7 +32,7 @@
               <p>配置案件所涉及的平台名称、平台类型和启用状态。</p>
             </div>
             <div class="table-actions-inline">
-              <button class="btn-primary">＋ 新增</button>
+              <button class="btn-primary">+ 新增</button>
               <button class="btn-secondary">批量排序</button>
             </div>
           </div>
@@ -67,9 +67,9 @@
             <div>
               <div class="help-title">使用说明</div>
               <ol>
-                <li>排序值越小，在下拉选择中显示越靠前。</li>
-                <li>停用的选项不会在下拉中显示，但历史数据不受影响。</li>
-                <li>修改选项名称不会影响历史数据，删除前请确认无关联数据。</li>
+                <li>排序值越小,在下拉选择中显示越靠前。</li>
+                <li>停用的选项不会在下拉中显示,但历史数据不受影响。</li>
+                <li>修改选项名称不会影响历史数据,删除前请确认无关联数据。</li>
               </ol>
             </div>
             <div class="help-illustration">🗂️</div>
@@ -108,8 +108,8 @@
         <div class="side-card">
           <div class="side-card-head"><h3>数据安全</h3></div>
           <div class="security-card-list">
-            <div class="security-row"><span>最近备份：</span><strong>2026-04-24 02:00:00</strong></div>
-            <div class="security-row"><span>自动备份：</span><strong class="green-text">已开启</strong></div>
+            <div class="security-row"><span>最近备份：</span><strong>{{ backupInfo.latestBackupTime || '暂无备份记录' }}</strong></div>
+            <div class="security-row"><span>自动备份：</span><strong :class="backupInfo.autoBackupEnabled ? 'green-text' : 'gray-text'">{{ backupInfo.autoBackupEnabled ? '已开启' : '未开启' }}</strong></div>
             <div class="quick-actions-grid one-col top-gap">
               <button class="btn-secondary">立即备份</button>
               <button class="btn-secondary">查看备份记录</button>
@@ -145,10 +145,10 @@ const summaryCards = [
   { label: '救济路径', value: '10 个' },
   { label: '答复结果', value: '16 个' },
 ]
-const recentUpdates = [
-  { title: '平台来源：新增“视频号小店”', time: '2026-04-24 15:30' },
-  { title: '案件类型：修改“虚假宣传”名称', time: '2026-04-24 14:20' },
-  { title: '提醒规则：调整复议答复提醒天数', time: '2026-04-24 11:15' },
-  { title: '机关库：新增杭州佰价茶饮局', time: '2026-04-23 16:40' },
-]
+const backupInfo = ref({
+  latestBackupTime: null,
+  autoBackupEnabled: false,
+})
+
+const recentUpdates = ref([])
 </script>
