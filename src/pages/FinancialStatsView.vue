@@ -1,8 +1,12 @@
 <template>
   <div class="page-shell">
-    <div class="page-header">
+    <div class="page-header page-header-row">
       <div>
         <h1 class="page-title">收支统计</h1>
+      </div>
+      <div class="header-actions">
+        <button class="btn-secondary">使用说明</button>
+        <button class="btn-primary">更新数据</button>
       </div>
     </div>
 
@@ -32,8 +36,8 @@
         <select class="filter-select"><option>市监局</option></select>
         <select class="filter-select"><option>平台来源</option></select>
         <select class="filter-select"><option>案件状态</option></select>
-        <input type="date" class="filter-input date-input" />
-        <input type="date" class="filter-input date-input" />
+        <input type="date" class="filter-input date-input" placeholder="开始日期" />
+        <input type="date" class="filter-input date-input" placeholder="结束日期" />
         <button class="btn-primary">查询</button>
         <button class="btn-secondary">重置</button>
       </div>
