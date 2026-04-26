@@ -70,7 +70,7 @@
         </div>
       </div>
       <div class="folder-grid four-col-grid">
-        <div class="evidence-folder-card" v-for="folder in materialCases" :key="folder.id">
+        <div class="evidence-folder-card" :class="{ 'selected-case': selectedCaseId === folder.id }" v-for="folder in materialCases" :key="folder.id" @click="selectedCaseId = folder.id">
           <div class="folder-card-top">
             <div class="folder-symbol">📁</div>
             <span class="status-chip" :class="getBadgeClass(folder)">{{ getEffectiveStatusLabel(folder) }}</span>

@@ -166,6 +166,7 @@ import { inject, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCaseStore } from '@/stores/case'
 import dayjs from 'dayjs'
+import { getEffectiveStatusLabel, getNextAction, getDeadlineText, getStatusBadgeClass } from '@/utils/caseStatus'
 
 const store = useCaseStore()
 const router = useRouter()
@@ -233,21 +234,10 @@ const filteredWorkbenchCases = computed(() => {
     default: filtered = all
   }
   return filtered.map(c => {
-    let deadline = ''
-    let deadlineClass = 'badge-blue'
-    if (c.reportResultDate) {
-      const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
-      if (daysLeft <= 0) { deadline = `已超期${Math.abs(daysLeft)}天`; deadlineClass = 'badge-red' }
-      else if (daysLeft <= 7) { deadline = `复议临期 ${daysLeft}天`; deadlineClass = 'badge-red' }
-      else { deadline = `${daysLeft}天`; deadlineClass = 'badge-orange' }
-    }
-    let progress = ''
-    let progressClass = 'badge-blue'
-    if (c.signDate && !c.reportResultStatus) {
-      progress = `已签收${dayjs().diff(dayjs(c.signDate), 'day')}天未答复`; progressClass = 'badge-orange'
-    } else if (c.reportResultStatus) {
-      progress = { rejected: '不予立案', not_punished: '违法事实不成立', closed: '已办结', exempted: '免于处罚', mediation_terminated: '终止调解', not_accepted: '不予受理' }[c.reportResultStatus] || c.reportResultStatus; progressClass = 'badge-orange'
-    } else if (c.mediationStatus === 'decided') { progress = '已调解'; progressClass = 'badge-green' }
+    const progress = getEffectiveStatusLabel(c)
+    const progressClass = getStatusBadgeClass(c)
+    const deadline = getDeadlineText(c)
+    const deadlineClass = deadline.includes('超期') || deadline.includes('临期') ? 'badge-red' : (deadline && deadline !== '补充材料' && deadline !== '等待处理结果' && deadline !== '可归档' ? 'badge-orange' : 'badge-blue')
     return {
       id: c.id,
       code: c.caseNumber || '待生成',
@@ -256,7 +246,7 @@ const filteredWorkbenchCases = computed(() => {
       progress, progressClass,
       result: c.reportResultDate ? `答复日期 ${dayjs(c.reportResultDate).format('YYYY-MM-DD')}` : (c.signDate ? `签收日期 ${dayjs(c.signDate).format('YYYY-MM-DD')}` : '-'),
       deadline, deadlineClass,
-      nextStep: c.reportResultStatus ? '登记答复结果' : (c.signDate ? '等待答复' : '待建档'),
+      nextStep: getNextAction(c),
       amount: c.expense ? `¥${Number(c.expense).toFixed(2)}` : '-',
       updatedAt: c.updatedAt ? dayjs(c.updatedAt).format('MM-DD HH:mm') : '-',
     }
