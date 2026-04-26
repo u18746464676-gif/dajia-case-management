@@ -156,11 +156,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useCaseStore } from '@/stores/case'
+import dayjs from 'dayjs'
+
+const store = useCaseStore()
 
 const activeView = ref('group')
 const gridView = ref(true)
 const activeTab = ref('购买凭证')
+const selectedCaseId = ref(null)
 
 const viewModes = [
   { key: 'group', label: '案件分组视图' },
@@ -168,29 +173,80 @@ const viewModes = [
   { key: 'check', label: '缺失检查视图' },
 ]
 
-const topStats = [
-  { label: '全部材料', value: 1286, className: 'blue' },
-  { label: '未绑定材料', value: 23, className: 'orange' },
-  { label: '待OCR识别', value: 58, className: 'blue' },
-  { label: '疑似重复', value: 12, className: 'purple' },
-]
+const allMaterialCount = computed(() => {
+  return store.cases.reduce((sum, c) => {
+    return sum + (c.images ? c.images.length : 0) + (c.documents ? c.documents.length : 0)
+  }, 0)
+})
 
-const folders = [
-  { code: 'AJ202604240021', shop: '1989潮牌鞋服集合店', subject: '不予立案', complete: '6 / 8', progress: '75%', icons: '🧾 2 · 🖼 1 · 💬 1 · ✉ 2', updatedAt: '更新时间 04-24 15:30', status: '已签收未答复', badgeClass: 'badge-orange' },
-  { code: 'AJ202604230018', shop: '母婴之家旗舰店', subject: '夸大宣传', complete: '5 / 8', progress: '62%', icons: '🧾 1 · 🖼 2 · 💬 1 · ✉ 1', updatedAt: '更新时间 04-24 14:12', status: '待补材料', badgeClass: 'badge-red' },
-  { code: 'AJ202604220012', shop: '优品数码专营店', subject: '违法宣传', complete: '7 / 8', progress: '88%', icons: '🧾 2 · 🖼 2 · 💬 1 · ✉ 2', updatedAt: '更新时间 04-23 19:08', status: '可复议', badgeClass: 'badge-purple' },
-  { code: 'AJ202604210007', shop: '家居生活馆', subject: '签收未答复', complete: '4 / 8', progress: '50%', icons: '🧾 1 · 🖼 1 · 💬 1 · ✉ 1', updatedAt: '更新时间 04-22 11:06', status: '临期提醒', badgeClass: 'badge-red' },
-  { code: 'AJ202604180009', shop: '美妆小铺', subject: '短视频宣传', complete: '6 / 8', progress: '75%', icons: '🧾 1 · 🖼 2 · 💬 1 · ✉ 2', updatedAt: '更新时间 04-22 09:32', status: '待跟进', badgeClass: 'badge-blue' },
-  { code: 'AJ202604150006', shop: '食品生活馆', subject: '答复不满意', complete: '8 / 8', progress: '100%', icons: '🧾 2 · 🖼 2 · 💬 2 · ✉ 2', updatedAt: '更新时间 04-21 18:56', status: '材料完整', badgeClass: 'badge-green' },
-]
+const unassignedCount = computed(() => store.unassignedImages.length)
 
-const legends = ['购买凭证', '商品宣传', '实物照片', '聊天记录', '邮寄签收', '机关答复', '复议材料', '其他材料']
-const materialTabs = [...legends]
+const pendingOcrCount = computed(() => {
+  return store.cases.reduce((sum, c) => {
+    return sum + (c.images ? c.images.filter(img => !img.ocrTitle).length : 0)
+  }, 0)
+})
 
-const materials = [
-  { name: '下单截图.png', size: '268KB', time: '2026-04-24 15:08', ocr: 'OCR完成', ocrClass: 'badge-green', preview: '🖼' },
-  { name: '支付记录.pdf', size: '1.2MB', time: '2026-04-24 15:09', ocr: 'OCR完成', ocrClass: 'badge-green', preview: 'PDF' },
-  { name: '物流签收截图.jpg', size: '326KB', time: '2026-04-24 15:20', ocr: '待OCR', ocrClass: 'badge-orange', preview: '📦' },
-  { name: '商品宣传页.png', size: '482KB', time: '2026-04-24 15:21', ocr: 'OCR完成', ocrClass: 'badge-green', preview: '🛍' },
-]
+const topStats = computed(() => [
+  { label: '全部材料', value: allMaterialCount.value, className: 'blue' },
+  { label: '未绑定材料', value: unassignedCount.value, className: 'orange' },
+  { label: '待OCR识别', value: pendingOcrCount.value, className: 'blue' },
+  { label: '疑似重复', value: 0, className: 'purple' },
+])
+
+const folders = computed(() => {
+  const cases = store.cases.filter(c => c.images && c.images.length > 0 || c.documents && c.documents.length > 0)
+  if (!selectedCaseId.value && cases.length > 0) selectedCaseId.value = cases[0].id
+  return cases.map(c => {
+    const total = (c.images ? c.images.length : 0) + (c.documents ? c.documents.length : 0)
+    const eff = store.getEffectiveStatus ? store.getEffectiveStatus(c) : (c.status || 'pending_report')
+    const STATUS_LABELS = {
+      pending_report: '待处理', accepted: '已受理', rejected: '不予立案',
+      not_punished: '违法事实不成立', closed: '已办结', decided: '已调解', mediation_terminated: '终止调解',
+    }
+    return {
+      id: c.id,
+      code: c.caseNumber || '待生成',
+      shop: c.shopName || '-',
+      subject: STATUS_LABELS[eff] || eff || '-',
+      complete: total + '份',
+      progress: '100%',
+      icons: total + '份',
+      updatedAt: c.updatedAt ? '更新于 ' + dayjs(c.updatedAt).format('MM-DD HH:mm') : '-',
+      status: STATUS_LABELS[eff] || eff || '待处理',
+      badgeClass: eff === 'rejected' || eff === 'not_punished' ? 'badge-orange' : eff === 'decided' ? 'badge-green' : 'badge-blue',
+    }
+  })
+})
+
+const selectedCase = computed(() => {
+  if (!selectedCaseId.value) return store.cases[0] || null
+  return store.cases.find(c => c.id === selectedCaseId.value) || store.cases[0] || null
+})
+
+const materials = computed(() => {
+  const c = selectedCase.value
+  if (!c) return []
+  const items = []
+  if (c.images) c.images.forEach(function(img) {
+    const name = img.name || (img.url ? img.url.split('/').pop() : '图片')
+    items.push({ name: name, size: '-', time: img.uploadedAt ? dayjs(img.uploadedAt).format('YYYY-MM-DD HH:mm') : '-', ocr: img.ocrTitle ? 'OCR完成' : '待OCR', ocrClass: img.ocrTitle ? 'badge-green' : 'badge-orange', preview: '🖼' })
+  })
+  if (c.documents) c.documents.forEach(function(doc) {
+    const name = doc.name || '文档'
+    items.push({ name: name, size: '-', time: doc.uploadedAt ? dayjs(doc.uploadedAt).format('YYYY-MM-DD HH:mm') : '-', ocr: doc.ocrTitle ? 'OCR完成' : '待OCR', ocrClass: doc.ocrTitle ? 'badge-green' : 'badge-orange', preview: 'PDF' })
+  })
+  return items
+})
+
+const completeness = computed(() => {
+  const c = selectedCase.value
+  if (!c) return { have: 0, total: 4, percent: 0 }
+  let have = 0
+  if (c.images && c.images.length > 0 || c.documents && c.documents.length > 0) have++
+  if (c.trackingNumber || c.mailTrackingNo) have++
+  if (c.signDate) have++
+  if (c.reportResultStatus) have++
+  return { have: have, total: 4, percent: Math.round((have / 4) * 100) }
+})
 </script>
