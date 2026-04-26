@@ -1,9 +1,23 @@
 <template>
   <div class="page-shell">
-    <div class="page-header">
+    <div class="page-header page-header-row">
       <div>
         <h1 class="page-title">机关答复</h1>
         <p class="page-desc">集中管理所有案件收到的处理结果、答复文书及结论，跟踪答复状态和后续可救济期限。</p>
+      </div>
+      <div class="header-actions">
+        <button class="top-action-btn icon-only">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="top-action-btn icon-only">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notif-badge">3</span>
+        </button>
+        <button class="top-action-btn user-pill">
+          <span class="mini-avatar">打</span>
+          <span>打假人</span>
+          <span class="caret">▾</span>
+        </button>
       </div>
     </div>
 
