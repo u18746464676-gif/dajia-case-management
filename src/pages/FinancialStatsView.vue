@@ -131,43 +131,77 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useCaseStore } from '@/stores/case'
+import dayjs from 'dayjs'
+
+const store = useCaseStore()
 const activeTab = ref('收支明细')
 const tabs = ['收支总览', '收支明细', '平台分析', '店铺分析']
-const statCards = [
-  { label: '累计案件数', value: 500, icon: '📁', bg: '#e8f2ff', color: '#1677ff' },
-  { label: '累计购买金额', value: '¥128,650.00', icon: '💰', bg: '#eff6ff', color: '#2563eb' },
-  { label: '累计赔付金额', value: '¥289,430.00', icon: '💵', bg: '#ecfdf5', color: '#10b981' },
-  { label: '累计净收益', value: '¥160,780.00', icon: '📈', bg: '#f5f3ff', color: '#8b5cf6' },
-  { label: '已回款案件数', value: 432, icon: '✅', bg: '#fff7ed', color: '#f59e0b' },
-  { label: '赔付成功率', value: '64.80%', icon: '📊', bg: '#fef2f2', color: '#ef4444' },
-]
-const financeRows = [
-  { code: 'AJ202604230018', shop: '1989潮牌鞋服集合店', subject: '商品宣传', platform: '拼多多', office: '杭州市市场监督管理局', buy: '¥199.00', compensation: '¥500.00', profit: '¥301.00', progress: '已回款', result: '责令整改', paid: '是', updatedAt: '2026-04-24' },
-  { code: 'AJ202604220012', shop: '优品数码专营店', subject: '违法宣传', platform: '淘宝', office: '余杭区市场监督管理局', buy: '¥88.00', compensation: '¥300.00', profit: '¥212.00', progress: '等待答复', result: '处理中', paid: '否', updatedAt: '2026-04-23' },
-  { code: 'AJ202604180009', shop: '家居生活馆', subject: '虚假宣传', platform: '京东', office: '广州市市场监督管理局', buy: '¥126.00', compensation: '¥800.00', profit: '¥674.00', progress: '已回款', result: '已办结', paid: '是', updatedAt: '2026-04-22' },
-]
-const metrics = [
-  { label: '涉及城市', value: 18 },
-  { label: '涉及市监局', value: 62 },
-  { label: '有效样本机关', value: 41 },
-  { label: '平均解决率', value: '52.8%' },
-  { label: '平均赔付率', value: '43.6%' },
-  { label: '平均处理周期', value: '18天' },
-]
-const cityRanks = [
-  { label: '杭州', value: '82%' },
-  { label: '广州', value: '76%' },
-  { label: '上海', value: '73%' },
-]
-const officeRanks = [
-  { label: '余杭区局', value: '68%' },
-  { label: '西湖区局', value: '61%' },
-  { label: '天河区局', value: '57%' },
-]
-const officeTable = [
-  { name: '余杭区市场监督管理局', solve: '68%', pay: '54%' },
-  { name: '西湖区市场监督管理局', solve: '61%', pay: '49%' },
-  { name: '天河区市场监督管理局', solve: '57%', pay: '46%' },
-]
+
+const statCards = computed(() => {
+  const all = store.cases
+  const totalCases = all.length
+  const totalBuy = all.reduce((sum, c) => sum + Number(c.expense || 0), 0)
+  const totalCompensation = all.reduce((sum, c) => sum + Number(c.profit || 0), 0)
+  const netProfit = totalCompensation - totalBuy
+  const paidCases = all.filter(c => Number(c.profit || 0) > 0).length
+  const resultCases = all.filter(c => c.reportResultStatus || c.mediationStatus === 'decided').length
+  const successRate = resultCases > 0 ? ((paidCases / resultCases) * 100).toFixed(1) : '0.0'
+  return [
+    { label: '累计案件数', value: totalCases, icon: '📁', bg: '#e8f2ff', color: '#1677ff' },
+    { label: '累计购买金额', value: `¥${totalBuy.toFixed(2)}`, icon: '💰', bg: '#eff6ff', color: '#2563eb' },
+    { label: '累计赔付金额', value: `¥${totalCompensation.toFixed(2)}`, icon: '💵', bg: '#ecfdf5', color: '#10b981' },
+    { label: '累计净收益', value: `¥${netProfit.toFixed(2)}`, icon: '📈', bg: '#f5f3ff', color: '#8b5cf6' },
+    { label: '已回款案件数', value: paidCases, icon: '✅', bg: '#fff7ed', color: '#f59e0b' },
+    { label: '赔付成功率', value: `${successRate}%`, icon: '📊', bg: '#fef2f2', color: '#ef4444' },
+  ]
+})
+
+const financeRows = computed(() => {
+  return store.cases.map(c => {
+    const buyAmt = Number(c.expense || 0)
+    const compAmt = Number(c.profit || 0)
+    return {
+      id: c.id,
+      code: c.caseNumber || '待生成',
+      shop: c.shopName || '-',
+      subject: c.productName || '-',
+      platform: c.platformSource || '-',
+      office: c.jurisdiction || '-',
+      buy: `¥${buyAmt.toFixed(2)}`,
+      compensation: `¥${compAmt.toFixed(2)}`,
+      profit: `¥${(compAmt - buyAmt).toFixed(2)}`,
+      progress: c.mediationStatus === 'decided' ? '已调解' : (c.reportResultStatus || '-'),
+      result: c.reportResultStatus ? { rejected: '不予立案', not_punished: '违法事实不成立', closed: '已办结', exempted: '免于处罚', mediation_terminated: '终止调解', not_accepted: '不予受理' }[c.reportResultStatus] || c.reportResultStatus : '-',
+      paid: compAmt > 0 ? '是' : '否',
+      updatedAt: c.updatedAt ? dayjs(c.updatedAt).format('YYYY-MM-DD') : '-',
+    }
+  })
+})
+
+const metrics = computed(() => {
+  const all = store.cases
+  const jurisdictions = [...new Set(all.map(c => c.jurisdiction).filter(Boolean))]
+  return [
+    { label: '涉及城市', value: jurisdictions.length },
+    { label: '涉及市监局', value: jurisdictions.length },
+    { label: '有效样本机关', value: jurisdictions.length },
+    { label: '平均解决率', value: '暂未统计' },
+    { label: '平均赔付率', value: '暂未统计' },
+    { label: '平均处理周期', value: '暂未统计' },
+  ]
+})
+
+const cityRanks = computed(() => {
+  return []
+})
+
+const officeRanks = computed(() => {
+  return []
+})
+
+const officeTable = computed(() => {
+  return []
+})
 </script>
