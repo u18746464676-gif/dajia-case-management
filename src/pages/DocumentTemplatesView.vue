@@ -96,13 +96,23 @@ const openAINextStepDrawer = inject('openAINextStepDrawer', null)
 const activeTab = ref('全部')
 const selected = ref('行政复议申请书')
 const tabs = ['全部', '投诉举报', '信息公开', '行政复议', '监督督办', '纪检监察', '人大信访', '行政诉讼', '归档材料']
-const statCards = [
-  { label: '全部模板', value: 68, icon: '📁', bg: '#e8f2ff', color: '#1677ff' },
-  { label: '常用模板', value: 18, icon: '⭐', bg: '#fdf2f8', color: '#ec4899' },
-  { label: '已生成文书', value: 126, icon: '📄', bg: '#f5f3ff', color: '#8b5cf6' },
-  { label: '草稿箱', value: 32, icon: '📝', bg: '#ecfdf5', color: '#10b981' },
-  { label: '最近使用', value: '行政复议申请书', sub: '2026-04-24 15:30', icon: '🕘', bg: '#eff6ff', color: '#2563eb' },
-]
+const generatedDocs = ref([])
+const draftDocs = ref([])
+
+const statCards = computed(() => {
+  const latest = [...templates].sort((a, b) => {
+    const da = a.lastUsed ? new Date(a.lastUsed) : new Date(0)
+    const db = b.lastUsed ? new Date(b.lastUsed) : new Date(0)
+    return db - da
+  })[0]
+  return [
+    { label: '全部模板', value: templates.length, icon: '📁', bg: '#e8f2ff', color: '#1677ff' },
+    { label: '常用模板', value: templates.filter(t => t.used > 10).length, icon: '⭐', bg: '#fdf2f8', color: '#ec4899' },
+    { label: '已生成文书', value: generatedDocs.value.length, icon: '📄', bg: '#f5f3ff', color: '#8b5cf6' },
+    { label: '草稿箱', value: draftDocs.value.length, icon: '📝', bg: '#ecfdf5', color: '#10b981' },
+    { label: '最近使用', value: latest ? latest.name : '暂无记录', sub: latest ? latest.lastUsed : '', icon: '🕘', bg: '#eff6ff', color: '#2563eb' },
+  ]
+})
 const templates = [
   { name: '行政复议申请书', icon: '📘', iconBg: '#e8f2ff', iconColor: '#1677ff', badge: '行政复议', badgeClass: 'badge-blue', scene: '收到不予立案、不予受理、违法事实不成立等不利结果后，在法定期限内申请行政复议。', materials: '原举报截图、购买凭证、商品宣传截图、邮寄签收、答复文书', used: 28, lastUsed: '2026-04-24' },
   { name: '政府信息公开申请书', icon: '🔓', iconBg: '#ecfdf5', iconColor: '#10b981', badge: '信息公开', badgeClass: 'badge-green', scene: '申请公开行政机关处理过程信息、受理依据、调查结果等。', materials: '案件基本信息、处理机关、申请公开具体内容', used: 36, lastUsed: '2026-04-23' },
