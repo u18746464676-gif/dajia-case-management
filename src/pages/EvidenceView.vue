@@ -66,26 +66,25 @@
     <div class="table-card card-section">
       <div class="table-head">
         <div>
-          <h2>案件材料夹（共 12 个案件）</h2>
+          <h2>案件材料夹（共 {{ materialCases.length }} 个案件）</h2>
         </div>
       </div>
       <div class="folder-grid four-col-grid">
-        <div class="evidence-folder-card" v-for="folder in folders" :key="folder.code">
+        <div class="evidence-folder-card" v-for="folder in materialCases" :key="folder.id">
           <div class="folder-card-top">
             <div class="folder-symbol">📁</div>
-            <span class="status-chip" :class="folder.badgeClass">{{ folder.status }}</span>
+            <span class="status-chip" :class="getBadgeClass(folder)">{{ getEffectiveStatusLabel(folder) }}</span>
           </div>
-          <div class="folder-case-code">{{ folder.code }}</div>
-          <div class="folder-shop">{{ folder.shop }}</div>
-          <div class="folder-subject">{{ folder.subject }}</div>
+          <div class="folder-case-code">{{ folder.caseNumber || '待生成' }}</div>
+          <div class="folder-shop">{{ folder.shopName || '-' }}</div>
+          <div class="folder-subject">{{ getEffectiveStatusLabel(folder) }}</div>
           <div class="folder-progress-row">
-            <span>材料完整度 {{ folder.complete }}</span>
-            <span>{{ folder.progress }}</span>
+            <span>材料 {{ folderMaterials(folder).length }} 份</span>
           </div>
-          <div class="folder-progress-bar"><span :style="{ width: folder.progress }"></span></div>
+          <div class="folder-progress-bar"><span :style="{ width: '100%' }"></span></div>
           <div class="folder-footer">
-            <span>{{ folder.icons }}</span>
-            <span>{{ folder.updatedAt }}</span>
+            <span>{{ folderMaterials(folder).length }} 份</span>
+            <span>{{ folder.updatedAt ? '更新于 ' + dayjs(folder.updatedAt).format('MM-DD HH:mm') : '-' }}</span>
           </div>
         </div>
         <div class="evidence-folder-card dashed-folder-card">
@@ -104,7 +103,7 @@
       <div class="table-card detail-main-card">
         <div class="table-head">
           <div>
-            <h2>案件材料详情：AJ202604240021 1989潮牌鞋服集合店（不予立案）</h2>
+            <h2>案件材料详情：{{ selectedCase ? (selectedCase.caseNumber + ' ' + selectedCase.shopName + '（' + getEffectiveStatusLabel(selectedCase) + '）') : '暂无选中案件' }}</h2>
           </div>
           <button class="btn-link">查看案件详情</button>
         </div>
@@ -129,8 +128,8 @@
       <div class="right-sidebar detail-sidebar">
         <div class="side-card">
           <div class="side-card-head"><h3>材料完整度</h3></div>
-          <div class="completeness-score">6 / 8</div>
-          <div class="folder-progress-bar large"><span style="width: 75%"></span></div>
+          <div class="completeness-score">{{ selectedCompleteness.done }} / {{ selectedCompleteness.total }}</div>
+          <div class="folder-progress-bar large"><span :style="{ width: selectedCompleteness.percent + '%' }"></span></div>
           <p class="side-note">缺少机关答复与复议材料，建议优先补齐签收截图与答复结论。</p>
         </div>
         <div class="side-card">
@@ -194,29 +193,8 @@ const topStats = computed(() => [
   { label: '疑似重复', value: 0, className: 'purple' },
 ])
 
-const folders = computed(() => {
-  const cases = store.cases.filter(c => c.images && c.images.length > 0 || c.documents && c.documents.length > 0)
-  if (!selectedCaseId.value && cases.length > 0) selectedCaseId.value = cases[0].id
-  return cases.map(c => {
-    const total = (c.images ? c.images.length : 0) + (c.documents ? c.documents.length : 0)
-    const eff = store.getEffectiveStatus ? store.getEffectiveStatus(c) : (c.status || 'pending_report')
-    const STATUS_LABELS = {
-      pending_report: '待处理', accepted: '已受理', rejected: '不予立案',
-      not_punished: '违法事实不成立', closed: '已办结', decided: '已调解', mediation_terminated: '终止调解',
-    }
-    return {
-      id: c.id,
-      code: c.caseNumber || '待生成',
-      shop: c.shopName || '-',
-      subject: STATUS_LABELS[eff] || eff || '-',
-      complete: total + '份',
-      progress: '100%',
-      icons: total + '份',
-      updatedAt: c.updatedAt ? '更新于 ' + dayjs(c.updatedAt).format('MM-DD HH:mm') : '-',
-      status: STATUS_LABELS[eff] || eff || '待处理',
-      badgeClass: eff === 'rejected' || eff === 'not_punished' ? 'badge-orange' : eff === 'decided' ? 'badge-green' : 'badge-blue',
-    }
-  })
+const materialCases = computed(() => {
+  return store.cases.filter(c => (c.images && c.images.length > 0) || (c.documents && c.documents.length > 0))
 })
 
 const selectedCase = computed(() => {
@@ -249,4 +227,32 @@ const completeness = computed(() => {
   if (c.reportResultStatus) have++
   return { have: have, total: 4, percent: Math.round((have / 4) * 100) }
 })
+
+const selectedCompleteness = computed(() => completeness.value)
+
+function getEffectiveStatusLabel(c) {
+  if (!c) return '-'
+  const eff = store.getEffectiveStatus ? store.getEffectiveStatus(c) : (c.status || 'pending_report')
+  const STATUS_LABELS = {
+    pending_report: '待处理', accepted: '已受理', rejected: '不予立案',
+    not_punished: '违法事实不成立', closed: '已办结', decided: '已调解', mediation_terminated: '终止调解',
+  }
+  return STATUS_LABELS[eff] || eff || '-'
+}
+
+function getBadgeClass(c) {
+  const eff = store.getEffectiveStatus ? store.getEffectiveStatus(c) : (c.status || 'pending_report')
+  if (eff === 'rejected' || eff === 'not_punished') return 'badge-orange'
+  if (eff === 'decided') return 'badge-green'
+  if (eff === 'closed') return 'badge-green'
+  return 'badge-blue'
+}
+
+function folderMaterials(folder) {
+  if (!folder) return []
+  return [
+    ...(folder.images || []),
+    ...(folder.documents || []),
+  ]
+}
 </script>
