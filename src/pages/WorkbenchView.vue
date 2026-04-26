@@ -21,7 +21,14 @@
     <div class="dashboard-layout">
       <div class="dashboard-main-column">
         <div class="stat6-grid">
-          <div class="stat-card" v-for="c in statCards" :key="c.label">
+          <div
+            class="stat-card"
+            v-for="c in statCards"
+            :key="c.key"
+            :class="activeMetric === c.key ? 'stat-card-active' : ''"
+            @click="activeMetric = c.key"
+            style="cursor:pointer"
+          >
             <div class="stat-icon" :style="{ background: c.iconBg, color: c.iconColor }">{{ c.icon }}</div>
             <div class="stat-body">
               <div class="stat-label">{{ c.label }}</div>
@@ -84,7 +91,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, index) in followUpCases" :key="item.id" :class="index === 0 ? 'selected-row' : ''">
+              <tr v-for="(item, index) in filteredWorkbenchCases" :key="item.id" :class="index === 0 ? 'selected-row' : ''">
                 <td>
                   <div class="row-radio" :class="index === 0 ? 'active' : ''"></div>
                 </td>
@@ -99,7 +106,7 @@
                 <td>{{ item.updatedAt }}</td>
                 <td>
                   <div class="table-actions">
-                    <button class="btn-link">查看</button>
+                    <button class="btn-link" @click="router.push(`/case/${item.id}`)">查看</button>
                   </div>
                 </td>
               </tr>
@@ -153,13 +160,18 @@
   </div>
 </template>
 
+
 <script setup>
 import { inject, ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useCaseStore } from '@/stores/case'
 import dayjs from 'dayjs'
 
 const store = useCaseStore()
+const router = useRouter()
 const openAINextStepDrawer = inject('openAINextStepDrawer', null)
+
+const unfavorableResults = ['rejected', 'not_punished', 'mediation_terminated', 'exempted']
 
 // 工作台统计卡 - 真实数据驱动
 const statCards = computed(() => {
@@ -170,31 +182,29 @@ const statCards = computed(() => {
   ).length
   const sent = all.filter(c => c.mailTrackingNo || c.trackingNumber || c.expressNo).length
   const waitingReply = all.filter(c => c.signDate && !c.reportResultStatus).length
-
-  const unfavorableResults = ['rejected', 'not_punished', 'mediation_terminated', 'exempted']
-  const canReconsider = all.filter(c => {
+  const canReconsiderCount = all.filter(c => {
     if (!c.reportResultStatus || !unfavorableResults.includes(c.reportResultStatus)) return false
     if (!c.reportResultDate) return false
-    const daysSinceResult = dayjs().diff(dayjs(c.reportResultDate), 'day')
-    return daysSinceResult <= 60
+    return dayjs().diff(dayjs(c.reportResultDate), 'day') <= 60
   }).length
-
-  const reviewDeadline = all.filter(c => {
+  const reviewDeadlineCount = all.filter(c => {
     if (!c.reportResultStatus || !['rejected', 'not_punished', 'exempted'].includes(c.reportResultStatus)) return false
     if (!c.reportResultDate) return false
     const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
     return daysLeft > 0 && daysLeft <= 7
   }).length
-
   return [
-    { label: '案件总数', value: all.length, change: '', trend: '', icon: '📁', iconBg: '#e8f2ff', iconColor: '#1677ff' },
-    { label: '待整理', value: needOrganize, change: '', trend: '', icon: '🗂️', iconBg: '#f5f3ff', iconColor: '#8b5cf6' },
-    { label: '已寄出', value: sent, change: '', trend: '', icon: '📮', iconBg: '#ecfdf5', iconColor: '#10b981' },
-    { label: '等待答复', value: waitingReply, change: '', trend: '', icon: '⏳', iconBg: '#fff7ed', iconColor: '#f59e0b' },
-    { label: '可复议', value: canReconsider, change: '', trend: '', icon: '⚖️', iconBg: '#fef2f2', iconColor: '#ef4444' },
-    { label: '临期提醒', value: reviewDeadline, change: '', trend: '', icon: '🔔', iconBg: '#fef9c3', iconColor: '#ca8a04' },
+    { key: 'all', label: '案件总数', value: all.length, change: '', trend: '', icon: '📁', iconBg: '#e8f2ff', iconColor: '#1677ff' },
+    { key: 'needOrganize', label: '待整理', value: needOrganize, change: '', trend: '', icon: '🗂️', iconBg: '#f5f3ff', iconColor: '#8b5cf6' },
+    { key: 'sent', label: '已寄出', value: sent, change: '', trend: '', icon: '📮', iconBg: '#ecfdf5', iconColor: '#10b981' },
+    { key: 'waitingReply', label: '等待答复', value: waitingReply, change: '', trend: '', icon: '⏳', iconBg: '#fff7ed', iconColor: '#f59e0b' },
+    { key: 'canReconsider', label: '可复议', value: canReconsiderCount, change: '', trend: '', icon: '⚖️', iconBg: '#fef2f2', iconColor: '#ef4444' },
+    { key: 'deadline', label: '临期提醒', value: reviewDeadlineCount, change: '', trend: '', icon: '🔔', iconBg: '#fef9c3', iconColor: '#ca8a04' },
   ]
 })
+
+// 点击统计卡后过滤的案件
+const activeMetric = ref('all')
 
 const quickFilters = [
   { key: 'all', label: '全部' },
@@ -209,91 +219,63 @@ const quickFilters = [
 ]
 const activeQuick = ref('all')
 
-// 工作台待跟进案件 - 真实数据
-const followUpCases = computed(() => {
+// 按统计卡过滤的案件列表
+const filteredWorkbenchCases = computed(() => {
   const all = store.cases
-  // 按到期紧迫性排序，取前10条
-  const sorted = all
-    .filter(c => {
-      const eff = store.getEffectiveStatus(c)
-      return eff !== 'decided' && !c.isArchived && eff !== 'pending_report'
-    })
-    .map(c => {
-      let deadline = ''
-      let deadlineClass = 'badge-blue'
-      let deadlineSort = 999
-
-      if (c.reportResultDate) {
-        const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
-        if (daysLeft <= 0) {
-          deadline = `已超期${Math.abs(daysLeft)}天`
-          deadlineClass = 'badge-red'
-          deadlineSort = -999 + daysLeft
-        } else if (daysLeft <= 7) {
-          deadline = `复议临期 ${daysLeft}天`
-          deadlineClass = 'badge-red'
-          deadlineSort = daysLeft
-        } else {
-          deadline = `${daysLeft}天`
-          deadlineClass = 'badge-orange'
-          deadlineSort = daysLeft
-        }
-      }
-
-      let progress = ''
-      let progressClass = 'badge-blue'
-      if (c.signDate && !c.reportResultStatus) {
-        const daysSinceSign = dayjs().diff(dayjs(c.signDate), 'day')
-        progress = `已签收${daysSinceSign}天未答复`
-        progressClass = 'badge-orange'
-      } else if (c.reportResultStatus) {
-        progress = c.reportResultStatus ? { rejected: '不予立案', not_punished: '违法事实不成立', closed: '已办结', exempted: '免于处罚', mediation_terminated: '终止调解', not_accepted: '不予受理' }[c.reportResultStatus] || c.reportResultStatus : c.reportResultStatus
-      } else if (c.mediationStatus === 'decided') {
-        progress = '已调解'
-        progressClass = 'badge-green'
-      }
-
-      return {
-        id: c.id,
-        code: c.caseNumber || '待生成',
-        shop: c.shopName || '-',
-        subject: c.productName || '-',
-        progress,
-        progressClass,
-        result: c.reportResultDate ? `答复日期 ${dayjs(c.reportResultDate).format('YYYY-MM-DD')}` : (c.signDate ? `签收日期 ${dayjs(c.signDate).format('YYYY-MM-DD')}` : '-'),
-        deadline,
-        deadlineClass,
-        nextStep: c.reportResultStatus ? '登记答复结果' : (c.signDate ? '等待答复' : '待建档'),
-        amount: c.expense ? `¥${Number(c.expense).toFixed(2)}` : '-',
-        updatedAt: c.updatedAt ? dayjs(c.updatedAt).format('MM-DD HH:mm') : '-',
-        _deadlineSort: deadlineSort,
-      }
-    })
-    .sort((a, b) => a._deadlineSort - b._deadlineSort)
-  return sorted.slice(0, 10)
+  let filtered = all.filter(c => {
+    const eff = store.getEffectiveStatus(c)
+    if (eff === 'decided' || c.isArchived) return false
+    switch (activeMetric.value) {
+      case 'all': return eff !== 'pending_report'
+      case 'needOrganize': return !c.caseNumber || !c.shopName || !c.productName || !c.jurisdiction || (!c.mailTrackingNo && !c.trackingNumber && !c.expressNo)
+      case 'sent': return !c.signDate && (c.mailTrackingNo || c.trackingNumber || c.expressNo)
+      case 'waitingReply': return c.signDate && !c.reportResultStatus
+      case 'canReconsider': return c.reportResultStatus && unfavorableResults.includes(c.reportResultStatus) && c.reportResultDate && dayjs().diff(dayjs(c.reportResultDate), 'day') <= 60
+      case 'deadline': return c.reportResultDate && (() => { const d = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day'); return d > 0 && d <= 7 })()
+      default: return eff !== 'pending_report'
+    }
+  })
+  return filtered.map(c => {
+    let deadline = ''
+    let deadlineClass = 'badge-blue'
+    if (c.reportResultDate) {
+      const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
+      if (daysLeft <= 0) { deadline = `已超期${Math.abs(daysLeft)}天`; deadlineClass = 'badge-red' }
+      else if (daysLeft <= 7) { deadline = `复议临期 ${daysLeft}天`; deadlineClass = 'badge-red' }
+      else { deadline = `${daysLeft}天`; deadlineClass = 'badge-orange' }
+    }
+    let progress = ''
+    let progressClass = 'badge-blue'
+    if (c.signDate && !c.reportResultStatus) {
+      progress = `已签收${dayjs().diff(dayjs(c.signDate), 'day')}天未答复`; progressClass = 'badge-orange'
+    } else if (c.reportResultStatus) {
+      progress = { rejected: '不予立案', not_punished: '违法事实不成立', closed: '已办结', exempted: '免于处罚', mediation_terminated: '终止调解', not_accepted: '不予受理' }[c.reportResultStatus] || c.reportResultStatus; progressClass = 'badge-orange'
+    } else if (c.mediationStatus === 'decided') { progress = '已调解'; progressClass = 'badge-green' }
+    return {
+      id: c.id,
+      code: c.caseNumber || '待生成',
+      shop: c.shopName || '-',
+      subject: c.productName || '-',
+      progress, progressClass,
+      result: c.reportResultDate ? `答复日期 ${dayjs(c.reportResultDate).format('YYYY-MM-DD')}` : (c.signDate ? `签收日期 ${dayjs(c.signDate).format('YYYY-MM-DD')}` : '-'),
+      deadline, deadlineClass,
+      nextStep: c.reportResultStatus ? '登记答复结果' : (c.signDate ? '等待答复' : '待建档'),
+      amount: c.expense ? `¥${Number(c.expense).toFixed(2)}` : '-',
+      updatedAt: c.updatedAt ? dayjs(c.updatedAt).format('MM-DD HH:mm') : '-',
+    }
+  })
 })
 
 // 右侧跟进提醒 - 真实数据
 const reminders = computed(() => {
   const all = store.cases
-
   const reviewDue = all.filter(c => {
     if (!c.reportResultDate) return false
     const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
     return daysLeft > 0 && daysLeft <= 7
   }).length
-
   const signedNoReply = all.filter(c => c.signDate && !c.reportResultStatus).length
-
-  const missingMaterial = all.filter(c => {
-    return !c.signDate && !c.trackingNumber && !c.mailTrackingNo
-  }).length
-
-  const noReplyRegistered = all.filter(c => {
-    if (!c.reportResultStatus) return false
-    return false // 已登记答复结果的暂不统计
-  }).length
-
+  const missingMaterial = all.filter(c => !c.signDate && !c.trackingNumber && !c.mailTrackingNo).length
   return [
     { label: '复议临期提醒', sub: `${reviewDue}件案件复议期限不足7天`, count: reviewDue, icon: '⚠', color: '#ef4444', bg: '#fef2f2' },
     { label: '已签收未答复', sub: `${signedNoReply}件案件已签收未登记答复`, count: signedNoReply, icon: '✉', color: '#f59e0b', bg: '#fff7ed' },

@@ -17,13 +17,17 @@ import DocumentTemplatesView from '@/pages/DocumentTemplatesView.vue'
 import SettingsCenterView from '@/pages/SettingsCenterView.vue'
 
 const routes = [
+  // 首页重定向到工作台
+  { path: '/', redirect: '/workbench' },
   // 原有路由保留
-  { path: '/', component: CaseArchiveView },
   { path: '/legacy-cases', component: CaseList },
   { path: '/case/new', component: CaseForm },
   { path: '/case/:id', component: CaseDetail },
   { path: '/case/:id/edit', component: CaseForm },
   { path: '/settings', component: Settings },
+
+  // 案件档案（显式路径）
+  { path: '/cases', component: CaseArchiveView },
 
   // 新增 10 个页面路由
   { path: '/workbench', component: WorkbenchView },
