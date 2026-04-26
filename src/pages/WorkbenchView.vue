@@ -4,9 +4,9 @@
       <div>
         <div class="page-title-inline">
           <h1 class="page-title">案件处置工作台</h1>
-          <span class="page-title-note">循证留痕，依法跟进</span>
+          <span class="page-title-note">循证留痕,依法跟进</span>
         </div>
-        <p class="page-desc">集中记录购买事实、投诉举报、邮寄签收、机关答复、救济监督和费用收益，帮助维权案件形成完整证据链与跟进链。</p>
+        <p class="page-desc">集中记录购买事实、投诉举报、邮寄签收、机关答复、救济监督和费用收益,帮助维权案件形成完整证据链与跟进链。</p>
       </div>
       <div class="header-actions">
         <button class="top-action-btn icon-only">🔔</button>
@@ -63,7 +63,7 @@
                 <h2>待跟进案件</h2>
                 <span class="info-dot">i</span>
               </div>
-              <p>优先展示需要继续操作的案件，按照期限紧急程度和材料缺口综合排序。</p>
+              <p>优先展示需要继续操作的案件,按照期限紧急程度和材料缺口综合排序。</p>
             </div>
             <button class="btn-ghost">刷新</button>
           </div>
@@ -139,7 +139,7 @@
 
         <div class="side-card">
           <div class="side-card-head">
-            <h3>费用收益概览（本月）</h3>
+            <h3>费用收益概览(本月)</h3>
           </div>
           <div class="mini-stat-grid">
             <div class="mini-stat-card" v-for="f in feeStats" :key="f.label">
@@ -154,18 +154,47 @@
 </template>
 
 <script setup>
-import { inject, ref } from 'vue'
+import { inject, ref, computed } from 'vue'
+import { useCaseStore } from '@/stores/case'
+import dayjs from 'dayjs'
 
+const store = useCaseStore()
 const openAINextStepDrawer = inject('openAINextStepDrawer', null)
 
-const statCards = [
-  { label: '案件总数', value: 128, change: '较上月 +18', trend: 'up', icon: '📁', iconBg: '#e8f2ff', iconColor: '#1677ff' },
-  { label: '待整理', value: 12, change: '较上月 -3', trend: 'down', icon: '🗂️', iconBg: '#f5f3ff', iconColor: '#8b5cf6' },
-  { label: '已寄出', value: 35, change: '较上月 +6', trend: 'up', icon: '📮', iconBg: '#ecfdf5', iconColor: '#10b981' },
-  { label: '等待答复', value: 26, change: '较上月 +4', trend: 'up', icon: '⏳', iconBg: '#fff7ed', iconColor: '#f59e0b' },
-  { label: '可复议', value: 9, change: '较上月 +2', trend: 'up', icon: '⚖️', iconBg: '#fef2f2', iconColor: '#ef4444' },
-  { label: '临期提醒', value: 7, change: '较上月 +1', trend: 'up', icon: '🔔', iconBg: '#fef9c3', iconColor: '#ca8a04' },
-]
+// 工作台统计卡 - 真实数据驱动
+const statCards = computed(() => {
+  const all = store.cases
+  const needOrganize = all.filter(c =>
+    !c.caseNumber || !c.shopName || !c.productName || !c.jurisdiction ||
+    (!c.mailTrackingNo && !c.trackingNumber && !c.expressNo)
+  ).length
+  const sent = all.filter(c => c.mailTrackingNo || c.trackingNumber || c.expressNo).length
+  const waitingReply = all.filter(c => c.signDate && !c.reportResultStatus).length
+
+  const unfavorableResults = ['rejected', 'not_punished', 'mediation_terminated', 'exempted']
+  const canReconsider = all.filter(c => {
+    if (!c.reportResultStatus || !unfavorableResults.includes(c.reportResultStatus)) return false
+    if (!c.reportResultDate) return false
+    const daysSinceResult = dayjs().diff(dayjs(c.reportResultDate), 'day')
+    return daysSinceResult <= 60
+  }).length
+
+  const reviewDeadline = all.filter(c => {
+    if (!c.reportResultStatus || !['rejected', 'not_punished', 'exempted'].includes(c.reportResultStatus)) return false
+    if (!c.reportResultDate) return false
+    const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
+    return daysLeft > 0 && daysLeft <= 7
+  }).length
+
+  return [
+    { label: '案件总数', value: all.length, change: '', trend: '', icon: '📁', iconBg: '#e8f2ff', iconColor: '#1677ff' },
+    { label: '待整理', value: needOrganize, change: '', trend: '', icon: '🗂️', iconBg: '#f5f3ff', iconColor: '#8b5cf6' },
+    { label: '已寄出', value: sent, change: '', trend: '', icon: '📮', iconBg: '#ecfdf5', iconColor: '#10b981' },
+    { label: '等待答复', value: waitingReply, change: '', trend: '', icon: '⏳', iconBg: '#fff7ed', iconColor: '#f59e0b' },
+    { label: '可复议', value: canReconsider, change: '', trend: '', icon: '⚖️', iconBg: '#fef2f2', iconColor: '#ef4444' },
+    { label: '临期提醒', value: reviewDeadline, change: '', trend: '', icon: '🔔', iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  ]
+})
 
 const quickFilters = [
   { key: 'all', label: '全部' },
@@ -180,28 +209,110 @@ const quickFilters = [
 ]
 const activeQuick = ref('all')
 
-const followUpCases = [
-  { id: 1, code: 'AJ202604230018', shop: '1989潮牌鞋服集合店', subject: '短视频宣传“国家级认证”', progress: '已签收未答复', progressClass: 'badge-orange', result: '2026-05-07 已签收', deadline: '复议临期 3天', deadlineClass: 'badge-red', nextStep: '催告 / 信息公开', amount: '¥199.00', updatedAt: '10:26', },
-  { id: 2, code: 'AJ202604220012', shop: '优品数码专营店', subject: '夸大功能宣传', progress: '准备复议', progressClass: 'badge-blue', result: '不予立案', deadline: '7天', deadlineClass: 'badge-orange', nextStep: '准备复议材料', amount: '¥88.00', updatedAt: '09:45', },
-  { id: 3, code: 'AJ202604150007', shop: '母婴之家旗舰店', subject: '签收31天未答复', progress: '待跟进', progressClass: 'badge-purple', result: '已签收 31天未登记答复', deadline: '已超期24天', deadlineClass: 'badge-red', nextStep: '催告 / 信息公开', amount: '¥168.00', updatedAt: '昨天', },
-  { id: 4, code: 'AJ202604230021', shop: '美妆小铺', subject: '商品页宣传“零添加”', progress: '待补材料', progressClass: 'badge-orange', result: '-', deadline: '5天', deadlineClass: 'badge-orange', nextStep: '上传检测截图', amount: '¥59.90', updatedAt: '昨天', },
-  { id: 5, code: 'AJ202604180009', shop: '家居生活馆', subject: '缺少签收截图', progress: '材料缺失', progressClass: 'badge-red', result: '-', deadline: '-', deadlineClass: 'badge-blue', nextStep: '上传签收截图', amount: '¥126.00', updatedAt: '04-24', },
-  { id: 6, code: 'AJ202604120006', shop: '3C数码商城', subject: '案件已赔付但未标记', progress: '待处理', progressClass: 'badge-blue', result: '已回款 ¥199.00', deadline: '-', deadlineClass: 'badge-green', nextStep: '标记已回款', amount: '¥199.00', updatedAt: '04-23', },
-  { id: 7, code: 'AJ202604120001', shop: '食品生活馆', subject: '答复结果不满意', progress: '可复议', progressClass: 'badge-purple', result: '复议期限剩余15天', deadline: '已超期2天', deadlineClass: 'badge-red', nextStep: '催告 / 上级监督', amount: '¥45.00', updatedAt: '04-22', },
-]
+// 工作台待跟进案件 - 真实数据
+const followUpCases = computed(() => {
+  const all = store.cases
+  // 按到期紧迫性排序，取前10条
+  const sorted = all
+    .filter(c => {
+      const eff = store.getEffectiveStatus(c)
+      return eff !== 'decided' && !c.isArchived && eff !== 'pending_report'
+    })
+    .map(c => {
+      let deadline = ''
+      let deadlineClass = 'badge-blue'
+      let deadlineSort = 999
 
-const reminders = [
-  { label: '复议临期提醒', sub: '3件案件复议期限不足7天', count: 3, icon: '⚠', color: '#ef4444', bg: '#fef2f2' },
-  { label: '已签收未答复', sub: '5件案件已签收超过15个工作日', count: 5, icon: '✉', color: '#f59e0b', bg: '#fff7ed' },
-  { label: '缺少关键材料', sub: '2件案件缺少快递签收截图', count: 2, icon: '📎', color: '#8b5cf6', bg: '#f5f3ff' },
-  { label: '未登记答复结果', sub: '4件案件未登记机关答复结果', count: 4, icon: '📝', color: '#1677ff', bg: '#eaf3ff' },
-  { label: '建议信息公开', sub: '1件案件建议申请信息公开', count: 1, icon: '💡', color: '#10b981', bg: '#ecfdf5' },
-]
+      if (c.reportResultDate) {
+        const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
+        if (daysLeft <= 0) {
+          deadline = `已超期${Math.abs(daysLeft)}天`
+          deadlineClass = 'badge-red'
+          deadlineSort = -999 + daysLeft
+        } else if (daysLeft <= 7) {
+          deadline = `复议临期 ${daysLeft}天`
+          deadlineClass = 'badge-red'
+          deadlineSort = daysLeft
+        } else {
+          deadline = `${daysLeft}天`
+          deadlineClass = 'badge-orange'
+          deadlineSort = daysLeft
+        }
+      }
 
-const feeStats = [
-  { label: '本月购买金额', value: '¥2,480' },
-  { label: '本月赔付金额', value: '¥8,200' },
-  { label: '本月净收益', value: '¥5,720' },
-  { label: '本月新增案件', value: '12' },
-]
+      let progress = ''
+      let progressClass = 'badge-blue'
+      if (c.signDate && !c.reportResultStatus) {
+        const daysSinceSign = dayjs().diff(dayjs(c.signDate), 'day')
+        progress = `已签收${daysSinceSign}天未答复`
+        progressClass = 'badge-orange'
+      } else if (c.reportResultStatus) {
+        progress = c.reportResultStatus ? { rejected: '不予立案', not_punished: '违法事实不成立', closed: '已办结', exempted: '免于处罚', mediation_terminated: '终止调解', not_accepted: '不予受理' }[c.reportResultStatus] || c.reportResultStatus : c.reportResultStatus
+      } else if (c.mediationStatus === 'decided') {
+        progress = '已调解'
+        progressClass = 'badge-green'
+      }
+
+      return {
+        id: c.id,
+        code: c.caseNumber || '待生成',
+        shop: c.shopName || '-',
+        subject: c.productName || '-',
+        progress,
+        progressClass,
+        result: c.reportResultDate ? `答复日期 ${dayjs(c.reportResultDate).format('YYYY-MM-DD')}` : (c.signDate ? `签收日期 ${dayjs(c.signDate).format('YYYY-MM-DD')}` : '-'),
+        deadline,
+        deadlineClass,
+        nextStep: c.reportResultStatus ? '登记答复结果' : (c.signDate ? '等待答复' : '待建档'),
+        amount: c.expense ? `¥${Number(c.expense).toFixed(2)}` : '-',
+        updatedAt: c.updatedAt ? dayjs(c.updatedAt).format('MM-DD HH:mm') : '-',
+        _deadlineSort: deadlineSort,
+      }
+    })
+    .sort((a, b) => a._deadlineSort - b._deadlineSort)
+  return sorted.slice(0, 10)
+})
+
+// 右侧跟进提醒 - 真实数据
+const reminders = computed(() => {
+  const all = store.cases
+
+  const reviewDue = all.filter(c => {
+    if (!c.reportResultDate) return false
+    const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
+    return daysLeft > 0 && daysLeft <= 7
+  }).length
+
+  const signedNoReply = all.filter(c => c.signDate && !c.reportResultStatus).length
+
+  const missingMaterial = all.filter(c => {
+    return !c.signDate && !c.trackingNumber && !c.mailTrackingNo
+  }).length
+
+  const noReplyRegistered = all.filter(c => {
+    if (!c.reportResultStatus) return false
+    return false // 已登记答复结果的暂不统计
+  }).length
+
+  return [
+    { label: '复议临期提醒', sub: `${reviewDue}件案件复议期限不足7天`, count: reviewDue, icon: '⚠', color: '#ef4444', bg: '#fef2f2' },
+    { label: '已签收未答复', sub: `${signedNoReply}件案件已签收未登记答复`, count: signedNoReply, icon: '✉', color: '#f59e0b', bg: '#fff7ed' },
+    { label: '缺少关键材料', sub: `${missingMaterial}件案件缺少关键材料`, count: missingMaterial, icon: '📎', color: '#8b5cf6', bg: '#f5f3ff' },
+  ].filter(r => r.count > 0)
+})
+
+// 费用收益概览 - 真实数据
+const feeStats = computed(() => {
+  const thisMonth = dayjs().format('YYYY-MM')
+  const monthCases = store.cases.filter(c => c.createdAt && c.createdAt.startsWith(thisMonth))
+  const totalExpense = monthCases.reduce((sum, c) => sum + Number(c.expense || 0), 0)
+  const totalProfit = monthCases.reduce((sum, c) => sum + Number(c.profit || 0), 0)
+  const netProfit = totalProfit - totalExpense
+  return [
+    { label: '本月购买金额', value: `¥${totalExpense.toFixed(0).replace(/\B(?=(\d{3})+$)/g, ',')}` },
+    { label: '本月赔付金额', value: `¥${totalProfit.toFixed(0).replace(/\B(?=(\d{3})+$)/g, ',')}` },
+    { label: '本月净收益', value: `¥${netProfit.toFixed(0).replace(/\B(?=(\d{3})+$)/g, ',')}` },
+    { label: '本月新增案件', value: String(monthCases.length) },
+  ]
+})
 </script>

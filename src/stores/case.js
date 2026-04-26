@@ -735,6 +735,7 @@ export const useCaseStore = defineStore('case', () => {
     isSynced,
     init,
     getCase,
+    getEffectiveStatus,
     createCase,
     createCasesBulk,
     updateCase,
