@@ -222,19 +222,16 @@ const activeQuick = ref('all')
 // 按统计卡过滤的案件列表
 const filteredWorkbenchCases = computed(() => {
   const all = store.cases
-  let filtered = all.filter(c => {
-    const eff = store.getEffectiveStatus(c)
-    if (eff === 'decided' || c.isArchived) return false
-    switch (activeMetric.value) {
-      case 'all': return eff !== 'pending_report'
-      case 'needOrganize': return !c.caseNumber || !c.shopName || !c.productName || !c.jurisdiction || (!c.mailTrackingNo && !c.trackingNumber && !c.expressNo)
-      case 'sent': return !c.signDate && (c.mailTrackingNo || c.trackingNumber || c.expressNo)
-      case 'waitingReply': return c.signDate && !c.reportResultStatus
-      case 'canReconsider': return c.reportResultStatus && unfavorableResults.includes(c.reportResultStatus) && c.reportResultDate && dayjs().diff(dayjs(c.reportResultDate), 'day') <= 60
-      case 'deadline': return c.reportResultDate && (() => { const d = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day'); return d > 0 && d <= 7 })()
-      default: return eff !== 'pending_report'
-    }
-  })
+  let filtered = all
+  switch (activeMetric.value) {
+    case 'all': filtered = all; break
+    case 'needOrganize': filtered = all.filter(c => !c.caseNumber || !c.shopName || !c.productName || !c.jurisdiction || (!c.mailTrackingNo && !c.trackingNumber && !c.expressNo)); break
+    case 'sent': filtered = all.filter(c => c.mailTrackingNo || c.trackingNumber || c.expressNo); break
+    case 'waitingReply': filtered = all.filter(c => c.signDate && !c.reportResultStatus); break
+    case 'canReconsider': filtered = all.filter(c => { if (!c.reportResultStatus || !unfavorableResults.includes(c.reportResultStatus) || !c.reportResultDate) return false; return dayjs().diff(dayjs(c.reportResultDate), 'day') <= 60 }); break
+    case 'deadline': filtered = all.filter(c => { if (!c.reportResultDate) return false; const d = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day'); return d > 0 && d <= 7 }); break
+    default: filtered = all
+  }
   return filtered.map(c => {
     let deadline = ''
     let deadlineClass = 'badge-blue'
