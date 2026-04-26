@@ -1,5 +1,6 @@
 <template>
   <div class="app-shell">
+    <AINextStepDrawer :visible="aiDrawerVisible" :context="aiDrawerContext" @close="aiDrawerVisible = false" />
     <!-- 左侧固定导航栏 -->
     <aside class="sidebar">
       <!-- 品牌区 -->
@@ -91,11 +92,35 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { provide, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import AINextStepDrawer from '@/components/AINextStepDrawer.vue'
 
 const route = useRoute()
 const notifOpen = ref(false)
+const aiDrawerVisible = ref(false)
+const aiDrawerContext = ref(null)
+
+function openAINextStepDrawer(payload = {}) {
+  console.log('[AI Drawer] open', payload)
+  aiDrawerContext.value = {
+    caseNumber: payload.caseNumber || 'AJ202604230018',
+    status: payload.status || '已签收未答复',
+    originalResult: payload.originalResult || '不予立案',
+    resultDate: payload.resultDate || '2026-04-21',
+    currentReliefStatus: payload.currentReliefStatus || '未建立救济记录',
+    relatedPathCount: payload.relatedPathCount ?? 0,
+    priorityActions: payload.priorityActions || ['准备行政复议', '建议优先级：高'],
+    basis: payload.basis || ['已登记不利处理结果', '当前仍在可救济期限内', '建议优先准备复议材料'],
+    deadlineRisk: payload.deadlineRisk || '复议剩余 57 天，建议优先处理。',
+    materials: payload.materials || ['原举报信', '购买凭证', '商品宣传截图', '邮寄签收记录', '机关答复', '程序问题说明', '事实理由说明'],
+    paths: payload.paths || ['行政复议', '政府信息公开', '上级复议机构监督', '纪检监察举报', '人大信访', '行政诉讼准备', '更多路径'],
+    riskNotice: payload.riskNotice || '纪检监察、人大信访、信访督办等路径应基于具体事实和证据，不得仅因不服处理结果而认定工作人员违法违纪。',
+  }
+  aiDrawerVisible.value = true
+}
+
+provide('openAINextStepDrawer', openAINextStepDrawer)
 
 function isActive(path) {
   if (path === '/workbench') return route.path === '/workbench' || route.path === '/'

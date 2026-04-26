@@ -1,6 +1,6 @@
 <template>
-  <div v-if="c" class="case-detail-page">
-    <section class="case-detail-page__header">
+  <div v-if="c" class="case-detail-page page-shell case-detail-shell">
+    <section class="case-detail-page__header detail-saas-card">
       <button @click="$router.back()" class="case-detail-page__back">
         <span>←</span>
         <span>返回列表</span>
@@ -51,7 +51,7 @@
       </article>
     </section>
 
-    <div class="detail-tabs">
+    <div class="detail-tabs detail-saas-card">
       <button
         v-for="tab in detailTabs"
         :key="tab.value"
@@ -68,7 +68,7 @@
       <div class="main-detail-grid">
         <div class="case-detail-page__main-col">
           <div class="info-row">
-            <section class="detail-section detail-section overview">
+            <section class="detail-section detail-section overview detail-saas-card">
               <div class="detail-section__head">
                 <div>
                   <h3 class="detail-section-title">案件速览</h3>
@@ -100,7 +100,7 @@
               </div>
             </section>
 
-            <section class="detail-section">
+            <section class="detail-section detail-saas-card">
               <div class="detail-section__head">
                 <div>
                   <h3 class="detail-section-title">基础信息</h3>
@@ -147,7 +147,7 @@
           </div>
 
           <div class="detail-lower-grid">
-            <section class="detail-section">
+            <section class="detail-section detail-saas-card">
               <div class="detail-section__head">
                 <div>
                   <h3 class="detail-section-title">流程状态摘要</h3>
@@ -185,7 +185,7 @@
             </section>
 
             <div class="detail-side-stack">
-              <section class="detail-section">
+              <section class="detail-section detail-saas-card">
                 <div class="detail-section__head">
                   <div>
                     <h3 class="detail-section-title">财务信息</h3>
@@ -205,7 +205,7 @@
                 </div>
               </section>
 
-              <section class="detail-section">
+              <section class="detail-section detail-saas-card">
                 <div class="detail-section__head">
                   <div>
                     <h3 class="detail-section-title">填写提醒</h3>
@@ -221,7 +221,7 @@
             </div>
           </div>
 
-          <section ref="disposalSectionRef" class="detail-section detail-disposal-section">
+          <section ref="disposalSectionRef" class="detail-section detail-disposal-section detail-saas-card">
             <div class="detail-section__head">
               <div>
                 <h3 class="detail-section-title">后续处置 / 救济监督</h3>
@@ -343,11 +343,12 @@
           </section>
         </div>
 
-        <aside class="detail-action-panel">
+        <aside class="detail-action-panel detail-saas-card">
           <div class="detail-action-title">处置操作</div>
           <button @click="showStatusModal = true" class="detail-btn detail-btn-primary">变更状态</button>
           <button @click="showReplyModal = true" class="detail-btn">添加答复</button>
           <button @click="showDocModal = true" class="detail-btn">上传文书</button>
+          <button @click="() => { if (openAINextStepDrawer) openAINextStepDrawer({ source: 'case-detail', caseNumber: c.caseNumber || '待生成', status: statusLabel(effectiveStatus), originalResult: c.reportResultStatus ? statusLabel(c.reportResultStatus) : '未登记', resultDate: c.reportResultDate || '-', currentReliefStatus: disposalRecords.length ? '已建立后续处置记录' : '未建立救济记录', relatedPathCount: disposalRecords.length, deadlineRisk: keyRiskSummary.title + '，' + keyRiskSummary.detail, priorityActions: ['准备行政复议', '建议优先级：高'], basis: ['已登记不利处理结果', '当前仍在可救济期限内', '建议优先准备复议材料'] }); else console.warn('openAINextStepDrawer not provided') }" class="detail-btn">AI分析下一步</button>
           <button @click="downloadCaseSummary" class="detail-btn">导出卷宗摘要</button>
           <button @click="printCaseDossier" class="detail-btn">打印卷宗</button>
           <button @click="confirmDelete" class="detail-btn detail-btn-danger">删除案件</button>
@@ -363,7 +364,7 @@
       <DeadlinePanel :case-obj="caseData" @update="loadCase" @open-disposal="handleOpenDisposal" />
 
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <section class="detail-section glass-card">
+        <section class="detail-section detail-saas-card">
           <div class="mb-4 flex items-center justify-between gap-3">
             <div>
               <h3 class="detail-section-title mb-1">流程时间轴</h3>
@@ -409,7 +410,7 @@
         </section>
 
         <div class="space-y-4">
-          <section class="detail-section glass-card">
+          <section class="detail-section detail-saas-card">
             <h3 class="detail-section-title">流程摘要</h3>
             <div class="space-y-3">
               <div class="detail-panel">
@@ -455,7 +456,7 @@
     </template>
 
     <template v-else-if="activeDetailTab === 'materials'">
-      <section class="detail-section glass-card">
+      <section class="detail-section detail-saas-card">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 class="detail-section-title mb-1 detail-inline-title">
@@ -835,7 +836,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { inject, ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCaseStore } from '@/stores/case'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -848,6 +849,7 @@ import { readFileAsDataUrl } from '@/lib/document-processing'
 const route = useRoute()
 const router = useRouter()
 const store = useCaseStore()
+const openAINextStepDrawer = inject('openAINextStepDrawer', null)
 
 const showStatusModal = ref(false)
 const showReplyModal = ref(false)
