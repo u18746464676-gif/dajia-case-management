@@ -1,9 +1,20 @@
 <template>
   <div class="page-shell">
-    <div class="page-header">
+    <div class="page-header page-header-row">
       <div>
         <h1 class="page-title">邮寄台账</h1>
         <p class="page-desc">集中管理所有案件的寄出记录、快递单号、签收状态、签收日期和后续跟进节点。</p>
+      </div>
+      <div class="header-actions">
+        <button class="top-action-btn icon-only">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notif-badge">3</span>
+        </button>
+        <button class="top-action-btn user-pill">
+          <span class="mini-avatar">打</span>
+          <span>打假人</span>
+          <span class="caret">▾</span>
+        </button>
       </div>
     </div>
 
@@ -104,7 +115,8 @@
         <div class="side-card">
           <div class="side-card-head"><h3>物流状态分布</h3></div>
           <div class="donut-wrap">
-            <div class="donut-chart"><span>149</span></div>
+            <div class="donut-chart"><span>174</span></div>
+            <div class="donut-total">总记录</div>
             <div class="donut-legend">
               <div class="donut-legend-item" v-for="d in distribution" :key="d.label">
                 <span class="dot" :style="{ background: d.color }"></span>
@@ -131,15 +143,16 @@ const statCards = [
   { label: '超期未答复', value: 7, icon: '⚠️', bg: '#fef2f2', color: '#ef4444' },
 ]
 const signReminders = [
-  { label: '已签收未答复', sub: '31条寄送记录已签收但未登记机关答复', color: '#ef4444' },
-  { label: '缺签收截图', sub: '12条记录需要补传签收截图', color: '#f59e0b' },
-  { label: '复议相关寄送', sub: '5条复议寄送记录需要核对期限', color: '#8b5cf6' },
+  { label: '已签收未答复', sub: '3件案件签收超过15个工作日', color: '#ef4444' },
+  { label: '缺签收截图', sub: '6件案件缺少签收截图', color: '#f59e0b' },
+  { label: '建议催告跟进', sub: '2件案件建议催告跟进', color: '#8b5cf6' },
+  { label: '建议准备复议', sub: '1件案件建议准备复议', color: '#10b981' },
 ]
 const distribution = [
+  { label: '待寄出', count: 18, color: '#1677ff' },
+  { label: '运输中', count: 26, color: '#2563eb' },
   { label: '已签收', count: 92, color: '#10b981' },
-  { label: '运输中', count: 26, color: '#1677ff' },
-  { label: '待寄出', count: 18, color: '#f59e0b' },
-  { label: '异常退回', count: 13, color: '#ef4444' },
+  { label: '未登记签收', count: 38, color: '#9ca3af' },
 ]
 const mailRows = [
   { code: 'AJ202604230018', shop: '1989潮牌鞋服集合店', target: '杭州市市场监督管理局', subject: '投诉举报材料', company: '中国邮政', tracking: 'XA123456789CN', sentAt: '2026-04-18', signedAt: '2026-04-21', status: '已签收', statusClass: 'badge-green', nextStep: '等待答复' },
