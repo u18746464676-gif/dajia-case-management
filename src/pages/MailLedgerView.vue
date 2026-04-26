@@ -115,7 +115,7 @@
         <div class="side-card">
           <div class="side-card-head"><h3>物流状态分布</h3></div>
           <div class="donut-wrap">
-            <div class="donut-chart"><span>174</span></div>
+            <div class="donut-chart"><span>{{ store.cases.length }}</span></div>
             <div class="donut-total">总记录</div>
             <div class="donut-legend">
               <div class="donut-legend-item" v-for="d in distribution" :key="d.label">
@@ -132,32 +132,100 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useCaseStore } from '@/stores/case'
+import dayjs from 'dayjs'
+
+const store = useCaseStore()
 const active = ref('全部')
 const quickFilters = ['全部', '待寄出', '有单号未签收', '已签收未答复', '超15个工作日', '缺签收截图', '复议相关寄送']
-const statCards = [
-  { label: '待寄出', value: 18, icon: '📮', bg: '#e8f2ff', color: '#1677ff' },
-  { label: '运输中', value: 26, icon: '🚚', bg: '#eff6ff', color: '#2563eb' },
-  { label: '已签收', value: 92, icon: '✅', bg: '#ecfdf5', color: '#10b981' },
-  { label: '签收未答复', value: 31, icon: '📄', bg: '#fff7ed', color: '#f59e0b' },
-  { label: '超期未答复', value: 7, icon: '⚠️', bg: '#fef2f2', color: '#ef4444' },
-]
-const signReminders = [
-  { label: '已签收未答复', sub: '3件案件签收超过15个工作日', color: '#ef4444' },
-  { label: '缺签收截图', sub: '6件案件缺少签收截图', color: '#f59e0b' },
-  { label: '建议催告跟进', sub: '2件案件建议催告跟进', color: '#8b5cf6' },
-  { label: '建议准备复议', sub: '1件案件建议准备复议', color: '#10b981' },
-]
-const distribution = [
-  { label: '待寄出', count: 18, color: '#1677ff' },
-  { label: '运输中', count: 26, color: '#2563eb' },
-  { label: '已签收', count: 92, color: '#10b981' },
-  { label: '未登记签收', count: 38, color: '#9ca3af' },
-]
-const mailRows = [
-  { code: 'AJ202604230018', shop: '1989潮牌鞋服集合店', target: '杭州市市场监督管理局', subject: '投诉举报材料', company: '中国邮政', tracking: 'XA123456789CN', sentAt: '2026-04-18', signedAt: '2026-04-21', status: '已签收', statusClass: 'badge-green', nextStep: '等待答复' },
-  { code: 'AJ202604220012', shop: '优品数码专营店', target: '余杭区市场监督管理局', subject: '信息公开申请', company: '顺丰速运', tracking: 'SF1234567890', sentAt: '2026-04-19', signedAt: '-', status: '运输中', statusClass: 'badge-blue', nextStep: '跟进物流' },
-  { code: 'AJ202604210007', shop: '母婴之家旗舰店', target: '上海市市场监督管理局', subject: '复议材料', company: '京东快递', tracking: 'JD1234509876', sentAt: '2026-04-10', signedAt: '2026-04-12', status: '已签收未答复', statusClass: 'badge-orange', nextStep: '催告 / 信息公开' },
-  { code: 'AJ202604180009', shop: '家居生活馆', target: '广州市市场监督管理局', subject: '投诉举报材料', company: '中国邮政', tracking: 'XA998877665CN', sentAt: '-', signedAt: '-', status: '待寄出', statusClass: 'badge-red', nextStep: '打印面单寄出' },
-]
+
+const statCards = computed(() => {
+  const all = store.cases
+  const pending = all.filter(c => !c.trackingNumber && !c.mailTrackingNo).length
+  const inTransit = all.filter(c => (c.trackingNumber || c.mailTrackingNo) && !c.signDate).length
+  const signed = all.filter(c => c.signDate).length
+  const signedNoReply = all.filter(c => c.signDate && !c.reportResultStatus).length
+  const overdue = all.filter(c => {
+    if (!c.signDate || c.reportResultStatus) return false
+    const daysSince = dayjs().diff(dayjs(c.signDate), 'day')
+    return daysSince >= 21
+  }).length
+  return [
+    { label: '待寄出', value: pending, icon: '📮', bg: '#e8f2ff', color: '#1677ff' },
+    { label: '运输中', value: inTransit, icon: '🚚', bg: '#eff6ff', color: '#2563eb' },
+    { label: '已签收', value: signed, icon: '✅', bg: '#ecfdf5', color: '#10b981' },
+    { label: '签收未答复', value: signedNoReply, icon: '📄', bg: '#fff7ed', color: '#f59e0b' },
+    { label: '超期未答复', value: overdue, icon: '⚠️', bg: '#fef2f2', color: '#ef4444' },
+  ]
+})
+
+const mailRows = computed(() => {
+  return store.cases
+    .filter(c => c.trackingNumber || c.mailTrackingNo || c.signDate)
+    .map(c => {
+      const trackingNo = c.trackingNumber || c.mailTrackingNo || '-'
+      const hasTracking = !!(c.trackingNumber || c.mailTrackingNo)
+      const hasSign = !!c.signDate
+      let status = '待寄出'
+      let statusClass = 'badge-red'
+      if (hasSign) {
+        status = c.reportResultStatus ? '已答复' : '签收未答复'
+        statusClass = c.reportResultStatus ? 'badge-green' : 'badge-orange'
+      } else if (hasTracking) {
+        status = '运输中'
+        statusClass = 'badge-blue'
+      }
+      return {
+        id: c.id,
+        code: c.caseNumber || '待生成',
+        shop: c.shopName || '-',
+        target: c.jurisdiction || '未填写',
+        subject: c.productName || '未填写',
+        company: hasTracking ? '待识别' : '-',
+        tracking: trackingNo,
+        sentAt: c.submitDate || '-',
+        signedAt: c.signDate || '-',
+        status,
+        statusClass,
+        nextStep: hasSign
+          ? (c.reportResultStatus ? '等待下一步' : '登记答复结果')
+          : (hasTracking ? '跟进物流' : '打印面单寄出'),
+      }
+    })
+})
+
+const signReminders = computed(() => {
+  const all = store.cases
+  const overdueList = all.filter(c => {
+    if (!c.signDate || c.reportResultStatus) return false
+    return dayjs().diff(dayjs(c.signDate), 'day') >= 21
+  })
+  const noReplyList = all.filter(c => c.signDate && !c.reportResultStatus)
+  const canReconsider = all.filter(c => {
+    if (!c.reportResultStatus || !['rejected', 'not_punished', 'exempted'].includes(c.reportResultStatus)) return false
+    if (!c.reportResultDate) return false
+    const daysSince = dayjs().diff(dayjs(c.reportResultDate), 'day')
+    return daysSince <= 60
+  })
+  const result = []
+  if (overdueList.length > 0) result.push({ label: '已签收未答复', sub: `${overdueList.length}件案件签收超过21天未答复`, color: '#ef4444' })
+  if (noReplyList.length > 0) result.push({ label: '建议催告跟进', sub: `${noReplyList.length}件案件建议催告跟进`, color: '#8b5cf6' })
+  if (canReconsider.length > 0) result.push({ label: '建议准备复议', sub: `${canReconsider.length}件案件建议准备复议`, color: '#10b981' })
+  return result
+})
+
+const distribution = computed(() => {
+  const all = store.cases
+  const pending = all.filter(c => !c.trackingNumber && !c.mailTrackingNo).length
+  const inTransit = all.filter(c => (c.trackingNumber || c.mailTrackingNo) && !c.signDate).length
+  const signed = all.filter(c => c.signDate).length
+  const noRecord = all.filter(c => !c.trackingNumber && !c.mailTrackingNo && !c.signDate).length
+  return [
+    { label: '待寄出', count: pending, color: '#1677ff' },
+    { label: '运输中', count: inTransit, color: '#2563eb' },
+    { label: '已签收', count: signed, color: '#10b981' },
+    { label: '未登记签收', count: signed ? noRecord : 0, color: '#9ca3af' },
+  ]
+})
 </script>
