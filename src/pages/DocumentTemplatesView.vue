@@ -1,9 +1,14 @@
 <template>
   <div class="page-shell">
-    <div class="page-header">
+    <div class="page-header page-header-row">
       <div>
         <h1 class="page-title">文书生成中心</h1>
         <p class="page-desc">基于案件数据和证据材料，自动生成各类法律文书。</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-secondary">使用说明</button>
+        <button class="btn-secondary">模板管理</button>
+        <button class="btn-secondary">生成记录</button>
       </div>
     </div>
 
