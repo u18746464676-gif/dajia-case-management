@@ -2,7 +2,7 @@
   <div class="app-shell">
     <AINextStepDrawer :visible="aiDrawerVisible" :context="aiDrawerContext" @close="aiDrawerVisible = false" />
     <!-- 左侧固定导航栏 -->
-    <aside class="sidebar">
+    <aside class="sidebar" :class="sidebarClass">
       <!-- 品牌区 -->
       <div class="sidebar-brand">
         <div class="brand-icon">
@@ -14,7 +14,7 @@
         </div>
         <div class="brand-text">
           <div class="brand-name">打假维权</div>
-          <div class="brand-sub">案件管理系统</div>
+          <div class="brand-sub">{{ sidebarBrandSub }}</div>
         </div>
       </div>
 
@@ -62,7 +62,7 @@
         <div class="topbar-right">
           <button class="topbar-icon-btn" @click="notifOpen = !notifOpen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <span class="notif-dot"></span>
+            <span class="notif-badge">3</span>
           </button>
           <button class="topbar-user">
             <span class="topbar-avatar">管</span>
@@ -92,11 +92,16 @@
 </template>
 
 <script setup>
-import { provide, ref } from 'vue'
+import { computed, provide, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AINextStepDrawer from '@/components/AINextStepDrawer.vue'
 
 const route = useRoute()
+
+const darkRoutes = ['/relief', '/finance', '/reminders', '/templates', '/settings-center']
+const sidebarClass = computed(() => darkRoutes.some(r => route.path.startsWith(r)) ? 'sidebar-dark' : 'sidebar-light')
+const sidebarBrandSub = computed(() => darkRoutes.some(r => route.path.startsWith(r)) ? '案件管理系统' : '案件工作台')
+
 const notifOpen = ref(false)
 const aiDrawerVisible = ref(false)
 const aiDrawerContext = ref(null)

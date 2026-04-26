@@ -132,11 +132,11 @@ const activeTab = ref('收支明细')
 const tabs = ['收支总览', '收支明细', '平台分析', '店铺分析']
 const statCards = [
   { label: '累计案件数', value: 500, icon: '📁', bg: '#e8f2ff', color: '#1677ff' },
-  { label: '累计购买金额', value: '¥128,460', icon: '💰', bg: '#eff6ff', color: '#2563eb' },
-  { label: '累计赔付金额', value: '¥396,800', icon: '💵', bg: '#ecfdf5', color: '#10b981' },
-  { label: '累计净收益', value: '¥268,340', icon: '📈', bg: '#f5f3ff', color: '#8b5cf6' },
-  { label: '已回款案件数', value: 282, icon: '✅', bg: '#fff7ed', color: '#f59e0b' },
-  { label: '赔付成功率', value: '56.4%', icon: '📊', bg: '#fef2f2', color: '#ef4444' },
+  { label: '累计购买金额', value: '¥128,650.00', icon: '💰', bg: '#eff6ff', color: '#2563eb' },
+  { label: '累计赔付金额', value: '¥289,430.00', icon: '💵', bg: '#ecfdf5', color: '#10b981' },
+  { label: '累计净收益', value: '¥160,780.00', icon: '📈', bg: '#f5f3ff', color: '#8b5cf6' },
+  { label: '已回款案件数', value: 432, icon: '✅', bg: '#fff7ed', color: '#f59e0b' },
+  { label: '赔付成功率', value: '64.80%', icon: '📊', bg: '#fef2f2', color: '#ef4444' },
 ]
 const financeRows = [
   { code: 'AJ202604230018', shop: '1989潮牌鞋服集合店', subject: '商品宣传', platform: '拼多多', office: '杭州市市场监督管理局', buy: '¥199.00', compensation: '¥500.00', profit: '¥301.00', progress: '已回款', result: '责令整改', paid: '是', updatedAt: '2026-04-24' },
