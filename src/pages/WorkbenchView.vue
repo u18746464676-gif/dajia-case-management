@@ -100,8 +100,6 @@
                 <td>
                   <div class="table-actions">
                     <button class="btn-link">查看</button>
-                    <button class="btn-link" @click="() => { if (openAINextStepDrawer) openAINextStepDrawer({ source: 'workbench', caseNumber: item.code, status: item.progress, originalResult: item.result, resultDate: item.updatedAt, currentReliefStatus: '未建立救济记录', relatedPathCount: 0, deadlineRisk: item.deadline, priorityActions: ['准备行政复议', '建议优先级：高'], basis: ['已登记不利处理结果', '当前仍在可救济期限内', '建议优先准备复议材料'] }); else console.warn('openAINextStepDrawer not provided') }">AI分析下一步</button>
-                    <button class="btn-link">更多</button>
                   </div>
                 </td>
               </tr>
@@ -194,9 +192,9 @@ const followUpCases = [
 
 const reminders = [
   { label: '复议临期提醒', sub: '3件案件复议期限不足7天', count: 3, icon: '⚠', color: '#ef4444', bg: '#fef2f2' },
-  { label: '已签收未答复', sub: '6件案件已签收超过15个工作日', count: 6, icon: '✉', color: '#f59e0b', bg: '#fff7ed' },
-  { label: '缺少关键材料', sub: '4件案件缺少截图或检测报告', count: 4, icon: '📎', color: '#8b5cf6', bg: '#f5f3ff' },
-  { label: '未登记答复结果', sub: '5件案件未登记机关答复', count: 5, icon: '📝', color: '#1677ff', bg: '#eaf3ff' },
+  { label: '已签收未答复', sub: '5件案件已签收超过15个工作日', count: 5, icon: '✉', color: '#f59e0b', bg: '#fff7ed' },
+  { label: '缺少关键材料', sub: '2件案件缺少快递签收截图', count: 2, icon: '📎', color: '#8b5cf6', bg: '#f5f3ff' },
+  { label: '未登记答复结果', sub: '4件案件未登记机关答复结果', count: 4, icon: '📝', color: '#1677ff', bg: '#eaf3ff' },
   { label: '建议信息公开', sub: '1件案件建议申请信息公开', count: 1, icon: '💡', color: '#10b981', bg: '#ecfdf5' },
 ]
 
