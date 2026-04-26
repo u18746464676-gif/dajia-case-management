@@ -24,7 +24,7 @@
     <div v-if="!selectedCase" class="table-card" style="padding: 40px; text-align: center;">
       <p style="color: #888; margin-bottom: 16px;">暂无可显示的案件</p>
       <p style="color: #aaa; font-size: 13px;">当前没有需要救济监督的案件，或请先在案件档案中查看。</p>
-      <router-link to="/archive" class="btn-primary" style="display: inline-block; margin-top: 16px;">去案件档案</router-link>
+      <router-link to="/cases" class="btn-primary" style="display: inline-block; margin-top: 16px;">去案件档案</router-link>
     </div>
 
     <template v-if="selectedCase">

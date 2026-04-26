@@ -810,7 +810,7 @@
   <div v-else class="rounded-2xl border border-slate-100 bg-white dark:bg-slate-900 py-32 text-center shadow-sm">
     <span class="text-8xl">🔍</span>
     <p class="mt-4 mb-6 text-xl text-slate-400 dark:text-slate-500">案件不存在</p>
-    <router-link to="/" class="btn-primary inline-flex items-center gap-2">返回列表</router-link>
+    <router-link to="/cases" class="btn-primary inline-flex items-center gap-2">返回列表</router-link>
   </div>
 
   <!-- 图片预览弹窗 -->
@@ -2099,7 +2099,7 @@ function deleteDoc(docId) {
 function confirmDelete() {
   if (confirm('确认删除此案件？删除后不可恢复。')) {
     store.deleteCase(c.value.id)
-    router.push('/')
+    router.push('/cases')
   }
 }
 </script>

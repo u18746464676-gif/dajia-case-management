@@ -1,6 +1,6 @@
 <template>
   <div class="max-w-4xl mx-auto space-y-4">
-    <button @click="router.push('/')" class="btn-ghost px-0">
+    <button @click="router.push('/cases')" class="btn-ghost px-0">
       <span>←</span><span>返回列表</span>
     </button>
 
@@ -198,7 +198,7 @@
       <!-- 提交按钮 -->
       <div class="card">
         <div class="flex flex-col-reverse gap-3 md:flex-row md:justify-end">
-          <button type="button" @click="router.push('/')" class="btn-secondary md:min-w-32">取消</button>
+          <button type="button" @click="router.push('/cases')" class="btn-secondary md:min-w-32">取消</button>
           <button type="submit" class="btn-primary md:min-w-40">
             <span>{{ isEdit ? '💾' : '✅' }}</span>
             <span>{{ isEdit ? '保存修改' : '创建案件' }}</span>
@@ -354,10 +354,10 @@ function handleSubmit() {
   const payload = buildPayload()
   if (isEdit.value) {
     store.updateCase(route.params.id, payload)
-    router.push('/')
+    router.push('/cases')
   } else {
     store.createCase(payload)
-    router.push('/')
+    router.push('/cases')
   }
 }
 </script>
