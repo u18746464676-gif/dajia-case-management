@@ -118,7 +118,7 @@
         <div class="side-card">
           <div class="side-card-head"><h3>答复结果分布</h3></div>
           <div class="donut-wrap small-gap">
-            <div class="donut-chart response-donut"><span>186</span></div>
+            <div class="donut-chart response-donut"><span>{{ store.cases.filter(c => c.reportResultStatus || c.mediationStatus === 'decided').length }}</span></div>
             <div class="donut-legend">
               <div class="donut-legend-item" v-for="d in distribution" :key="d.label">
                 <span class="dot" :style="{ background: d.color }"></span>
@@ -143,34 +143,157 @@
 </template>
 
 <script setup>
-import { inject } from 'vue'
+import { inject, computed } from 'vue'
+import { useCaseStore } from '@/stores/case'
+import dayjs from 'dayjs'
+
+const store = useCaseStore()
 const openAINextStepDrawer = inject('openAINextStepDrawer', null)
-const statCards = [
-  { label: '答复总数', value: 186, icon: '📄', bg: '#e8f2ff', color: '#1677ff' },
-  { label: '不利答复', value: 78, icon: '⚠️', bg: '#fef2f2', color: '#ef4444' },
-  { label: '可复议案件', value: 62, icon: '⚖️', bg: '#f5f3ff', color: '#8b5cf6' },
-  { label: '临期复议', value: 14, icon: '⏳', bg: '#fff7ed', color: '#f59e0b' },
-  { label: '已超期', value: 6, icon: '🚨', bg: '#fef2f2', color: '#ef4444' },
-  { label: '有利 / 已办结', value: 40, icon: '✅', bg: '#ecfdf5', color: '#10b981' },
-]
 
-const reminders = [
-  { label: '临期复议提醒', sub: '14件案件复议期限不足7天', color: '#ef4444' },
-  { label: '需补答复文书', sub: '9件案件已登记结果但未绑定答复文书', color: '#f59e0b' },
-  { label: '建议建立救济记录', sub: '11件不利答复建议进入救济监督', color: '#8b5cf6' },
-]
+const UNFAVORABLE = ['rejected', 'not_punished', 'not_accepted', 'exempted', 'mediation_terminated']
+const FAVORABLE = ['closed', 'decided']
 
-const distribution = [
-  { label: '不予立案', count: 68, color: '#ef4444' },
-  { label: '责令整改', count: 34, color: '#1677ff' },
-  { label: '已受理', count: 24, color: '#10b981' },
-  { label: '已办结', count: 40, color: '#8b5cf6' },
-  { label: '其他', count: 20, color: '#f59e0b' },
-]
+const statCards = computed(() => {
+  const all = store.cases
+  const total = all.filter(c => c.reportResultStatus || c.mediationStatus === 'decided').length
+  const unfavorable = all.filter(c => c.reportResultStatus && UNFAVORABLE.includes(c.reportResultStatus)).length
+  const canReconsider = all.filter(c => {
+    if (!c.reportResultStatus || !UNFAVORABLE.includes(c.reportResultStatus)) return false
+    if (!c.reportResultDate) return false
+    return dayjs().diff(dayjs(c.reportResultDate), 'day') <= 60
+  }).length
+  const nearDeadline = all.filter(c => {
+    if (!c.reportResultStatus || !UNFAVORABLE.includes(c.reportResultStatus)) return false
+    if (!c.reportResultDate) return false
+    const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
+    return daysLeft > 0 && daysLeft <= 7
+  }).length
+  const overdue = all.filter(c => {
+    if (!c.reportResultStatus || !UNFAVORABLE.includes(c.reportResultStatus)) return false
+    if (!c.reportResultDate) return false
+    return dayjs().diff(dayjs(c.reportResultDate), 'day') > 60
+  }).length
+  const favorable = all.filter(c => {
+    if (c.mediationStatus === 'decided') return true
+    if (c.reportResultStatus && FAVORABLE.includes(c.reportResultStatus)) return true
+    if (c.reportResultStatus === 'not_punished') return true
+    return false
+  }).length
+  return [
+    { label: '答复总数', value: total, icon: '📄', bg: '#e8f2ff', color: '#1677ff' },
+    { label: '不利答复', value: unfavorable, icon: '⚠️', bg: '#fef2f2', color: '#ef4444' },
+    { label: '可复议案件', value: canReconsider, icon: '⚖️', bg: '#f5f3ff', color: '#8b5cf6' },
+    { label: '临期复议', value: nearDeadline, icon: '⏳', bg: '#fff7ed', color: '#f59e0b' },
+    { label: '已超期', value: overdue, icon: '🚨', bg: '#fef2f2', color: '#ef4444' },
+    { label: '有利 / 已办结', value: favorable, icon: '✅', bg: '#ecfdf5', color: '#10b981' },
+  ]
+})
 
-const responseRows = [
-  { code: 'AJ202604230018', shop: '1989潮牌鞋服集合店', subject: '商品宣传', office: '杭州市市场监督管理局', type: '不予立案决定书', date: '2026-04-21', result: '不予立案', resultClass: 'badge-red', review: '可复议，剩余6天', document: '不予立案决定书.pdf', nextStep: '准备复议材料' },
-  { code: 'AJ202604220012', shop: '优品数码专营店', subject: '违法宣传', office: '余杭区市场监督管理局', type: '投诉举报答复', date: '2026-04-18', result: '责令整改', resultClass: 'badge-blue', review: '无需复议', document: '整改答复函.pdf', nextStep: '跟进整改结果' },
-  { code: 'AJ202604180009', shop: '家居生活馆', subject: '虚假宣传', office: '广州市市场监督管理局', type: '信息公开答复', date: '2026-04-16', result: '未完整公开', resultClass: 'badge-orange', review: '可复议，剩余18天', document: '信息公开答复.pdf', nextStep: '建立信息公开复议' },
-]
+const responseRows = computed(() => {
+  const STATUS_MAP = {
+    rejected: { label: '不予立案', cls: 'badge-red' },
+    not_punished: { label: '违法事实不成立', cls: 'badge-red' },
+    not_accepted: { label: '不予受理', cls: 'badge-red' },
+    exempted: { label: '免于处罚', cls: 'badge-red' },
+    mediation_terminated: { label: '终止调解', cls: 'badge-orange' },
+    closed: { label: '已办结', cls: 'badge-green' },
+    decided: { label: '已调解', cls: 'badge-green' },
+  }
+  return store.cases
+    .filter(c => c.reportResultStatus || c.mediationStatus === 'decided')
+    .map(c => {
+      const statusInfo = STATUS_MAP[c.reportResultStatus] || { label: c.reportResultStatus || '-', cls: 'badge-blue' }
+      let review = '无'
+      let reviewClass = ''
+      if (c.reportResultStatus && UNFAVORABLE.includes(c.reportResultStatus) && c.reportResultDate) {
+        const daysSince = dayjs().diff(dayjs(c.reportResultDate), 'day')
+        const daysLeft = 60 - daysSince
+        if (daysLeft <= 0) {
+          review = `已超期${Math.abs(daysLeft)}天`
+          reviewClass = 'badge-red'
+        } else if (daysLeft <= 7) {
+          review = `临期，剩余${daysLeft}天`
+          reviewClass = 'badge-red'
+        } else {
+          review = `可复议，剩余${daysLeft}天`
+          reviewClass = 'badge-blue'
+        }
+      } else if (c.mediationStatus === 'decided') {
+        review = '无需复议'
+      } else {
+        review = '无'
+      }
+      return {
+        id: c.id,
+        code: c.caseNumber || '待生成',
+        shop: c.shopName || '-',
+        subject: c.productName || '-',
+        office: c.jurisdiction || '-',
+        type: c.acceptanceWay || '投诉举报答复',
+        date: c.reportResultDate || '-',
+        result: statusInfo.label,
+        resultClass: statusInfo.cls,
+        review,
+        reviewClass,
+        document: (c.documents && c.documents.length > 0) ? `${c.documents.length}份文书` : '未关联',
+        nextStep: c.reportResultStatus === 'rejected' ? '准备复议材料' :
+                  c.reportResultStatus === 'not_punished' ? '准备复议材料' :
+                  c.mediationStatus === 'decided' ? '等待下一步' : '跟进结果',
+      }
+    })
+})
+
+const reminders = computed(() => {
+  const all = store.cases
+  const nearDeadline = all.filter(c => {
+    if (!c.reportResultStatus || !UNFAVORABLE.includes(c.reportResultStatus)) return false
+    if (!c.reportResultDate) return false
+    const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
+    return daysLeft > 0 && daysLeft <= 7
+  }).length
+  const overdue = all.filter(c => {
+    if (!c.reportResultStatus || !UNFAVORABLE.includes(c.reportResultStatus)) return false
+    if (!c.reportResultDate) return false
+    return dayjs().diff(dayjs(c.reportResultDate), 'day') > 60
+  }).length
+  const unfavorable = all.filter(c => c.reportResultStatus && UNFAVORABLE.includes(c.reportResultStatus)).length
+  const result = []
+  if (nearDeadline > 0) result.push({ label: '临期复议提醒', sub: `${nearDeadline}件案件复议期限不足7天`, color: '#ef4444' })
+  if (overdue > 0) result.push({ label: '已超期未行动', sub: `${overdue}件案件复议期限已超期`, color: '#ef4444' })
+  if (unfavorable > 0) result.push({ label: '建议建立救济记录', sub: `${unfavorable}件不利答复建议进入救济监督`, color: '#8b5cf6' })
+  return result
+})
+
+const distribution = computed(() => {
+  const all = store.cases
+  const resultMap = {}
+  all.forEach(c => {
+    const s = c.reportResultStatus || (c.mediationStatus === 'decided' ? 'decided' : null)
+    if (!s) return
+    resultMap[s] = (resultMap[s] || 0) + 1
+  })
+  const LABEL_MAP = {
+    rejected: '不予立案',
+    not_punished: '违法事实不成立',
+    not_accepted: '不予受理',
+    exempted: '免于处罚',
+    mediation_terminated: '终止调解',
+    closed: '已办结',
+    decided: '已调解',
+  }
+  const COLOR_MAP = {
+    rejected: '#ef4444',
+    not_punished: '#ef4444',
+    not_accepted: '#ef4444',
+    exempted: '#f59e0b',
+    mediation_terminated: '#f59e0b',
+    closed: '#8b5cf6',
+    decided: '#10b981',
+  }
+  return Object.entries(resultMap).map(([key, count]) => ({
+    label: LABEL_MAP[key] || key,
+    count,
+    color: COLOR_MAP[key] || '#9ca3af',
+  }))
+})
 </script>
