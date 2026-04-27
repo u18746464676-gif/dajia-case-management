@@ -1,20 +1,20 @@
 # BASELINE.md - 稳定基线记录
 
-> 更新时间：2026-04-27 10:23
+> 更新时间：2026-04-27 18:51
 
 ## 当前稳定版本
 
-- **commit**: `6847a7c`
-- **JS**: `index-BFQnEph3.js`
-- **CSS**: `index-BhznxOu7.css`
-- **上线时间**: 2026-04-27 10:23
+- **commit**: `d2ae074`
+- **JS**: `index-Cf5gZIxR.js`
+- **CSS**: `index-BY2WTL0l.css`
+- **上线时间**: 2026-04-27 18:51
 - **线上目录**: `/var/www/case-management`
 
 ---
 
 ## 本次上线内容
 
-**工作台统计卡调整为 9 张案件状态卡**
+**案件详情页三类操作弹窗 modal 化**
 
 ### 本次修复（3 项）
 1. 工作台顶部统计卡从流程辅助项改为 9 张案件状态统计卡：案件总数 / 已受理 / 未受理 / 不予受理 / 已立案 / 不予立案 / 不予处罚 / 已处罚 / 已调解
@@ -78,7 +78,15 @@
 <details>
 <summary>展开历史基线记录</summary>
 
-### v2026-04-27-1023 工作台 9 张状态统计卡（当前）
+### v2026-04-27-1851 案件详情页三类操作弹窗 modal 化（当前）
+
+- commit: `d2ae074`
+- JS: `index-Cf5gZIxR.js`
+- CSS: `index-BY2WTL0l.css`
+- 上线时间: 2026-04-27 18:51
+- 备份文件: `index.html.bak-before-case-detail-modal-fix-20260427-185127`
+
+### v2026-04-27-1023 工作台 9 张状态统计卡
 
 - commit: `6847a7c`
 - JS: `index-BFQnEph3.js`
