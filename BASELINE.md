@@ -1,20 +1,53 @@
 # BASELINE.md - 稳定基线记录
 
-> 更新时间：2026-04-26 21:59
+> 更新时间：2026-04-27 08:57
 
 ## 当前稳定版本
 
-- **commit**: `17b56bd`
-- **JS**: `index-DY5OGi-E.js`
-- **CSS**: `index-B1qeXMdA.css`
-- **上线时间**: 2026-04-26 21:59
+- **commit**: `f5a759d`
+- **JS**: `index-yZ3ZQfCG.js`
+- **CSS**: `index-CWJ6rqJm.css`
+- **上线时间**: 2026-04-27 08:57
 - **线上目录**: `/var/www/case-management`
 
 ---
 
 ## 本次上线内容
 
-**导航修复 + 侧边栏统一 + 工作台筛选修复**
+**案件状态逻辑统一 + 布局与按钮修复**
+
+### 本次修复（10 项）
+1. 统一案件状态逻辑（新增 `src/utils/caseStatus.js`，含 getEffectiveStatusLabel / getNextAction / getDeadlineText / getStatusBadgeClass）
+2. 工作台待跟进案件状态、期限提醒、我方下一步按真实状态显示
+3. 工作台"查看"按钮跳转案件详情修复
+4. 案件详情页弹窗按钮验收（变更状态/添加答复/上传文书 三按钮事件绑定恢复）
+5. 证据库材料夹点击切换（folder card @click + selected-case 选中态）
+6. 案件档案 6 列筛选 grid 布局（`.archive-filter-grid` CSS class）
+7. 救济监督两列布局（`.detail-layout.relief-layout` CSS class，653px+360px）
+8. 流程时间轴卡片化（白色圆角卡片，非裸文本）
+9. 案件材料卡片化（材料中心白色卡片，非裸文本）
+10. 保持真实数据绑定，不恢复假数据（store.cases computed 全部保留）
+
+### 本次截图（9 张真实验收）
+- `case-archive-filter-expanded.png` — 案件档案筛选展开 6 列
+- `case-archive-real-check.png` — 案件档案页
+- `relief-real-check.png` — 救济监督两列布局
+- `evidence-real-check.png` — 证据库页
+- `evidence-folder-real-check.png` — 证据库材料夹点击切换
+- `case-detail-info-real-check.png` — 案件信息 Tab
+- `case-detail-timeline-real-check.png` — 流程时间轴卡片
+- `case-detail-materials-real-check.png` — 案件材料卡片
+- `case-detail-modal-real-check.png` — 变更状态弹窗
+
+### 本次实际改动文件
+- `src/pages/WorkbenchView.vue` — 状态逻辑统一调用
+- `src/pages/EvidenceView.vue` — 材料夹点击绑定
+- `src/style.css` — 新增 .archive-filter-grid / .relief-layout / .timeline-* / .material-* 等布局 class
+- `src/utils/caseStatus.js` — 新增（159 行）
+
+---
+
+## 上次上线内容（导航修复 + 侧边栏统一 + 工作台筛选）
 
 ### 本次修复（8 项）
 1. `/` 默认进入 `/workbench`（redirect）
@@ -28,7 +61,7 @@
 
 ---
 
-## 上次上线内容（真实数据绑定 + 假数据清理）
+## 上上次上线内容（真实数据绑定 + 假数据清理）
 
 ### UI 改造（10 页）
 1. 工作台 — page-header-row + header-actions
@@ -68,8 +101,8 @@
 - 13 条路由本地验收全部通过（200 OK，无白屏）
 - 线上 10 个菜单全部可打开
 - 线上首页 HTTP 200，引用正确 JS/CSS
-- MD5 本地与线上完全一致
-- Playwright 截图 3 张全部生成（case-archive / relief / workbench-filter），0 控制台错误
+- 真实验收截图 9 张全部生成
+- 所有弹窗按钮经真实点击验证（dispatchEvent 触发 Vue 事件）
 
 ---
 
@@ -77,21 +110,21 @@
 
 | 项 | 状态 |
 |---|---|
-| JS 文件大小 | 1,291,323 bytes |
-| CSS 文件大小 | 33,980 bytes |
+| JS 文件大小 | 1,292,888 bytes |
+| CSS 文件大小 | 40,925 bytes |
 | JS 权限 644 | ✅ |
 | CSS 权限 644 | ✅ |
-| JS HTTP 200 | ✅ |
-| CSS HTTP 200 | ✅ |
+| JS HTTP 200（服务器本地） | ✅ |
+| CSS HTTP 200（服务器本地） | ✅ |
 | 首页引用正确 JS/CSS | ✅ |
-| MD5 本地=线上 | ✅ (`8e11e22424486b3f6ba6bbd848f516b1` / `f851d71809c5abce5f007316baff74f1`) |
 
 ---
 
 ## 当前回滚点
 
-- **commit**: `37f3187`
+- **commit**: `a614b04`
 - **备份文件**: `index.html.bak-before-nav-filter-fix-20260426-2157`
+- **本次备份文件**: `index.html.bak-before-detail-function-layout-fix-20260427-085726`
 - **说明**: 回滚仅切 bundle 引用，不需要重新构建
 
 ---
@@ -103,7 +136,17 @@
 ```bash
 # 线上目录
 cd /var/www/case-management
-cp index.html.bak-before-nav-filter-fix-20260426-2157 index.html
+cp index.html.bak-before-detail-function-layout-fix-20260427-085726 index.html
+```
+
+### 回滚到上一稳定版本（本次 bundle）
+
+```bash
+# 线上目录
+# 上次的 JS/CSS 仍在线上 assets/ 目录
+# 只需切回旧引用
+# JS: index-DY5OGi-E.js
+# CSS: index-B1qeXMdA.css
 ```
 
 ### 需要同时回滚源码
@@ -111,7 +154,7 @@ cp index.html.bak-before-nav-filter-fix-20260426-2157 index.html
 ```bash
 # 本地源码
 cd /Users/huangcheng/.agents/skills/case-management
-git reset --hard 37f3187
+git reset --hard a614b04
 npm run build
 # 然后重新上传新的 bundle 到 /var/www/case-management/assets/
 ```
@@ -123,7 +166,15 @@ npm run build
 <details>
 <summary>展开历史基线记录</summary>
 
-### v2026-04-26-2159 导航修复 + 侧边栏统一 + 工作台筛选（当前）
+### v2026-04-27-0857 案件状态逻辑统一 + 布局按钮修复（当前）
+
+- commit: `f5a759d`
+- JS: `index-yZ3ZQfCG.js`
+- CSS: `index-CWJ6rqJm.css`
+- 上线时间: 2026-04-27 08:57
+- 备份文件: `index.html.bak-before-detail-function-layout-fix-20260427-085726`
+
+### v2026-04-26-2159 导航修复 + 侧边栏统一 + 工作台筛选
 
 - commit: `17b56bd`
 - JS: `index-DY5OGi-E.js`
