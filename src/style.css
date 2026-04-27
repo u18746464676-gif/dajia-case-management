@@ -1226,3 +1226,203 @@ button, input, select, textarea { font: inherit; }
   color: #fff;
   border-color: #1677ff;
 }
+
+/* ========== Modal ========== */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.case-modal {
+  width: 560px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+}
+
+.case-modal-header {
+  height: 56px;
+  padding: 0 18px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.case-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.case-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.case-modal-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.case-modal-body {
+  padding: 18px;
+}
+
+.case-modal-footer {
+  padding: 14px 18px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ========== Form Controls ========== */
+.case-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.case-form-field {
+  min-width: 0;
+}
+
+.case-form-field.full {
+  grid-column: 1 / -1;
+}
+
+.case-form-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.case-form-field input,
+.case-form-field select,
+.case-form-field textarea {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #111827;
+}
+
+.case-form-field textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+/* ========== Buttons ========== */
+.btn-primary {
+  height: 36px;
+  border-radius: 6px;
+  background: #1677ff;
+  color: #fff;
+  border: none;
+  padding: 0 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: #1673ee;
+}
+
+.btn-secondary {
+  height: 36px;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 0 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #f9fafb;
+}
+
+/* ========== Status Choice ========== */
+.status-choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-choice {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-choice:hover {
+  border-color: #9ca3af;
+}
+
+.status-choice.active {
+  border-color: #1677ff;
+  background: #eaf3ff;
+  color: #1677ff;
+}
+
+/* ========== Inline label/input (modal section) ========== */
+.case-modal-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.case-modal-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.case-modal-section-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.case-modal-section-row:last-child {
+  margin-bottom: 0;
+}

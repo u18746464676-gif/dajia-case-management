@@ -153,7 +153,7 @@
                   <h3 class="detail-section-title">流程状态摘要</h3>
                   <p class="detail-section-desc">这里只展示摘要和入口，完整编辑仍然只在“变更状态”弹窗中处理。</p>
                 </div>
-                <button class="detail-mini-btn" @click="showStatusModal = true">变更状态</button>
+                <button @click="openStatusModal" class="detail-btn detail-btn-primary">变更状态</button>
               </div>
 
               <div class="detail-flow-grid">
@@ -345,9 +345,9 @@
 
         <aside class="detail-action-panel detail-saas-card">
           <div class="detail-action-title">处置操作</div>
-          <button @click="showStatusModal = true" class="detail-btn detail-btn-primary">变更状态</button>
-          <button @click="showReplyModal = true" class="detail-btn">添加答复</button>
-          <button @click="showDocModal = true" class="detail-btn">上传文书</button>
+          <button @click="openStatusModal" class="detail-btn detail-btn-primary">变更状态</button>
+          <button @click="openReplyModal" class="detail-btn">添加答复</button>
+          <button @click="openDocModal" class="detail-btn">上传文书</button>
           <button @click="() => { if (openAINextStepDrawer) openAINextStepDrawer({ source: 'case-detail', caseNumber: c.caseNumber || '待生成', status: statusLabel(effectiveStatus), originalResult: c.reportResultStatus ? statusLabel(c.reportResultStatus) : '未登记', resultDate: c.reportResultDate || '-', currentReliefStatus: disposalRecords.length ? '已建立后续处置记录' : '未建立救济记录', relatedPathCount: disposalRecords.length, deadlineRisk: keyRiskSummary.title + '，' + keyRiskSummary.detail, priorityActions: ['准备行政复议', '建议优先级：高'], basis: ['已登记不利处理结果', '当前仍在可救济期限内', '建议优先准备复议材料'] }); else console.warn('openAINextStepDrawer not provided') }" class="detail-btn">AI分析下一步</button>
           <button @click="downloadCaseSummary" class="detail-btn">导出卷宗摘要</button>
           <button @click="printCaseDossier" class="detail-btn">打印卷宗</button>
@@ -434,7 +434,7 @@
                 <span>💬</span>
                 <span>流程答复记录</span>
               </h3>
-              <button @click="showReplyModal = true" class="btn-secondary">新增答复</button>
+              <button @click="openReplyModal" class="btn-secondary">新增答复</button>
             </div>
             <div v-if="!(c.replies || []).length" class="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 px-4 py-8 text-center text-sm text-slate-400 dark:text-slate-500">
               还没有答复记录
@@ -466,7 +466,7 @@
             <p class="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">把信封图片、官方答复、处罚决定、复议材料分开管理，卷宗会更清晰。</p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <button @click="showDocModal = true" class="btn-primary">新增文书</button>
+            <button @click="openDocModal" class="btn-primary">新增文书</button>
           </div>
         </div>
 
@@ -591,217 +591,175 @@
     </template>
 
 
-    <div v-if="showStatusModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showStatusModal = false">
-      <div class="flex max-h-[90vh] w-full max-w-xl flex-col rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
-        <h3 class="shrink-0 text-lg font-bold text-slate-800 dark:text-slate-100">变更案件状态</h3>
-        <div class="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
-          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-            <div class="mb-3 flex items-center justify-between gap-3">
-              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">适用规则版本</div>
-              <span class="text-xs text-slate-400">默认按签收日期判断，可手动覆盖</span>
-            </div>
-            <div class="flex flex-wrap gap-2">
+    <div v-if="showStatusModal" class="modal-mask" @click.self="closeStatusModal">
+      <div class="case-modal">
+        <div class="case-modal-header">
+          <span class="case-modal-title">变更案件状态</span>
+          <button class="case-modal-close" @click="openStatusModal">×</button>
+        </div>
+        <div class="case-modal-body">
+          <div class="case-modal-section">
+            <div class="case-modal-section-title">适用规则版本</div>
+            <div class="status-choice-row">
               <button
                 v-for="s in procedureVersionOptions"
                 :key="s.value"
                 @click="saveProcedureVersion(s.value)"
-                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
-                :class="c.procedureVersion === s.value ? 'border-amber-400 bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
-              >
-                <span>{{ s.label }}</span>
-              </button>
+                class="status-choice"
+                :class="c.procedureVersion === s.value ? 'active' : ''"
+              ><span>{{ s.label }}</span></button>
             </div>
           </div>
 
-
-
-          <!-- 受理状态 -->
-          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-            <div class="mb-3 flex items-center justify-between gap-3">
-              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">① 受理状态</div>
-              <button @click="clearAcceptanceStatus" class="text-xs text-rose-500 hover:text-rose-600">清空本段状态</button>
-            </div>
-            <div class="flex flex-wrap gap-2">
+          <div class="case-modal-section">
+            <div class="case-modal-section-title">① 受理状态</div>
+            <div class="status-choice-row">
               <button
                 v-for="s in acceptanceOptions"
                 :key="s.value"
                 @click="changeAcceptanceStatus(s.value)"
-                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
-                :class="c.acceptanceStatus === s.value ? 'border-blue-400 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
-              >
-                <span>{{ s.icon }}</span><span>{{ s.label }}</span>
-              </button>
+                class="status-choice"
+                :class="c.acceptanceStatus === s.value ? 'active' : ''"
+              ><span>{{ s.icon }}</span><span>{{ s.label }}</span></button>
             </div>
-            <div class="mt-3">
-              <label class="label">{{ c.acceptanceStatus === 'reported' ? '不予受理日期' : '受理日期' }}</label>
-              <input
-                :value="c.acceptanceDate || ''"
-                @change="saveAcceptanceDate($event.target.value)"
-                type="date"
-                class="input-field"
-              />
+            <div class="case-form-field" style="margin-top:10px">
+              <label>{{ c.acceptanceStatus === 'reported' ? '不予受理日期' : '受理日期' }}</label>
+              <input :value="c.acceptanceDate || ''" @change="saveAcceptanceDate($event.target.value)" type="date" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" />
             </div>
           </div>
 
-          <!-- 投诉跟进 -->
-          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-            <div class="mb-3 flex items-center justify-between gap-3">
-              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">② 投诉跟进</div>
-              <button @click="clearMediationStatus" class="text-xs text-rose-500 hover:text-rose-600">清空本段状态</button>
-            </div>
-            <div class="flex flex-wrap gap-2">
+          <div class="case-modal-section">
+            <div class="case-modal-section-title">② 投诉跟进</div>
+            <div class="status-choice-row">
               <button
                 v-for="s in mediationOptions"
                 :key="s.value"
                 @click="changeMediationStatus(s.value)"
-                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
-                :class="c.mediationStatus === s.value ? 'border-purple-400 bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
-              >
-                <span>{{ s.icon }}</span><span>{{ s.label }}</span>
-              </button>
+                class="status-choice"
+                :class="c.mediationStatus === s.value ? 'active' : ''"
+              ><span>{{ s.icon }}</span><span>{{ s.label }}</span></button>
             </div>
-            <div class="mt-3">
-              <label class="label">{{ c.mediationStatus === 'mediation_terminated' ? '终止调解日期' : '调解日期' }}</label>
-              <input
-                :value="c.mediationDate || ''"
-                @change="saveMediationDate($event.target.value)"
-                type="date"
-                class="input-field"
-              />
+            <div class="case-form-field" style="margin-top:10px">
+              <label>{{ c.mediationStatus === 'mediation_terminated' ? '终止调解日期' : '调解日期' }}</label>
+              <input :value="c.mediationDate || ''" @change="saveMediationDate($event.target.value)" type="date" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" />
             </div>
-            <div v-if="c.mediationStatus === 'decided'" class="mt-3 space-y-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 p-3">
-              <label class="label">赔偿金额（元）</label>
-              <div class="flex flex-wrap gap-2">
+            <div v-if="c.mediationStatus === 'decided'" style="margin-top:10px">
+              <label style="display:block;margin-bottom:6px;font-size:13px;color:#374151;font-weight:500">赔偿金额（元）</label>
+              <div class="status-choice-row">
                 <button
                   v-for="amount in compensationPresets"
                   :key="amount"
                   type="button"
                   @click="saveProfit(amount)"
-                  class="rounded-full border px-3 py-1.5 text-sm transition"
-                  :class="Number(c.profit || 0) === amount ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-slate-400 hover:text-slate-700 dark:text-slate-200'"
-                >
-                  {{ amount }}
-                </button>
+                  class="status-choice"
+                  :class="Number(c.profit || 0) === amount ? 'active' : ''"
+                >{{ amount }}</button>
               </div>
-              <input
-                :value="c.profit ?? ''"
-                @change="saveProfit($event.target.value)"
-                type="number"
-                step="0.01"
-                class="input-field"
-                placeholder="已调解后填写赔偿金额"
-              />
+              <input :value="c.profit ?? ''" @change="saveProfit($event.target.value)" type="number" step="0.01" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827;margin-top:8px" placeholder="已调解后填写赔偿金额" />
             </div>
           </div>
 
-          <!-- 举报结果 -->
-          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-            <div class="mb-3 flex items-center justify-between gap-3">
-              <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">③ 举报结果</div>
-              <div class="flex items-center gap-2">
-                <button
-                  v-if="c.procedureVersion === 'old' && c.filingStatus === 'filed'"
-                  @click="clearFilingQuickStatus"
-                  class="text-xs text-rose-500 hover:text-rose-600">清空已立案</button>
-                <button
-                  v-if="c.reportResultStatus"
-                  @click="clearReportResultStatus"
-                  class="text-xs text-rose-500 hover:text-rose-600">清空举报结果</button>
-              </div>
-            </div>
-            <div class="flex flex-wrap gap-2">
+          <div class="case-modal-section">
+            <div class="case-modal-section-title">③ 举报结果</div>
+            <div class="status-choice-row">
               <button
                 v-for="s in reportResultOptions"
                 :key="s.value"
                 @click="changeReportResultStatus(s.value)"
-                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
-                :class="c.reportResultStatus === s.value ? 'border-green-400 bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
-              >
-                <span>{{ s.icon }}</span><span>{{ s.label }}</span>
-              </button>
+                class="status-choice"
+                :class="c.reportResultStatus === s.value ? 'active' : ''"
+              ><span>{{ s.icon }}</span><span>{{ s.label }}</span></button>
               <button
                 v-if="c.procedureVersion === 'old'"
                 v-for="s in filingQuickOptions"
                 :key="s.value"
                 @click="changeFilingQuickStatus(s.value)"
-                class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition hover:border-slate-400 dark:border-slate-600"
-                :class="c.filingStatus === s.value ? 'border-amber-400 bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
-              >
-                <span>{{ s.icon }}</span><span>{{ s.label }}</span>
-              </button>
+                class="status-choice"
+                :class="c.filingStatus === s.value ? 'active' : ''"
+              ><span>{{ s.icon }}</span><span>{{ s.label }}</span></button>
             </div>
-            <div class="mt-3">
-              <label class="label">{{ reportDateLabel }}</label>
+            <div class="case-form-field" style="margin-top:10px">
+              <label>{{ reportDateLabel }}</label>
               <input
                 v-if="c.procedureVersion === 'old' && c.filingStatus === 'filed' && !c.reportResultStatus"
                 :value="c.filingDate || ''"
                 @change="saveFilingDate($event.target.value)"
                 type="date"
-                class="input-field"
+                style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827"
               />
               <input
                 v-else
                 :value="c.reportResultDate || ''"
                 @change="saveReportResultDate($event.target.value)"
                 type="date"
-                class="input-field"
+                style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827"
               />
             </div>
           </div>
         </div>
-        <div class="mt-4 shrink-0">
-          <button @click="showStatusModal = false" class="btn-secondary w-full">取消</button>
+        <div class="case-modal-footer">
+          <button @click="closeStatusModal" class="btn-secondary">取消</button>
         </div>
       </div>
     </div>
 
-    <div v-if="showReplyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showReplyModal = false">
-      <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
-        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">添加答复记录</h3>
-        <div class="mt-4 space-y-4">
-          <div>
-            <label class="label">日期</label>
-            <input v-model="replyForm.date" type="date" class="input-field" />
+    <div v-if="showReplyModal" class="modal-mask" @click.self="closeReplyModal">
+      <div class="case-modal" style="width:480px">
+        <div class="case-modal-header">
+          <span class="case-modal-title">添加答复记录</span>
+          <button class="case-modal-close" @click="openReplyModal">×</button>
+        </div>
+        <div class="case-modal-body">
+          <div class="case-form-grid">
+            <div class="case-form-field">
+              <label>日期</label>
+              <input v-model="replyForm.date" type="date" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" />
+            </div>
           </div>
-          <div>
-            <label class="label">答复内容</label>
-            <textarea v-model="replyForm.content" class="input-field min-h-32 resize-none" placeholder="官方答复内容..."></textarea>
+          <div class="case-form-field full" style="margin-top:14px">
+            <label>答复内容</label>
+            <textarea v-model="replyForm.content" style="width:100%;min-height:96px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827;resize:vertical" placeholder="官方答复内容..."></textarea>
           </div>
         </div>
-        <div class="mt-6 flex flex-col-reverse gap-3 md:flex-row">
-          <button @click="showReplyModal = false" class="btn-secondary flex-1">取消</button>
-          <button @click="submitReply" class="btn-primary flex-1">保存</button>
+        <div class="case-modal-footer">
+          <button @click="closeReplyModal" class="btn-secondary">取消</button>
+          <button @click="submitReply" class="btn-primary">保存</button>
         </div>
       </div>
     </div>
 
-    <div v-if="showDocModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" @click.self="showDocModal = false">
-      <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
-        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">新增文书材料</h3>
-        <div class="mt-4 space-y-4">
-          <div>
-            <label class="label">文件名</label>
-            <input v-model="docForm.name" type="text" class="input-field" placeholder="例：处罚决定书.pdf" />
-          </div>
-          <div>
-            <label class="label">文书分类</label>
-            <select v-model="docForm.category" class="input-field">
-              <option v-for="option in documentCategoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="label">本地上传文件</label>
-            <input ref="docFileInputRef" type="file" accept="image/*,.pdf,.doc,.docx" multiple class="input-field" @change="handleDocFileChange" />
-            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{{ selectedDocFiles.length ? (selectedDocFiles.length === 1 ? `已选择：${selectedDocFiles[0].name}` : `已选择 ${selectedDocFiles.length} 个文件`) : '支持图片、信封图片、Word、PDF' }}</div>
-          </div>
-          <div>
-            <label class="label">材料备注</label>
-            <textarea v-model="docForm.note" class="input-field min-h-24 resize-none" placeholder="补充这份材料的用途、来源或处理说明"></textarea>
+    <div v-if="showDocModal" class="modal-mask" @click.self="closeDocModal">
+      <div class="case-modal" style="width:520px">
+        <div class="case-modal-header">
+          <span class="case-modal-title">新增文书材料</span>
+          <button class="case-modal-close" @click="openDocModal">×</button>
+        </div>
+        <div class="case-modal-body">
+          <div class="case-form-grid">
+            <div class="case-form-field">
+              <label>文件名</label>
+              <input v-model="docForm.name" type="text" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" placeholder="例：处罚决定书.pdf" />
+            </div>
+            <div class="case-form-field">
+              <label>文书分类</label>
+              <select v-model="docForm.category" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827">
+                <option v-for="option in documentCategoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+              </select>
+            </div>
+            <div class="case-form-field full">
+              <label>本地上传文件</label>
+              <input ref="docFileInputRef" type="file" accept="image/*,.pdf,.doc,.docx" multiple style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:14px;background:#fff;color:#111827" @change="handleDocFileChange" />
+              <div style="margin-top:4px;font-size:12px;color:#6b7280">{{ selectedDocFiles.length ? (selectedDocFiles.length === 1 ? `已选择：${selectedDocFiles[0].name}` : `已选择 ${selectedDocFiles.length} 个文件`) : '支持图片、信封图片、Word、PDF' }}</div>
+            </div>
+            <div class="case-form-field full">
+              <label>材料备注</label>
+              <textarea v-model="docForm.note" style="width:100%;min-height:72px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827;resize:vertical" placeholder="补充这份材料的用途、来源或处理说明"></textarea>
+            </div>
           </div>
         </div>
-        <div class="mt-6 flex flex-col-reverse gap-3 md:flex-row">
-          <button @click="showDocModal = false" class="btn-secondary flex-1">取消</button>
-          <button @click="submitDoc" :disabled="docUploading" class="btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed">{{ docUploading ? '上传中...' : '保存' }}</button>
+        <div class="case-modal-footer">
+          <button @click="closeDocModal" class="btn-secondary">取消</button>
+          <button @click="submitDoc" :disabled="docUploading" class="btn-primary disabled:opacity-60 disabled:cursor-not-allowed">{{ docUploading ? '上传中...' : '保存' }}</button>
         </div>
       </div>
     </div>
@@ -854,6 +812,13 @@ const openAINextStepDrawer = inject('openAINextStepDrawer', null)
 const showStatusModal = ref(false)
 const showReplyModal = ref(false)
 const showDocModal = ref(false)
+
+function openStatusModal() { showStatusModal.value = true; showReplyModal.value = false; showDocModal.value = false }
+function openReplyModal() { showStatusModal.value = false; showReplyModal.value = true; showDocModal.value = false }
+function openDocModal() { showStatusModal.value = false; showReplyModal.value = false; showDocModal.value = true }
+function closeStatusModal() { showStatusModal.value = false }
+function closeReplyModal() { showReplyModal.value = false }
+function closeDocModal() { showDocModal.value = false }
 const activeDetailTab = ref('info')
 const disposalTabSelected = ref(false)
 const activeMaterialTab = ref('all')
