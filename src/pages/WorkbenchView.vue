@@ -20,7 +20,7 @@
 
     <div class="dashboard-layout">
       <div class="dashboard-main-column">
-        <div class="stat6-grid">
+        <div class="stat9-grid">
           <div
             class="stat-card"
             v-for="c in statCards"
@@ -174,33 +174,28 @@ const openAINextStepDrawer = inject('openAINextStepDrawer', null)
 
 const unfavorableResults = ['rejected', 'not_punished', 'mediation_terminated', 'exempted']
 
+function isAccepted(c) {
+  return c.acceptanceStatus === 'accepted' || c.acceptanceStatus === '已受理'
+}
+
+function isNotAccepted(c) {
+  return c.acceptanceStatus === 'not_accepted' || c.acceptanceStatus === 'rejected_acceptance' || c.acceptanceStatus === '不予受理'
+}
+
 // 工作台统计卡 - 真实数据驱动
 const statCards = computed(() => {
   const all = store.cases
-  const needOrganize = all.filter(c =>
-    !c.caseNumber || !c.shopName || !c.productName || !c.jurisdiction ||
-    (!c.mailTrackingNo && !c.trackingNumber && !c.expressNo)
-  ).length
-  const sent = all.filter(c => c.mailTrackingNo || c.trackingNumber || c.expressNo).length
-  const waitingReply = all.filter(c => c.signDate && !c.reportResultStatus).length
-  const canReconsiderCount = all.filter(c => {
-    if (!c.reportResultStatus || !unfavorableResults.includes(c.reportResultStatus)) return false
-    if (!c.reportResultDate) return false
-    return dayjs().diff(dayjs(c.reportResultDate), 'day') <= 60
-  }).length
-  const reviewDeadlineCount = all.filter(c => {
-    if (!c.reportResultStatus || !['rejected', 'not_punished', 'exempted'].includes(c.reportResultStatus)) return false
-    if (!c.reportResultDate) return false
-    const daysLeft = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day')
-    return daysLeft > 0 && daysLeft <= 7
-  }).length
+  const unaccepted = all.filter(c => !isAccepted(c) && !isNotAccepted(c))
   return [
-    { key: 'all', label: '案件总数', value: all.length, change: '', trend: '', icon: '📁', iconBg: '#e8f2ff', iconColor: '#1677ff' },
-    { key: 'needOrganize', label: '待整理', value: needOrganize, change: '', trend: '', icon: '🗂️', iconBg: '#f5f3ff', iconColor: '#8b5cf6' },
-    { key: 'sent', label: '已寄出', value: sent, change: '', trend: '', icon: '📮', iconBg: '#ecfdf5', iconColor: '#10b981' },
-    { key: 'waitingReply', label: '等待答复', value: waitingReply, change: '', trend: '', icon: '⏳', iconBg: '#fff7ed', iconColor: '#f59e0b' },
-    { key: 'canReconsider', label: '可复议', value: canReconsiderCount, change: '', trend: '', icon: '⚖️', iconBg: '#fef2f2', iconColor: '#ef4444' },
-    { key: 'deadline', label: '临期提醒', value: reviewDeadlineCount, change: '', trend: '', icon: '🔔', iconBg: '#fef9c3', iconColor: '#ca8a04' },
+    { key: 'all', label: '案件总数', value: all.length, icon: '📁', iconBg: '#e8f2ff', iconColor: '#1677ff' },
+    { key: 'accepted', label: '已受理', value: all.filter(isAccepted).length, icon: '📋', iconBg: '#f0fdf4', iconColor: '#16a34a' },
+    { key: 'notAccepted', label: '未受理', value: unaccepted.length, icon: '📝', iconBg: '#fffbeb', iconColor: '#d97706' },
+    { key: 'notAcceptedExplicit', label: '不予受理', value: all.filter(isNotAccepted).length, icon: '🚫', iconBg: '#fef2f2', iconColor: '#dc2626' },
+    { key: 'filed', label: '已立案', value: all.filter(c => ['filed', '已立案'].includes(c.filingStatus)).length, icon: '⚖️', iconBg: '#eff6ff', iconColor: '#2563eb' },
+    { key: 'rejected', label: '不予立案', value: all.filter(c => ['rejected', 'not_filed', '不予立案'].includes(c.reportResultStatus)).length, icon: '❌', iconBg: '#fff1f2', iconColor: '#be123c' },
+    { key: 'notPunished', label: '不予处罚', value: all.filter(c => ['not_punished', 'exempted', '违法事实不成立', '不予处罚'].includes(c.reportResultStatus)).length, icon: '🚫', iconBg: '#f5f3ff', iconColor: '#7c3aed' },
+    { key: 'penalized', label: '已处罚', value: all.filter(c => ['penalty', 'punished', '已处罚'].includes(c.reportResultStatus)).length, icon: '🔨', iconBg: '#fef3c7', iconColor: '#b45309' },
+    { key: 'decided', label: '已调解', value: all.filter(c => ['decided', 'mediation_success', '已调解'].includes(c.mediationStatus)).length, icon: '🤝', iconBg: '#ecfdf5', iconColor: '#059669' },
   ]
 })
 
@@ -226,11 +221,14 @@ const filteredWorkbenchCases = computed(() => {
   let filtered = all
   switch (activeMetric.value) {
     case 'all': filtered = all; break
-    case 'needOrganize': filtered = all.filter(c => !c.caseNumber || !c.shopName || !c.productName || !c.jurisdiction || (!c.mailTrackingNo && !c.trackingNumber && !c.expressNo)); break
-    case 'sent': filtered = all.filter(c => c.mailTrackingNo || c.trackingNumber || c.expressNo); break
-    case 'waitingReply': filtered = all.filter(c => c.signDate && !c.reportResultStatus); break
-    case 'canReconsider': filtered = all.filter(c => { if (!c.reportResultStatus || !unfavorableResults.includes(c.reportResultStatus) || !c.reportResultDate) return false; return dayjs().diff(dayjs(c.reportResultDate), 'day') <= 60 }); break
-    case 'deadline': filtered = all.filter(c => { if (!c.reportResultDate) return false; const d = 60 - dayjs().diff(dayjs(c.reportResultDate), 'day'); return d > 0 && d <= 7 }); break
+    case 'accepted': filtered = all.filter(c => c.acceptanceStatus === 'accepted'); break
+    case 'notAccepted': filtered = all.filter(c => !c.acceptanceStatus); break
+    case 'notAcceptedExplicit': filtered = all.filter(c => ['not_accepted', 'rejected_acceptance', '不予受理'].includes(c.acceptanceStatus)); break
+    case 'filed': filtered = all.filter(c => ['filed', '已立案'].includes(c.filingStatus)); break
+    case 'rejected': filtered = all.filter(c => ['rejected', 'not_filed', '不予立案'].includes(c.reportResultStatus)); break
+    case 'notPunished': filtered = all.filter(c => ['not_punished', 'exempted', '违法事实不成立', '不予处罚'].includes(c.reportResultStatus)); break
+    case 'penalized': filtered = all.filter(c => ['penalty', 'punished', '已处罚'].includes(c.reportResultStatus)); break
+    case 'decided': filtered = all.filter(c => ['decided', 'mediation_success', '已调解'].includes(c.mediationStatus)); break
     default: filtered = all
   }
   return filtered.map(c => {
