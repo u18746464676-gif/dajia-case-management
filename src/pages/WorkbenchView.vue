@@ -450,26 +450,30 @@ function toggleMetric(key) {
 }
 
 function handleTopbarSearch() {
-  if (!topbarSearch.value.trim()) {
-    activeMetric.value = null
-    return
-  }
-  activeMetric.value = null
+  topbarSearch.value = topbarSearch.value.trim()
 }
 
 function goToCasesArchive() {
-  const statusQuery = {
+  const statusQueryMap = {
     accepted: 'accepted',
+    notAccepted: 'reported',
     filed: 'filed',
     rejected: 'rejected',
-    notPunished: 'exempted',
-    punished: 'closed',
+    notPunished: 'not_punished',
     mediated: 'decided',
-  }[activeMetric.value]
+  }
+
+  const query = {}
+  if (activeMetric.value && statusQueryMap[activeMetric.value]) {
+    query.status = statusQueryMap[activeMetric.value]
+  }
+  if (activeMetric.value) {
+    query.workbenchMetric = activeMetric.value
+  }
 
   router.push({
     path: '/cases',
-    query: statusQuery ? { status: statusQuery } : {},
+    query,
   })
 }
 

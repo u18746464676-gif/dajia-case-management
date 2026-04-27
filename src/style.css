@@ -1455,7 +1455,7 @@ body:has(.workbench-app-shell) .app-shell > .main-wrapper > .main-content {
 .wb-sidebar {
   width: 224px;
   flex-shrink: 0;
-  min-height: calc(100vh - 64px);
+  min-height: 100vh;
   background: linear-gradient(180deg, #A60F17 0%, #970C14 48%, #7E0911 100%);
   padding: 0 16px 20px;
   display: flex;
