@@ -205,15 +205,15 @@
               <table class="follow-data-table">
                 <thead>
                   <tr>
-                    <th>案件编号</th>
-                    <th>店铺 / 商家</th>
-                    <th>商品 / 事项</th>
+                    <th>管辖局</th>
+                    <th>店铺名称</th>
+                    <th>商品名称</th>
+                    <th>执照名称</th>
                     <th>当前进度</th>
-                    <th>结果 / 答复日期</th>
+                    <th>签收日期</th>
+                    <th>结果日期</th>
                     <th>期限提醒</th>
-                    <th>我方下一步</th>
                     <th>金额</th>
-                    <th>更新时间</th>
                     <th>操作</th>
                   </tr>
                 </thead>
@@ -222,15 +222,15 @@
                     <td colspan="10" class="follow-empty-cell">当前分类暂无重点待跟进案件</td>
                   </tr>
                   <tr v-for="item in previewCases" :key="item.id">
-                    <td>{{ item.code }}</td>
+                    <td>{{ item.jurisdiction }}</td>
                     <td>{{ item.shop }}</td>
-                    <td>{{ item.subject }}</td>
+                    <td>{{ item.product }}</td>
+                    <td>{{ item.license }}</td>
                     <td><span class="status-chip" :class="item.progressClass">{{ item.progress }}</span></td>
-                    <td>{{ item.result }}</td>
+                    <td>{{ item.signDate }}</td>
+                    <td>{{ item.resultDate }}</td>
                     <td><span class="status-chip" :class="item.deadlineClass">{{ item.deadline }}</span></td>
-                    <td>{{ item.nextStep }}</td>
                     <td>{{ item.amount }}</td>
-                    <td>{{ item.updatedAt }}</td>
                     <td><button class="follow-view-btn" type="button" @click="goToCaseDetail(item.id)">查看</button></td>
                   </tr>
                 </tbody>
@@ -295,6 +295,19 @@ import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { useCaseStore } from '@/stores/case'
 import { uploadBase64ToTos, uploadWordToTos } from '@/lib/tos'
+import {
+  getCurrentProgress,
+  getStatusBadgeClass,
+  getJurisdiction,
+  getShopName,
+  getProductName,
+  getLicenseName,
+  getSignDate as getCaseSignDate,
+  getResultDate,
+  getDisplayAmount,
+  formatMoney as formatCaseMoney,
+} from '@/utils/caseStatus'
+import { getDeadlineReminder, getDeadlineLevel } from '@/utils/deadline'
 
 const router = useRouter()
 const store = useCaseStore()
@@ -608,72 +621,54 @@ function formatPreviewCase(caseItem) {
 
   return {
     id: caseItem.id,
-    code: caseItem.caseNumber || '待生成',
-    shop: caseItem.shopName || caseItem.licenseName || '-',
-    subject: caseItem.productName || caseItem.jurisdiction || '未填写',
+    jurisdiction: getJurisdiction(caseItem),
+    shop: getShopName(caseItem),
+    product: getProductName(caseItem),
+    license: getLicenseName(caseItem),
     progress: progressMeta.label,
     progressClass: progressMeta.className,
-    result: getResultDateText(caseItem),
+    signDate: formatDate(getCaseSignDate(caseItem)) || '-',
+    resultDate: formatDate(getResultDate(caseItem)) || '-',
     deadline: deadlineMeta.label,
     deadlineClass: deadlineMeta.className,
-    nextStep: getNextStepText(caseItem),
     amount: getAmountText(caseItem),
-    updatedAt: formatDateTime(caseItem.updatedAt || caseItem.createdAt),
   }
 }
 
+function mapStatusChipClass(className) {
+  return {
+    'badge-abnormal': 'chip-abnormal',
+    'badge-filed': 'chip-filed',
+    'badge-not-filed': 'chip-not-filed',
+    'badge-mediated': 'chip-mediated',
+    'badge-punished': 'chip-filed',
+    'badge-corrected': 'chip-waiting',
+    'badge-not-punished': 'chip-waiting',
+    'badge-accepted': 'chip-signed',
+    'badge-not-accepted': 'chip-not-filed',
+    'badge-presumed': 'chip-waiting',
+    'badge-unaccepted': 'chip-waiting',
+  }[className] || 'chip-waiting'
+}
+
 function getProgressMeta(caseItem) {
-  if (isAbnormal(caseItem)) return { label: '列入异常', className: 'chip-abnormal' }
-  if (isFiled(caseItem)) return { label: '已立案', className: 'chip-filed' }
-  if (isNotFiled(caseItem)) return { label: '不予立案', className: 'chip-not-filed' }
-  if (isMediated(caseItem)) return { label: '已调解', className: 'chip-mediated' }
-  if (caseItem.mediationStatus === 'mediation_terminated' || caseItem.mediationStatus === '终止调解') return { label: '终止调解', className: 'chip-signed' }
-  if (caseItem.reportResultStatus === 'penalty' || caseItem.reportResultStatus === 'punished' || caseItem.reportResultStatus === '已处罚') return { label: '已处罚', className: 'chip-filed' }
-  if (caseItem.reportResultStatus === 'not_punished' || caseItem.reportResultStatus === 'exempted' || caseItem.reportResultStatus === '违法事实不成立' || caseItem.reportResultStatus === '不予处罚') return { label: '不予处罚', className: 'chip-waiting' }
-  if (isAccepted(caseItem)) return { label: '已受理', className: 'chip-signed' }
-  if (isNotAccepted(caseItem)) return { label: '不予受理', className: 'chip-not-filed' }
-  return { label: '待整理', className: 'chip-waiting' }
+  return {
+    label: getCurrentProgress(caseItem),
+    className: mapStatusChipClass(getStatusBadgeClass(caseItem)),
+  }
 }
 
 function getDeadlineState(caseItem) {
-  if (isFinalCase(caseItem)) return { label: '正常', state: 'normal', className: 'deadline-normal' }
-
-  const baseDate = caseItem.signDate || caseItem.acceptanceDate || caseItem.submitDate || caseItem.createdAt
-  const parsed = dayjs(baseDate)
-  if (!parsed.isValid()) return { label: '正常', state: 'normal', className: 'deadline-normal' }
-
-  const deadlineAt = parsed.add(15, 'day')
-  const diff = deadlineAt.startOf('day').diff(dayjs().startOf('day'), 'day')
-
-  if (diff < 0) return { label: '已超期', state: 'overdue', className: 'deadline-overdue' }
-  if (diff <= 3) return { label: '临期', state: 'soon', className: 'deadline-soon' }
-  return { label: '正常', state: 'normal', className: 'deadline-normal' }
-}
-
-function getNextStepText(caseItem) {
-  if (isAbnormal(caseItem)) return '优先人工复核并补充说明'
-  if (isPendingAcceptance(caseItem)) return '补齐受理材料并登记状态'
-  if (isAccepted(caseItem) && !isFiled(caseItem) && !isNotFiled(caseItem)) return '跟进机关处理进度'
-  if (isFiled(caseItem)) return '整理立案后续材料'
-  if (isNotFiled(caseItem)) return '评估复议或补证路径'
-  if (isNotPunished(caseItem)) return '核对处理依据并留存材料'
-  if (isPunished(caseItem)) return '跟进处罚执行与回款'
-  if (isMediated(caseItem)) return '归档调解结果与凭证'
-  return '补录节点信息'
-}
-
-function getResultDateText(caseItem) {
-  const dateValue = caseItem.reportResultDate || caseItem.mediationDate || caseItem.signDate || caseItem.updatedAt
-  const label = getProgressMeta(caseItem).label
-  return dateValue ? `${label} · ${formatDate(dateValue)}` : label
+  const reminder = getDeadlineReminder(caseItem)
+  return {
+    label: reminder.text || '未签收，暂不计算期限',
+    state: reminder.level || 'muted',
+    className: getDeadlineLevel(reminder.level),
+  }
 }
 
 function getAmountText(caseItem) {
-  const profit = Number(caseItem.profit || 0)
-  const expense = Number(caseItem.expense || 0)
-  if (profit > 0) return `赔付 ${formatCurrency(profit)}`
-  if (expense > 0) return `支出 ${formatCurrency(expense)}`
-  return '-'
+  return formatCaseMoney(getDisplayAmount(caseItem))
 }
 
 function getFileTypeLabel(item = {}) {

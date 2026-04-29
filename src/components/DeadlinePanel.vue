@@ -100,7 +100,7 @@
         <span class="text-xl">⚠️</span>
         <span class="font-semibold">已超过法定受理期限</span>
       </div>
-      <p class="text-sm text-red-500 mt-1">自签收之日起已超过10个工作日，请尽快处理</p>
+      <p class="text-sm text-red-500 mt-1">自签收之日起已超过7个工作日，请尽快处理</p>
     </div>
 
     <!-- 自定义时限 -->
@@ -232,9 +232,11 @@ function buildReviewDisposalPayload(c) {
       jurisdiction: c.jurisdiction || '',
       reportResult: c.reportResultStatus || '',
       reportResultLabel: {
+        penalty: '已处罚',
         closed: '已处罚',
         rejected: '不予立案',
-        not_punished: '责令改正',
+        ordered_correction: '责令改正',
+        not_punished: '不予处罚',
         exempted: '不予处罚',
       }[c.reportResultStatus] || c.reportResultStatus || '',
       reportResultDate: c.reportResultDate || '',
@@ -248,9 +250,11 @@ function buildReviewDisposalPayload(c) {
       submitDate: dayjs().format('YYYY-MM-DD'),
       status: '拟申请',
       resultSummary: c.reportResultStatus ? `举报结果：${{
+        penalty: '已处罚',
         closed: '已处罚',
         rejected: '不予立案',
-        not_punished: '责令改正',
+        ordered_correction: '责令改正',
+        not_punished: '不予处罚',
         exempted: '不予处罚',
       }[c.reportResultStatus] || c.reportResultStatus}` : '',
       reviewStartDate: c.reportResultDate || '',
@@ -309,13 +313,13 @@ function buildMediationDisposalPayload(c, type, deadline, daysLeft) {
   }
 }
 
-// 检查是否超过法定受理期限（未受理状态下，签收日期起10个工作日）
+// 检查是否超过法定受理期限（未受理状态下，签收日期起7个工作日）
 const overdueAlert = computed(() => {
   const c = props.caseObj
   // 有受理状态后不再提示受理超期
   if (c.acceptanceStatus && c.signDate) return false
   if (!c.acceptanceStatus && c.signDate) {
-    const deadline = addWorkingDays(c.signDate, 10)
+    const deadline = addWorkingDays(c.signDate, 7)
     const workingDaysLeft = workingDaysDiff(dayjs(), deadline)
     return workingDaysLeft < 0
   }
@@ -439,13 +443,13 @@ const legalDeadlines = computed(() => {
     && !!c.filingDate
     && !hasReportTerminalOutcome
 
-  const shouldShowReviewReminder = ['rejected', 'exempted'].includes(c.reportResultStatus) && Boolean(c.reportResultDate)
+  const shouldShowReviewReminder = ['rejected', 'ordered_correction', 'not_punished', 'exempted'].includes(c.reportResultStatus) && Boolean(c.reportResultDate)
   const isOldProcedure = c.procedureVersion === 'old'
 
   if (!c.acceptanceStatus && c.signDate) {
     const acceptanceDeadline = addWorkingDays(c.signDate, 10)
     const acceptanceDaysLeft = workingDaysDiff(dayjs(), acceptanceDeadline)
-    list.push(buildCountdownItem('受理到期日（10个工作日）', acceptanceDeadline, acceptanceDaysLeft, 'acceptance', { urgentThreshold: 3 }))
+    list.push(buildCountdownItem('投诉受理到期日（7个工作日）', acceptanceDeadline, acceptanceDaysLeft, 'acceptance', { urgentThreshold: 3 }))
   }
 
   if (hasOldRuleFilingCountdown) {
@@ -509,7 +513,7 @@ const legalDeadlines = computed(() => {
 
   if (c.mediationStatus === 'decided') {
     list.push({
-      name: '案件已调解',
+      name: '已调解，案件结束',
       date: c.mediationDate || '',
       statusText: '',
       urgent: false,
@@ -521,7 +525,7 @@ const legalDeadlines = computed(() => {
   }
   if (c.mediationStatus === 'mediation_terminated') {
     list.push({
-      name: '调解已终止',
+      name: '终止调解',
       date: c.mediationDate || '',
       statusText: '',
       urgent: false,
@@ -534,9 +538,11 @@ const legalDeadlines = computed(() => {
 
   if (c.reportResultStatus) {
     const reportLabels = {
+      penalty: '已处罚',
       closed: '已处罚',
       rejected: '不予立案',
-      not_punished: '责令改正',
+      ordered_correction: '责令改正',
+      not_punished: '不予处罚',
       exempted: '不予处罚',
     }
     list.push({
