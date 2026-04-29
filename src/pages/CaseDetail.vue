@@ -623,8 +623,8 @@
               ><span>{{ s.icon }}</span><span>{{ s.label }}</span></button>
             </div>
             <div class="case-form-field" style="margin-top:10px">
-              <label>{{ c.acceptanceStatus === 'reported' ? '不予受理日期' : '受理日期' }}</label>
-              <input :value="c.acceptanceDate || ''" @change="saveAcceptanceDate($event.target.value)" type="date" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" />
+              <label>{{ c.acceptanceStatus === 'not_accepted' ? '不予受理日期' : '受理日期' }}</label>
+              <input :value="c.acceptanceStatus === 'not_accepted' ? (c.reportResultDate || '') : (c.acceptanceDate || '')" @change="saveAcceptanceDate($event.target.value)" type="date" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" />
             </div>
           </div>
 
@@ -652,10 +652,14 @@
                   type="button"
                   @click="saveProfit(amount)"
                   class="status-choice"
-                  :class="Number(c.profit || 0) === amount ? 'active' : ''"
+                  :class="Number(c.compensationAmount || c.profit || 0) === amount ? 'active' : ''"
                 >{{ amount }}</button>
               </div>
-              <input :value="c.profit ?? ''" @change="saveProfit($event.target.value)" type="number" step="0.01" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827;margin-top:8px" placeholder="已调解后填写赔偿金额" />
+              <input :value="c.compensationAmount ?? c.profit ?? ''" @change="saveProfit($event.target.value)" type="number" step="0.01" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827;margin-top:8px" placeholder="已调解后填写赔偿金额" />
+            </div>
+            <div v-if="c.mediationStatus === 'mediation_terminated'" class="case-form-field" style="margin-top:10px">
+              <label>终止原因</label>
+              <input :value="c.mediationEndReason || ''" @change="saveField('mediationEndReason', $event.target.value)" type="text" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" placeholder="输入终止原因" />
             </div>
           </div>
 
@@ -694,6 +698,41 @@
                 type="date"
                 style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827"
               />
+            </div>
+            <div v-if="c.reportResultStatus === 'ordered_correction'" class="case-form-field" style="margin-top:10px">
+              <label>责令改正内容</label>
+              <input :value="c.correctionContent || ''" @change="saveField('correctionContent', $event.target.value)" type="text" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" placeholder="输入责令改正内容" />
+            </div>
+            <template v-if="c.reportResultStatus === 'penalty'">
+              <div class="case-form-field" style="margin-top:10px">
+                <label>处罚金额</label>
+                <input :value="c.penaltyAmount ?? ''" @change="saveField('penaltyAmount', Number($event.target.value || 0))" type="number" step="0.01" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" placeholder="输入处罚金额" />
+              </div>
+              <div class="case-form-field" style="margin-top:10px">
+                <label>处罚内容</label>
+                <input :value="c.penaltyContent || ''" @change="saveField('penaltyContent', $event.target.value)" type="text" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" placeholder="输入处罚内容" />
+              </div>
+            </template>
+          </div>
+
+          <div class="case-modal-section">
+            <div class="case-modal-section-title">④ 异常状态</div>
+            <div class="status-choice-row">
+              <button
+                v-for="s in abnormalOptions"
+                :key="s.value"
+                @click="changeAbnormalStatus(s.value)"
+                class="status-choice"
+                :class="(c.abnormalStatus || c.isAbnormal) ? 'active' : ''"
+              ><span>{{ s.icon }}</span><span>{{ s.label }}</span></button>
+            </div>
+            <div v-if="c.abnormalStatus || c.isAbnormal" class="case-form-field" style="margin-top:10px">
+              <label>异常日期</label>
+              <input :value="c.abnormalDate || ''" @change="saveField('abnormalDate', $event.target.value || null)" type="date" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" />
+            </div>
+            <div v-if="c.abnormalStatus || c.isAbnormal" class="case-form-field" style="margin-top:10px">
+              <label>异常原因</label>
+              <input :value="c.abnormalReason || ''" @change="saveField('abnormalReason', $event.target.value)" type="text" style="width:100%;min-height:36px;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff;color:#111827" placeholder="输入异常原因" />
             </div>
           </div>
         </div>
@@ -803,6 +842,7 @@ import dayjs from 'dayjs'
 import { formatAmount } from '@/lib/case-status'
 import { uploadBase64ToTos, uploadWordToTos } from '@/lib/tos'
 import { readFileAsDataUrl } from '@/lib/document-processing'
+import { getDeadlineReminder } from '@/utils/deadline'
 
 const route = useRoute()
 const router = useRouter()
@@ -1069,25 +1109,30 @@ const secondaryTitle = computed(() => {
 // 终态综合状态：已调解最优先，其次举报结果，其次终止调解，最后受理状态
 // 如果所有子状态字段都为空，则直接视为"未受理"，不受原 c.status 影响
 const effectiveStatus = computed(() => {
-  const cv = caseData.value
-  if (!cv) return 'pending_report'
+  const cv = caseData.value || {}
+  if (cv.abnormalStatus || cv.isAbnormal) return 'abnormal'
   if (cv.mediationStatus === 'decided') return 'decided'
-  if (cv.reportResultStatus) return cv.reportResultStatus
+  if (['penalty', 'punished', 'closed'].includes(cv.reportResultStatus)) return 'penalty'
+  if (['ordered_correction', 'corrected', '责令改正'].includes(cv.reportResultStatus)) return 'ordered_correction'
+  if (['not_punished', 'exempted', '不予处罚', '违法事实不成立'].includes(cv.reportResultStatus)) return 'not_punished'
+  if (['rejected', 'not_filed', '不予立案'].includes(cv.reportResultStatus)) return 'rejected'
+  if (['not_accepted', 'reported', 'rejected_acceptance', '不予受理'].includes(cv.acceptanceStatus)) return 'not_accepted'
   if (cv.procedureVersion === 'old' && cv.filingStatus === 'filed' && !cv.reportResultStatus) return 'filed'
-  if (cv.acceptanceStatus) return cv.acceptanceStatus
+  if (cv.acceptanceStatus === 'accepted') return 'accepted'
   if (cv.mediationStatus === 'mediation_terminated') return 'mediation_terminated'
-  return cv.status || 'pending_report'
+  return 'pending_report'
 })
 const statusOptions = [
-  { value: 'pending_report', label: '未受理', icon: '⏳' },
   { value: 'accepted', label: '已受理', icon: '✅' },
-  { value: 'reported', label: '不予受理', icon: '📝' },
+  { value: 'not_accepted', label: '不予受理', icon: '📝' },
   { value: 'decided', label: '已调解', icon: '🤝' },
-  { value: 'closed', label: '已处罚', icon: '⚖️' },
-  { value: 'rejected', label: '不予立案', icon: '❌' },
-  { value: 'not_punished', label: '责令改正', icon: '🚫' },
-  { value: 'exempted', label: '不予处罚', icon: '🚫' },
   { value: 'mediation_terminated', label: '终止调解', icon: '✖️' },
+  { value: 'filed', label: '已立案', icon: '📋' },
+  { value: 'rejected', label: '不予立案', icon: '❌' },
+  { value: 'ordered_correction', label: '责令改正', icon: '🛠️' },
+  { value: 'penalty', label: '已处罚', icon: '⚖️' },
+  { value: 'not_punished', label: '不予处罚', icon: '🚫' },
+  { value: 'abnormal', label: '列入异常', icon: '⚠️' },
 ]
 
 const procedureVersionOptions = [
@@ -1103,34 +1148,23 @@ const filingStatusOptions = [
 ]
 
 const keyRiskSummary = computed(() => {
-  const cv = c.value || {}
-  if (['rejected', 'exempted'].includes(cv.reportResultStatus) && cv.reportResultDate) {
-    const deadline60 = dayjs(cv.reportResultDate).add(60, 'day')
-    const daysLeft = deadline60.diff(dayjs(), 'day')
+  const reminder = getDeadlineReminder(c.value || {})
+  if (!reminder?.text) {
     return {
-      title: daysLeft >= 0 ? `复议期限${daysLeft === 0 ? '今日到期' : `剩余 ${daysLeft} 天`}` : `复议期限已超期 ${Math.abs(daysLeft)} 天`,
-      detail: `结果日期：${cv.reportResultDate}，60 日节点：${deadline60.format('YYYY-MM-DD')}`,
-    }
-  }
-  if (cv.acceptanceStatus === 'accepted' && cv.acceptanceDate && !cv.mediationStatus) {
-    const isOld = cv.procedureVersion === 'old'
-    const deadline = isOld ? addWorkdayForDetail(cv.acceptanceDate, 45) : dayjs(cv.acceptanceDate).add(60, 'day')
-    const daysLeft = deadline.diff(dayjs(), 'day')
-    return {
-      title: isOld ? '关注调解 45 个工作日' : '关注调解 60 日时限',
-      detail: `截止：${deadline.format('YYYY-MM-DD')}，${daysLeft >= 0 ? `剩余 ${daysLeft} 天` : `已超期 ${Math.abs(daysLeft)} 天`}`,
+      title: '当前暂无高优先级风险',
+      detail: '关键期限会随受理、调解、举报结果自动变化，这里只做摘要提示。',
     }
   }
   return {
-    title: '当前暂无高优先级风险',
-    detail: '关键期限会随受理、调解、举报结果自动变化，这里只做摘要提示。',
+    title: reminder.text,
+    detail: '期限口径已统一到案件状态与法定期限规则。',
   }
 })
 
 function statusToneClass(status) {
-  if (['rejected', 'reported', 'exempted', 'mediation_terminated'].includes(status)) return 'detail-pill-danger'
+  if (['rejected', 'not_accepted', 'mediation_terminated', 'abnormal'].includes(status)) return 'detail-pill-danger'
   if (status === 'filed') return 'detail-pill-info'
-  if (['closed', 'decided'].includes(status)) return 'detail-pill-success'
+  if (['penalty', 'decided'].includes(status)) return 'detail-pill-success'
   return 'detail-pill-neutral'
 }
 
@@ -1165,9 +1199,9 @@ const filingReminders = computed(() => {
         : '当前为新规案件，无需补旧规立案日期。',
     },
     {
-      done: cv.mediationStatus !== 'decided' || Boolean(cv.profit),
+      done: cv.mediationStatus !== 'decided' || Boolean(cv.compensationAmount || cv.profit),
       text: cv.mediationStatus === 'decided'
-        ? (cv.profit ? '已调解案件赔偿金额已填写。' : '已调解案件建议补齐赔偿金额。')
+        ? ((cv.compensationAmount || cv.profit) ? '已调解案件赔偿金额已填写。' : '已调解案件建议补齐赔偿金额。')
         : '当前不是已调解案件，无需填写赔偿金额。',
     },
     {
@@ -1181,7 +1215,7 @@ const filingReminders = computed(() => {
 
 const acceptanceOptions = [
   { value: 'accepted', label: '已受理', icon: '✅' },
-  { value: 'reported', label: '不予受理', icon: '📝' },
+  { value: 'not_accepted', label: '不予受理', icon: '📝' },
 ]
 
 const mediationOptions = [
@@ -1191,6 +1225,10 @@ const mediationOptions = [
 
 const filingQuickOptions = [
   { value: 'filed', label: '已立案', icon: '📋' },
+]
+
+const abnormalOptions = [
+  { value: 'abnormal', label: '列入异常', icon: '⚠️' },
 ]
 
 // 举报结果区域日期框 label：已立案时显示“立案日期”，其他显示“举报结果日期”
@@ -1203,22 +1241,25 @@ const reportDateLabel = computed(() => {
 })
 
 const reportResultOptions = [
-  { value: 'closed', label: '已处罚', icon: '⚖️' },
   { value: 'rejected', label: '不予立案', icon: '❌' },
-  { value: 'not_punished', label: '责令改正', icon: '🚫' },
-  { value: 'exempted', label: '不予处罚', icon: '🚫' },
+  { value: 'ordered_correction', label: '责令改正', icon: '🛠️' },
+  { value: 'penalty', label: '已处罚', icon: '⚖️' },
+  { value: 'not_punished', label: '不予处罚', icon: '🚫' },
 ]
 
 const statusLabels = {
   pending_report: '未受理',
   accepted: '已受理',
+  not_accepted: '不予受理',
   reported: '不予受理',
   decided: '已调解',
-  closed: '已处罚',
-  rejected: '不予立案',
-  not_punished: '责令改正',
-  exempted: '不予处罚',
   mediation_terminated: '终止调解',
+  filed: '已立案',
+  rejected: '不予立案',
+  ordered_correction: '责令改正',
+  penalty: '已处罚',
+  not_punished: '不予处罚',
+  abnormal: '列入异常',
 }
 
 const timelineItems = computed(() => {
@@ -1505,7 +1546,7 @@ function buildCaseSummaryText() {
 
   const baseInfo = [
     ['案件编号', c.value.caseNumber || ''],
-    ['当前状态', statusLabel(c.value.status)],
+    ['当前状态', statusLabel(effectiveStatus.value)],
     ['执照名称', c.value.licenseName || ''],
     ['店铺名称', c.value.shopName || ''],
     ['商品名称', c.value.productName || ''],
@@ -1653,9 +1694,14 @@ function saveFilingNote(value) {
 }
 
 async function saveProfit(value) {
-  const normalized = value === '' || value === null || value === undefined ? '' : Number(value)
+  const normalized = value === '' || value === null || value === undefined ? 0 : Number(value)
   c.value.profit = normalized
-  await store.updateCase(c.value.id, { profit: normalized })
+  c.value.compensationAmount = normalized
+  await store.updateCase(c.value.id, {
+    profit: normalized,
+    compensationAmount: normalized,
+    paymentStatus: normalized > 0 ? 'paid' : c.value.paymentStatus,
+  })
   loadCase()
 }
 
@@ -1876,6 +1922,14 @@ function clearStatusSection(statusField, dateField) {
 }
 
 function changeAcceptanceStatus(newStatus) {
+  if (newStatus === 'not_accepted') {
+    store.updateCase(c.value.id, {
+      acceptanceStatus: 'not_accepted',
+      reportResultDate: c.value.reportResultDate || dayjs().format('YYYY-MM-DD'),
+    })
+    loadCase()
+    return
+  }
   updateStatusSection('acceptanceStatus', 'acceptanceDate', newStatus)
 }
 
@@ -1884,7 +1938,11 @@ function clearAcceptanceStatus() {
 }
 
 function saveAcceptanceDate(value) {
-  store.updateCase(c.value.id, { acceptanceDate: value || null })
+  if (c.value.acceptanceStatus === 'not_accepted') {
+    store.updateCase(c.value.id, { reportResultDate: value || null })
+  } else {
+    store.updateCase(c.value.id, { acceptanceDate: value || null })
+  }
   loadCase()
 }
 
@@ -1902,10 +1960,18 @@ function saveMediationDate(value) {
 }
 
 function changeReportResultStatus(newStatus) {
-  // 只写举报结果字段，不触碰 filingStatus / filingDate
   store.updateCase(c.value.id, {
     reportResultStatus: newStatus,
     reportResultDate: c.value.reportResultDate || dayjs().format('YYYY-MM-DD'),
+  })
+  loadCase()
+}
+
+function changeAbnormalStatus() {
+  store.updateCase(c.value.id, {
+    abnormalStatus: true,
+    isAbnormal: true,
+    abnormalDate: c.value.abnormalDate || dayjs().format('YYYY-MM-DD'),
   })
   loadCase()
 }

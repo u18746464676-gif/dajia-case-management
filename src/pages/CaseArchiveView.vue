@@ -60,8 +60,8 @@
         <div class="filter-field"><label>案件类型</label><select class="filter-select"><option>全部类型</option><option>投诉举报</option><option>信息公开</option><option>行政复议</option></select></div>
         <div class="filter-field"><label>平台来源</label><select class="filter-select"><option>平台来源</option><option>拼多多</option><option>淘宝</option><option>京东</option></select></div>
         <div class="filter-field"><label>管辖局</label><input class="filter-input" placeholder="输入管辖局" /></div>
-        <div class="filter-field"><label>店铺 / 商家</label><input class="filter-input" placeholder="输入店铺 / 商家" /></div>
-        <div class="filter-field"><label>商品 / 事项</label><input class="filter-input" placeholder="输入商品 / 事项" /></div>
+        <div class="filter-field"><label>店铺名称</label><input class="filter-input" placeholder="输入店铺名称" /></div>
+        <div class="filter-field"><label>商品名称</label><input class="filter-input" placeholder="输入商品名称" /></div>
         <div class="filter-field"><label>答复结果</label><select class="filter-select"><option>答复结果</option><option>不予立案</option><option>责令整改</option></select></div>
         <div class="filter-field"><label>是否归档</label><select class="filter-select"><option>是否归档</option><option>未归档</option><option>已归档</option></select></div>
         <div class="filter-field"><label>是否已回款</label><select class="filter-select"><option>是否已回款</option><option>未回款</option><option>已回款</option></select></div>
@@ -94,42 +94,33 @@
         <thead>
           <tr>
             <th><input type="checkbox" :checked="isAllPageSelected" @change="toggleSelectAllPage" /></th>
-            <th>案件编号</th>
-            <th>店铺 / 商家</th>
-            <th>商品 / 事项</th>
-            <th>平台来源</th>
-            <th>当前进度</th>
             <th>管辖局</th>
+            <th>店铺名称</th>
+            <th>商品名称</th>
+            <th>执照名称</th>
+            <th>当前进度</th>
             <th>签收日期</th>
-            <th>答复结果</th>
-            <th>金额(元)</th>
-            <th>更新时间</th>
-            <th>是否归档</th>
+            <th>结果日期</th>
+            <th>期限提醒</th>
+            <th>金额</th>
             <th>操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="filteredCases.length === 0">
-            <td colspan="13" class="empty-cell">暂无符合条件的案件</td>
+            <td colspan="11" class="empty-cell">暂无符合条件的案件</td>
           </tr>
           <tr v-for="caseItem in paginatedCases" :key="caseItem.id">
             <td><input type="checkbox" :checked="selectedIds.includes(caseItem.id)" @change="toggleSelect(caseItem.id)" /></td>
-            <td>{{ caseItem.caseNumber || '待生成' }}</td>
-            <td>
-              <div class="double-line-cell">
-                <div>{{ getPrimaryCaseName(caseItem) }}</div>
-                <div class="sub-line">{{ caseItem.shopName || '-' }}</div>
-              </div>
-            </td>
-            <td>{{ caseItem.productName || '-' }}</td>
-            <td>{{ caseItem.platformSource || '未填写' }}</td>
-            <td><StatusBadge :status="getEffectiveStatus(caseItem)" :profit="caseItem.profit" /></td>
-            <td>{{ caseItem.jurisdiction || '未填写' }}</td>
-            <td>{{ caseItem.signDate || '-' }}</td>
-            <td>{{ caseItem.reportResultStatus ? getStatusLabel(caseItem.reportResultStatus) : '-' }}</td>
-            <td>{{ formatMoney(caseItem.expense) }}</td>
-            <td>{{ formatCaseDate(caseItem.updatedAt) }}</td>
-            <td>{{ caseItem.isArchived ? '已归档' : '未归档' }}</td>
+            <td>{{ getJurisdiction(caseItem) }}</td>
+            <td>{{ getShopName(caseItem) }}</td>
+            <td>{{ getProductName(caseItem) }}</td>
+            <td>{{ getLicenseName(caseItem) }}</td>
+            <td><StatusBadge :status="getStatusForBadge(caseItem)" :profit="caseItem.compensationAmount || caseItem.profit" /></td>
+            <td>{{ getSignDate(caseItem) || '-' }}</td>
+            <td>{{ getResultDate(caseItem) || '-' }}</td>
+            <td>{{ getDeadlineReminder(caseItem).text || '-' }}</td>
+            <td>{{ formatMoney(getDisplayAmount(caseItem)) }}</td>
             <td>
               <div class="table-actions">
                 <router-link :to="'/case/' + caseItem.id" class="btn-link">查看</router-link>
@@ -168,8 +159,29 @@ import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { formatAmount } from '@/lib/case-status'
 import { useCaseStore } from '@/stores/case'
+import {
+  getCurrentProgress,
+  getStatusBadgeClass,
+  getJurisdiction,
+  getShopName,
+  getProductName,
+  getLicenseName,
+  getSignDate,
+  getResultDate,
+  getDisplayAmount,
+  formatMoney,
+  isAccepted,
+  isNotAccepted,
+  isUnaccepted,
+  isFiled,
+  isRejectedFiling,
+  isNotPunished,
+  isPenalty,
+  isMediated,
+  isAbnormal,
+} from '@/utils/caseStatus'
+import { getDeadlineReminder } from '@/utils/deadline'
 
 const store = useCaseStore()
 const route = useRoute()
@@ -192,44 +204,15 @@ const showCloudFiles = ref(false)
 
 const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
 const statusOptions = [
-  { value: 'pending_report', label: '待举报' },
   { value: 'accepted', label: '已受理' },
-  { value: 'reported', label: '不予受理' },
+  { value: 'notAccepted', label: '不予受理' },
   { value: 'filed', label: '已立案' },
-  { value: 'decided', label: '已调解' },
   { value: 'rejected', label: '不予立案' },
-  { value: 'not_punished', label: '责令改正' },
-  { value: 'exempted', label: '不予处罚' },
-  { value: 'mediation_terminated', label: '终止调解' },
+  { value: 'notPunished', label: '不予处罚' },
+  { value: 'punished', label: '已处罚' },
+  { value: 'mediated', label: '已调解' },
+  { value: 'abnormal', label: '列入异常' },
 ]
-
-function getEffectiveStatus(c) {
-  if (c.mediationStatus === 'decided') return 'decided'
-  if (c.reportResultStatus) return c.reportResultStatus
-  if (c.procedureVersion === 'old' && c.filingStatus === 'filed' && !c.reportResultStatus) return 'filed'
-  if (c.acceptanceStatus) return c.acceptanceStatus
-  if (c.mediationStatus === 'mediation_terminated') return 'mediation_terminated'
-  return c.status || 'pending_report'
-}
-
-function getStatusLabel(status = '') {
-  const labels = {
-    pending_report: '待举报',
-    accepted: '已受理',
-    reported: '不予受理',
-    decided: '已调解',
-    rejected: '不予立案',
-    not_punished: '责令改正',
-    exempted: '不予处罚',
-    mediation_terminated: '终止调解',
-    filed: '已立案',
-  }
-  return labels[status] || status || '-'
-}
-
-function formatMoney(value) {
-  return formatAmount(value)
-}
 
 function formatCaseDate(value) {
   if (!value) return '-'
@@ -238,7 +221,22 @@ function formatCaseDate(value) {
 }
 
 function getPrimaryCaseName(caseItem = {}) {
-  return caseItem.licenseName || caseItem.shopName || '未命名案件'
+  return getLicenseName(caseItem) || getShopName(caseItem) || '未命名案件'
+}
+
+function getStatusForBadge(caseItem = {}) {
+  const badgeClass = getStatusBadgeClass(caseItem)
+  if (badgeClass === 'badge-abnormal') return 'abnormal'
+  if (badgeClass === 'badge-mediated') return caseItem.mediationStatus === 'mediation_terminated' ? 'mediation_terminated' : 'decided'
+  if (badgeClass === 'badge-punished') return 'penalty'
+  if (badgeClass === 'badge-corrected') return 'ordered_correction'
+  if (badgeClass === 'badge-not-punished') return 'not_punished'
+  if (badgeClass === 'badge-not-filed') return 'rejected'
+  if (badgeClass === 'badge-not-accepted') return 'not_accepted'
+  if (badgeClass === 'badge-filed') return 'filed'
+  if (badgeClass === 'badge-presumed') return 'presumed_filed'
+  if (badgeClass === 'badge-accepted') return 'accepted'
+  return 'pending_report'
 }
 
 const availableYears = computed(() => {
@@ -253,23 +251,26 @@ const filteredCases = computed(() => {
   if (filterYear.value) list = list.filter(c => dayjs(c.createdAt).year() === Number(filterYear.value))
   if (filterMonth.value) list = list.filter(c => dayjs(c.createdAt).month() + 1 === Number(filterMonth.value))
   if (filterStatus.value) {
-    if (filterStatus.value === 'filed') {
-      list = list.filter(c => c.procedureVersion === 'old' && c.filingStatus === 'filed' && !c.reportResultStatus)
-    } else {
-      list = list.filter(c => getEffectiveStatus(c) === filterStatus.value)
-    }
+    if (filterStatus.value === 'accepted') list = list.filter(isAccepted)
+    else if (filterStatus.value === 'notAccepted') list = list.filter(isNotAccepted)
+    else if (filterStatus.value === 'filed') list = list.filter(isFiled)
+    else if (filterStatus.value === 'rejected') list = list.filter(isRejectedFiling)
+    else if (filterStatus.value === 'notPunished') list = list.filter(isNotPunished)
+    else if (filterStatus.value === 'punished') list = list.filter(isPenalty)
+    else if (filterStatus.value === 'mediated') list = list.filter(isMediated)
+    else if (filterStatus.value === 'abnormal') list = list.filter(isAbnormal)
   }
-  if (activeTab.value === 'ongoing') list = list.filter(c => !c.isArchived && !['decided'].includes(getEffectiveStatus(c)))
-  if (activeTab.value === 'done') list = list.filter(c => ['decided'].includes(getEffectiveStatus(c)) || Number(c.profit) > 0)
+  if (activeTab.value === 'ongoing') list = list.filter(c => !c.isArchived && !isMediated(c))
+  if (activeTab.value === 'done') list = list.filter(c => isMediated(c) || isPenalty(c) || Number(c.compensationAmount || c.profit) > 0)
   if (activeTab.value === 'archived') list = list.filter(c => c.isArchived)
   if (activeTab.value === 'deleted') list = []
   if (keyword.value) {
     const kw = keyword.value.toLowerCase()
     list = list.filter(c =>
-      (c.shopName || '').toLowerCase().includes(kw) ||
-      (c.productName || '').toLowerCase().includes(kw) ||
-      (c.licenseName || '').toLowerCase().includes(kw) ||
-      (c.jurisdiction || '').toLowerCase().includes(kw) ||
+      getShopName(c).toLowerCase().includes(kw) ||
+      getProductName(c).toLowerCase().includes(kw) ||
+      getLicenseName(c).toLowerCase().includes(kw) ||
+      getJurisdiction(c).toLowerCase().includes(kw) ||
       (c.trackingNumber || '').toLowerCase().includes(kw) ||
       (c.caseNumber || '').toLowerCase().includes(kw)
     )
@@ -279,8 +280,8 @@ const filteredCases = computed(() => {
 
 const statusTabs = computed(() => [
   { key: 'all', label: '全部案件', count: store.cases.length },
-  { key: 'ongoing', label: '进行中', count: store.cases.filter(c => !c.isArchived && !['decided'].includes(getEffectiveStatus(c))).length },
-  { key: 'done', label: '已完成', count: store.cases.filter(c => ['decided'].includes(getEffectiveStatus(c)) || Number(c.profit) > 0).length },
+  { key: 'ongoing', label: '进行中', count: store.cases.filter(c => !c.isArchived && !isMediated(c)).length },
+  { key: 'done', label: '已完成', count: store.cases.filter(c => isMediated(c) || isPenalty(c) || Number(c.compensationAmount || c.profit) > 0).length },
   { key: 'archived', label: '已归档', count: store.cases.filter(c => c.isArchived).length },
   { key: 'deleted', label: '已删除', count: 0 },
 ])
@@ -373,15 +374,15 @@ function exportCasesToExcel() {
   const exportList = selectedIds.value.length > 0 ? store.cases.filter(item => selectedIds.value.includes(item.id)) : filteredCases.value
   const rows = exportList.map(item => ({
     案件编号: item.caseNumber || '',
-    当前状态: getStatusLabel(getEffectiveStatus(item)),
-    执照名称: item.licenseName || '',
-    店铺名称: item.shopName || '',
-    商品名称: item.productName || '',
-    管辖局: item.jurisdiction || '',
+    当前状态: getCurrentProgress(item),
+    执照名称: getLicenseName(item),
+    店铺名称: getShopName(item),
+    商品名称: getProductName(item),
+    管辖局: getJurisdiction(item),
     快递单号: item.trackingNumber || '',
-    签收日期: item.signDate || '',
-    花费总额: Number(item.expense || 0),
-    赔偿金额: Number(item.profit || 0),
+    签收日期: getSignDate(item) || '',
+    结果日期: getResultDate(item) || '',
+    金额: Number(getDisplayAmount(item) || 0),
   }))
   const workbook = XLSX.utils.book_new()
   const worksheet = XLSX.utils.json_to_sheet(rows)

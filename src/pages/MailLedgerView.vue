@@ -46,11 +46,11 @@
           <div class="filter-row">
             <select class="filter-select"><option>年份</option></select>
             <select class="filter-select"><option>月份</option></select>
-            <select class="filter-select"><option>寄送对象</option></select>
-            <select class="filter-select"><option>寄送事项</option></select>
-            <select class="filter-select"><option>快递公司</option></select>
-            <select class="filter-select"><option>签收状态</option></select>
-            <input placeholder="搜索案件编号 / 店铺 / 单号 / 寄送对象" class="filter-input flex-1" />
+            <input v-model="licenseKeyword" placeholder="执照名称" class="filter-input" />
+            <input v-model="agencyKeyword" placeholder="收件机关" class="filter-input" />
+            <input v-model="trackingKeyword" placeholder="快递单号" class="filter-input" />
+            <select v-model="statusKeyword" class="filter-select"><option value="">快递状态</option><option value="待识别">待识别</option><option value="运输中">运输中</option><option value="已签收">已签收</option><option value="异常件">异常件</option></select>
+            <input v-model="searchKeyword" placeholder="搜索执照名称、收件机关、快递单号" class="filter-input flex-1" />
             <button class="btn-secondary">重置</button>
           </div>
         </div>
@@ -59,38 +59,28 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th><input type="checkbox" /></th>
-                <th>案件编号</th>
-                <th>店铺 / 商家</th>
-                <th>寄送对象</th>
-                <th>寄送事项</th>
+                <th>执照名称</th>
+                <th>收件机关</th>
                 <th>快递公司</th>
                 <th>快递单号</th>
                 <th>寄出日期</th>
                 <th>签收日期</th>
-                <th>签收状态</th>
-                <th>下一步</th>
+                <th>当前状态</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in mailRows" :key="item.code">
-                <td><input type="checkbox" /></td>
-                <td>{{ item.code }}</td>
-                <td>{{ item.shop }}</td>
-                <td>{{ item.target }}</td>
-                <td>{{ item.subject }}</td>
+              <tr v-for="item in mailRows" :key="item.id">
+                <td>{{ item.license }}</td>
+                <td>{{ item.agency }}</td>
                 <td>{{ item.company }}</td>
                 <td>{{ item.tracking }}</td>
                 <td>{{ item.sentAt }}</td>
                 <td>{{ item.signedAt }}</td>
                 <td><span class="status-chip" :class="item.statusClass">{{ item.status }}</span></td>
-                <td>{{ item.nextStep }}</td>
                 <td>
                   <div class="table-actions">
                     <button class="btn-link">查看</button>
-                    <button class="btn-link">编辑</button>
-                    <button class="btn-link">更多</button>
                   </div>
                 </td>
               </tr>
@@ -135,10 +125,25 @@
 import { ref, computed } from 'vue'
 import { useCaseStore } from '@/stores/case'
 import dayjs from 'dayjs'
+import {
+  getMailStatus,
+  getMailStatusClass,
+  normalizeCourierCompany,
+  getMailLicenseName,
+  getMailRecipientAgency,
+  getMailTrackingNumber,
+  getMailSentDate,
+  getMailSignDate,
+} from '@/lib/mail-recognition'
 
 const store = useCaseStore()
 const active = ref('全部')
 const quickFilters = ['全部', '待寄出', '有单号未签收', '已签收未答复', '超15个工作日', '缺签收截图', '复议相关寄送']
+const searchKeyword = ref('')
+const licenseKeyword = ref('')
+const agencyKeyword = ref('')
+const trackingKeyword = ref('')
+const statusKeyword = ref('')
 
 const statCards = computed(() => {
   const all = store.cases
@@ -161,38 +166,25 @@ const statCards = computed(() => {
 })
 
 const mailRows = computed(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase()
   return store.cases
-    .filter(c => c.trackingNumber || c.mailTrackingNo || c.signDate)
-    .map(c => {
-      const trackingNo = c.trackingNumber || c.mailTrackingNo || '-'
-      const hasTracking = !!(c.trackingNumber || c.mailTrackingNo)
-      const hasSign = !!c.signDate
-      let status = '待寄出'
-      let statusClass = 'badge-red'
-      if (hasSign) {
-        status = c.reportResultStatus ? '已答复' : '签收未答复'
-        statusClass = c.reportResultStatus ? 'badge-green' : 'badge-orange'
-      } else if (hasTracking) {
-        status = '运输中'
-        statusClass = 'badge-blue'
-      }
-      return {
-        id: c.id,
-        code: c.caseNumber || '待生成',
-        shop: c.shopName || '-',
-        target: c.jurisdiction || '未填写',
-        subject: c.productName || '未填写',
-        company: hasTracking ? '待识别' : '-',
-        tracking: trackingNo,
-        sentAt: c.submitDate || '-',
-        signedAt: c.signDate || '-',
-        status,
-        statusClass,
-        nextStep: hasSign
-          ? (c.reportResultStatus ? '等待下一步' : '登记答复结果')
-          : (hasTracking ? '跟进物流' : '打印面单寄出'),
-      }
-    })
+    .filter(c => c.trackingNumber || c.mailTrackingNo || c.signDate || c.licenseName || c.recipientAgency)
+    .map(c => ({
+      id: c.id,
+      license: getMailLicenseName(c),
+      agency: getMailRecipientAgency(c),
+      company: normalizeCourierCompany(c),
+      tracking: getMailTrackingNumber(c),
+      sentAt: getMailSentDate(c) || '-',
+      signedAt: getMailSignDate(c) || '-',
+      status: getMailStatus(c),
+      statusClass: getMailStatusClass(getMailStatus(c)),
+    }))
+    .filter(item => !licenseKeyword.value.trim() || item.license.toLowerCase().includes(licenseKeyword.value.trim().toLowerCase()))
+    .filter(item => !agencyKeyword.value.trim() || item.agency.toLowerCase().includes(agencyKeyword.value.trim().toLowerCase()))
+    .filter(item => !trackingKeyword.value.trim() || item.tracking.toLowerCase().includes(trackingKeyword.value.trim().toLowerCase()))
+    .filter(item => !statusKeyword.value || item.status === statusKeyword.value)
+    .filter(item => !keyword || item.license.toLowerCase().includes(keyword) || item.agency.toLowerCase().includes(keyword) || item.tracking.toLowerCase().includes(keyword))
 })
 
 const signReminders = computed(() => {
